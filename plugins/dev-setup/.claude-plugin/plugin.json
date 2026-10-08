@@ -7,7 +7,7 @@
     "name": "Adrian Hernandez-Mendez"
   },
   "repository": "https://github.com/adrianhdezm/agent-skills",
-  "keywords": ["dev-setup", "codebase", "angular", "understanding", "guardrails"],
+  "keywords": ["dev-setup", "codebase", "angular", "understanding", "guardrails", "bootstrap", "typescript", "pnpm"],
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
