@@ -1,7 +1,7 @@
 {
   "name": "dev-setup",
   "displayName": "Dev Setup",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Skills for setting up and configuring a development environment with Claude Code — hooks, guardrails, tooling conventions, and codebase understanding.",
   "author": {
     "name": "Adrian Hernandez-Mendez"
