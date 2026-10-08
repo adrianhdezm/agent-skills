@@ -21,6 +21,7 @@ plugins/<plugin>/
   skills/<skill>/
     SKILL.md                        the skill itself; frontmatter name + description
     scripts/                        files the skill installs or runs
+    references/                     detail loaded on demand
 ```
 
 ## Plugins
@@ -32,6 +33,7 @@ tooling conventions.
 
 | Skill | What it does |
 | --- | --- |
+| `create-node-project` | Scaffolds a single-package TypeScript project that Node 24 runs directly: pnpm, ESLint, Prettier, Vitest, and three passing checks |
 | `setting-up-git-guardrails` | Installs a PreToolUse hook that blocks destructive git commands (force-push, `reset --hard`, `clean -f`, `branch -D`, whole-tree `checkout`/`restore`) |
 | `setting-up-npm-block` | Installs a PreToolUse hook that redirects `npm` to `pnpm`, active only in repos with a `pnpm-lock.yaml` |
 | `writing-a-skill` | Guidance for authoring new skills |
