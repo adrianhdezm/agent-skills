@@ -8,14 +8,15 @@ description: Scaffolds a pnpm-workspace monorepo with an Express 5 + Drizzle + P
 Creates a pnpm-workspace monorepo with this shape:
 
 - **`api/`: Express 5 + Drizzle + Postgres + zod + Pino.** An app factory takes a context singleton; controllers call
-  DAOs, and DAOs are the only code that touches Drizzle. List endpoints take Hasura-flavored `where` / `orderBy` /
-  `limit` / `offset` queries.
+  DAOs, and DAOs are the only code that touches Drizzle. The DAO layer follows an AppSync-style contract: `get` /
+  `list` / `create` / `update` / `delete`, typed `<Type>FilterInput`s with `and` / `or` / `not`, and page-based lists
+  (see [The DAO layer](#the-dao-layer)).
 - **`web/`: Angular 22 + NgRx + `@ngrx/router-store` + Tailwind v4.** The URL is the single source of truth for list
   queries. Templates are inline, and there are no `.html` or `.scss` files. Fundamental NGX + SAP Horizon is opt-in.
 - **Docker Compose** runs `db` + `api` + `web`, both images built from the repo root; Nginx serves the web app
   statically. A single root `.env` feeds everything.
-- **An `entity` CRUDL example** runs end to end, from DAO to Angular pages. It is a placeholder: the first real
-  resource replaces it with a one-file rename.
+- **An `entity` CRUDL example** runs end to end, from DAO to Angular pages. It is a placeholder and the template for
+  every later resource: one schema file, one DAO, one controller, and the web slice.
 - **pnpm**, with TypeScript pinned exactly on 6.0.x in the catalog (Angular 22 and typescript-eslint both stop below
   6.1), and the rest resolved by `pnpm add` at scaffold time.
 - **Prettier formats, ESLint judges.** ESLint runs with type information; its formatting rules are switched off.
@@ -47,10 +48,12 @@ my-app/
 │   ├── db/scripts/init.sql   # creates the app DB; no db/migrations/ is shipped
 │   ├── src/
 │   │   ├── server.ts / app.ts / logger.ts / express.d.ts
-│   │   ├── db/{client,schema}.ts
-│   │   ├── models/           # *.model.ts types, errors, query/ zod primitives
-│   │   ├── helpers/          # *.helper.ts, transport-agnostic
-│   │   ├── daos/             # query.ts translator + one *.dao.ts per table
+│   │   ├── db/
+│   │   │   ├── client.ts / schema.ts   # schema.ts: the table registry
+│   │   │   └── schemas/      # one <resource>.schema.ts: table + every input of the resource
+│   │   ├── models/           # dao.model.ts (contract), list-input.model.ts (filter/sort vocabulary), errors
+│   │   ├── helpers/          # dao.helper.ts (input → SQL), query-parser.helper.ts (normalizeQuery)
+│   │   ├── daos/             # one *.dao.ts per table, nothing else
 │   │   ├── controllers/      # *.controller.ts, wired directly on the app
 │   │   └── middleware/       # error + not-found
 │   └── tests/                # mirrors src/, one *.test.ts per module, no database
@@ -60,7 +63,8 @@ my-app/
     ├── eslint.config.mjs
     └── src/app/
         ├── pages/ layouts/ components/   # flat *.component.ts
-        └── store/            # appContext + entities globally, per-page slices on routes; *.spec.ts beside the code
+        ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers
+        └── store/            # app-context/ + app-router/ globally, one slice per page on its route; *.spec.ts beside the code
 ```
 
 ## Process
@@ -99,15 +103,15 @@ Copy this checklist and tick it off:
    ```
 
 3. **Write the API** from [references/api-setup.md](references/api-setup.md) (manifest, configs, app shell,
-   Dockerfile), [references/api-query.md](references/api-query.md) (DAO contract, query vocabulary, parser, SQL
-   translator, their tests) and [references/api-entity.md](references/api-entity.md) (schema, DAO, controllers, their
-   test). Add `api/.prettierrc`, `api/.prettierignore` and `api/eslint.config.mjs` from
+   Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary, SQL translator,
+   query parser, their tests) and [references/api-entity.md](references/api-entity.md) (resource schema, DAO,
+   controllers, their test). Read the "How the layers fit" section of `api-dao.md` first. Add `api/.prettierrc`, `api/.prettierignore` and `api/eslint.config.mjs` from
    [references/eslint-prettier.md](references/eslint-prettier.md). Do not create `db/migrations/`.
 
 4. **Scaffold the web app**, then immediately apply [references/web.md](references/web.md) in order: clean up the CLI
-   output, set the scripts, add Tailwind, the environment files, the core files, both slices, the three pages and the
-   spec. Add `web/.prettierrc`, `web/.prettierignore` and `web/eslint.config.mjs` from
-   [references/eslint-prettier.md](references/eslint-prettier.md).
+   output, set the scripts, add Tailwind, the environment files, the core files, the global slices, the shared model,
+   one slice per page, the three pages and the spec. Add `web/.prettierrc`, `web/.prettierignore` and
+   `web/eslint.config.mjs` from [references/eslint-prettier.md](references/eslint-prettier.md).
 
    ```sh
    pnpm dlx @angular/cli@22 new web --directory=web --package-manager=pnpm --skip-install --skip-git \
@@ -168,7 +172,7 @@ These bite first when writing code in the project. The full set is in
 
 ### File-naming suffixes
 
-- API: `*.controller.ts`, `*.middleware.ts`, `*.dao.ts`, `*.helper.ts`
+- API: `*.controller.ts`, `*.middleware.ts`, `*.dao.ts`, `*.helper.ts`, `db/schemas/*.schema.ts`
 - API and web types and errors: `*.model.ts`
 - Web: `*.component.ts`, flat under `components/` / `layouts/` / `pages/` with no wrapping folder
 - NgRx slices: `*.model.ts`, `*.actions.ts`, `*.reducer.ts`, `*.selectors.ts`, `*.effects.ts`
@@ -188,35 +192,79 @@ These bite first when writing code in the project. The full set is in
   ```
   Errors forward through `next(err)` only. The error handler shapes responses with `http-errors`
   (`createError(status, msg, { expose, cause })`).
-- **DAO pattern.** Every table has a DAO class under `src/daos/` that implements `Dao<T, C, U, ListQuery>` from
-  `models/dao.model.ts`. Drizzle calls never appear in controllers. DAOs throw `NotFoundError`, and controllers turn it
-  into a 404 at the edge.
-- **Hasura-flavored list queries.**
-  - `where` is a predicate tree using `_eq / _neq / _ilike / _gt / _lt / _is_null / …` and nestable `_and / _or / _not`.
-  - `orderBy` is `[{ field, dir }]`; pagination is `limit` / `offset`.
-  - These are built from the zod primitives in `models/query/` (`predicates.ts`, `where.ts`, `list.ts`), with operators
-    enumerated once per column type, not per entity.
-- **zod + drizzle-zod.** Row schemas come from `createInsertSchema` / `createUpdateSchema` / `createSelectSchema`. List
-  queries are composed with `listQuerySchema({ where, sortFields })`. A validation failure throws `QueryParseError`,
-  which becomes a 400 at the edge.
-- **Tests need no database.** The SQL translator is tested through the SQL it renders; controllers through `createApp`
-  with a fake DAO on the context. A new resource gets a controller test copied from the entity one.
+- **The DAO layer** is the core of the API; its rules are in [The DAO layer](#the-dao-layer) below.
+- **zod + drizzle-zod.** Row inputs come from `createInsertSchema` / `createUpdateSchema` / `createSelectSchema`; list
+  inputs from the `createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema` builders. Controllers
+  validate every input inline with `safeParse` and throw `createError(400, …)` on failure.
+- **Tests need no database.** The filter / sort translator is tested through the SQL it renders; controllers through
+  `createApp` with a fake DAO on the context. A new resource gets a controller test copied from the entity one.
 - **`types: ["node"]` is explicit** in `tsconfig.app.json`: TypeScript 6 defaults `types` to `[]`. Every new config file
   goes into the `include` of `tsconfig.node.json`, or ESLint reports it as belonging to no project.
 - **Pino logs plain JSON.** `pino-pretty` is only a pipe in the `dev` script.
 - **`drizzle.config.ts` throws** when `DATABASE_URL` is missing.
 
+### The DAO layer
+
+Each layer has one job; the full walk-through is in [references/api-dao.md](references/api-dao.md#how-the-layers-fit).
+
+| layer | file | holds |
+| --- | --- | --- |
+| contract | `models/dao.model.ts` | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`; no zod, no drizzle |
+| vocabulary | `models/list-input.model.ts` | scalar filter inputs (id, string, number, date, boolean), `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema` |
+| translation | `helpers/dao.helper.ts` | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult` |
+| HTTP parsing | `helpers/query-parser.helper.ts` | `normalizeQuery` |
+| resource | `db/schemas/<resource>.schema.ts` | table, create / update / filter / sort / list input schemas, default sort, and the types inferred from them |
+| DAO | `daos/<resource>.dao.ts` | `implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput>`; queries only |
+
+- **One contract, single-input methods:** `get({ id })` → `T | null`, `list(input)` → `PaginatedResult<T>`,
+  `create(input)`, `update(input)` with the `id` inside the input, `delete({ id })` → `void`. DAOs throw
+  `NotFoundError`; controllers turn it into a 404.
+- **Typed filter inputs, AppSync-style:** a resource declares
+  `createFilterInputSchema({ name: stringFilterInputSchema, createdAt: dateFilterInputSchema, … })`, which adds
+  recursive `and` / `or` / `not`. Operators are fixed per kind: `eq ne lt le gt ge between in`, plus case-insensitive
+  `contains notContains beginsWith` for strings; ids take `eq ne in`, booleans `eq ne`. Strict schemas reject unknown
+  fields and operators.
+- **Fields are named after columns.** The DAO passes its drizzle table to `filterToSql` / `sortToSql`; a field with no
+  matching column does not compile. There are no column maps.
+- **Sorting:** an allowlist via `createSortInputSchema([...])`, a `<resource>DefaultSort`, and an `id` tie-breaker
+  appended to every sort.
+- **Pagination is page-based:** `page` / `pageSize` in, `{ items, total, page, pageSize, totalPages }` out. The list
+  input schema applies the defaults (1, 20) and the range (max 100), so the DAO receives both set.
+- **URL decoding lives in the controller.** `?filter=<json>&sortField=…&sortDirection=ASC|DESC&page=…&pageSize=…`
+  is decoded in the handler (unknown params → 400, `JSON.parse` the filter, build `sort`, numbers for the page) and
+  then validated by `list<Resource>InputSchema = createListInputSchema({ filter, sort })`, which takes the structured
+  input and knows nothing about the URL.
+- **Resource schema files carry no comments and follow one order:** the table, the schemas (select, id, create,
+  update, filter, sort, list), the default sort, then the inferred types in the same order. The naming patterns and
+  the builders carry the meaning, and the conventions file explains them.
+- **Types come from `z.infer`**, including the recursive filter type and `List<Resource>Input`; `dao.model.ts`
+  defines no input types. The web mirrors the API's resource types by name
+  in `models/<resource>.model.ts`.
+
 ### Web
 
 - **Components never use the store**; they take `input()` / `output()`. Pages and layouts may read it.
+- **Pages inject only the `Store`.** Route params come from `selectRouteParam` / `selectQueryParams` in the app-router
+  slice, navigation is `AppRouterActions.navigate` (its effect is the only `Router` caller), and forms are
+  `new FormGroup` rather than an injected `FormBuilder`. Services are injected only in effects.
+- **Data access lives in `services/`.** `EntityService` is the only `HttpClient` user and is called only from effects.
+  Each method writes its URL explicitly and builds its params inline, with no private URL or params helper.
+- **Every page loads the same way:** `Load` on init, `Leave` on destroy; the slice goes `'loading'` → `'loaded'` (or
+  `'error'`). Each slice has one `status` union and an `error` message, never `loading` / `saving` / `deleting`
+  booleans, and templates use `@switch (status())`.
 - **Global NgRx slices:**
   - `appContext` holds `apiBaseUrl` and `appName`, and is the only consumer of Angular `environment`.
-  - `router` comes from `@ngrx/router-store`.
-  - `entities` is registered globally because the list, detail and form pages share it.
-- **Per-page slices** live under `store/<page-name>/` and are registered on the route with `provideState` +
-  `provideEffects`.
-- **The URL is the source of truth.** List pages never dispatch load actions. They call
-  `router.navigate([], { queryParams })`, and a `routerNavigatedAction` effect filtered by path does the fetch. This is
+  - `appRouter` (`store/app-router/app-router.selectors.ts`) holds the `@ngrx/router-store` state; its key is passed
+    to `provideRouterStore({ stateKey })` and its selectors come from `getRouterSelectors(selectRouterState)`.
+- **One slice per page.** Each page owns `store/<page-name>/` (model, actions, reducer, selectors, effects) and
+  registers it on its route with `provideState` + `provideEffects`; a page reads only its own slice. Detail and form
+  each load the entity themselves. The form serves two routes, so it registers its slice once on a shared parent
+  route. Route-level effects outlive the page, so navigation effects filter by path.
+- **The URL is the source of truth.** The list page dispatches `Load` and navigates with
+  `AppRouterActions.navigate({ commands: [], queryParams })`; its effect loads whenever the list input in the URL
+  changes (`Fetch({ input })`), until `Leave`.
+- **Actions are named for intent, not lifecycle:** `Load` (not `Enter` / `Init`), `Fetch` for one request with a given
+  input, and `<Action> Success` / `<Action> Failure` for results. This is
   what makes back, forward, refresh and deep links work.
 - **Inline templates and Tailwind utilities.** There are no `.html` or `.scss` files.
 
@@ -246,9 +294,9 @@ pnpm workspace, then:
 - **Root files** (workspace, manifest, shared tooling, ignore files, env, Compose):
   [references/monorepo-root.md](references/monorepo-root.md)
 - **API setup** (manifest, dependencies, tsconfigs, app shell, Dockerfile): [references/api-setup.md](references/api-setup.md)
-- **API query layer** (DAO contract, errors, query vocabulary, parser, SQL translator, tests):
-  [references/api-query.md](references/api-query.md)
-- **API entity example** (schema, DAO, controllers, controller test, adding a resource):
+- **API DAO layer** (how the layers fit, DAO contract, list-input vocabulary, errors, SQL translator, query normalizer,
+  tests, extending the vocabulary): [references/api-dao.md](references/api-dao.md)
+- **API entity example** (resource schema, table registry, DAO, controllers, controller test, adding a resource):
   [references/api-entity.md](references/api-entity.md)
 - **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, pages, spec, Nginx): [references/web.md](references/web.md)
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
@@ -266,7 +314,8 @@ pnpm workspace, then:
 - [ ] `pnpm --filter api db:generate --name init` produces exactly one migration, and `db:migrate` applies it
 - [ ] `curl http://localhost:3000/health` returns `{status:'ok', db:'up', …}`
 - [ ] `curl http://localhost:4200/entities` returns 200
-- [ ] `POST /entities` creates; `GET /entities?where=…&orderBy=…&limit=&offset=` returns `{items,total,limit,offset}`;
-      `PATCH /entities/:id` updates; `DELETE /entities/:id` returns 204, and 404 for a missing id
+- [ ] `POST /entities` creates; `GET /entities?filter=<json>&sortField=…&sortDirection=…&page=&pageSize=` returns
+      `{items,total,page,pageSize,totalPages}`; an unknown filter field or operator returns 400; `PATCH /entities/:id`
+      updates; `DELETE /entities/:id` returns 204, and 404 for a missing id
 - [ ] `.env` is not committed and `.env.example` is
 - [ ] `coding-conventions.md` is at the repo root

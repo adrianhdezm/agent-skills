@@ -1,28 +1,47 @@
 # API entity example
 
-The `entity` resource wired end to end: table, schemas, DAO, controllers and tests. It is a placeholder for the first
-real resource, and the template for every later one.
+The `entity` resource wired end to end: table, inputs, DAO, controllers and tests. It is a placeholder for the first
+real resource, and the template for every later one. The resource-agnostic pieces it uses are in
+[api-dao.md](api-dao.md).
 
 ## Contents
 
+- [`api/src/db/schemas/entity.schema.ts`](#apisrcdbschemasentityschemats)
 - [`api/src/db/schema.ts`](#apisrcdbschemats)
 - [`api/src/daos/entity.dao.ts`](#apisrcdaosentitydaots)
 - [`api/src/controllers/home.controller.ts`](#apisrccontrollershomecontrollerts)
 - [`api/src/controllers/health.controller.ts`](#apisrccontrollershealthcontrollerts)
 - [`api/src/controllers/entity.controller.ts`](#apisrccontrollersentitycontrollerts)
 - [`api/tests/controllers/entity.controller.test.ts`](#apitestscontrollersentitycontrollertestts)
+- [`api/tests/db/schemas/entity.schema.test.ts`](#apitestsdbschemasentityschematestts)
 - [Adding another resource](#adding-another-resource)
 
-## `api/src/db/schema.ts`
+## `api/src/db/schemas/entity.schema.ts`
 
-One example resource: `entity`, with a uuid id, name, description and timestamps. The list query is built
-declaratively from the primitives in `models/query/`.
+Everything resource-specific lives here, so the DAO holds no configuration of its own:
+
+- the drizzle table, and the row type `Entity = z.infer<typeof selectEntitySchema>`, inferred from drizzle-zod's
+  select schema like every other type in the file;
+- `CreateEntityInput` / `UpdateEntityInput` from drizzle-zod. The update input carries the `id`, and the controller
+  merges the path id into the body before validating;
+- the list pieces: `entityFilterInputSchema` and `entitySortInputSchema` from the builders, `ListEntityInput`,
+  `listEntityInputSchema` (the structured `ListEntityInput`, with no URL decoding), and `entityDefaultSort`.
+
+Filter and sort fields carry the column names, which is what lets the DAO pass `entity` as the column source. The file
+has no comments: every resource schema is declarations only, so keep it that way when copying it.
 
 ```ts
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-zod';
 import { z } from 'zod';
-import { dateTimePredicate, listQuerySchema, textPredicate, whereSchema } from '../models/query/index.js';
+import {
+  createFilterInputSchema,
+  createListInputSchema,
+  createSortInputSchema,
+  dateFilterInputSchema,
+  idFilterInputSchema,
+  stringFilterInputSchema
+} from '../../models/list-input.model.js';
 
 export const entity = pgTable('entity', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -32,112 +51,120 @@ export const entity = pgTable('entity', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 });
 
-export type Entity = typeof entity.$inferSelect;
-
-// --- Row-level schemas (drizzle-zod) --------------------------------------
-
 export const selectEntitySchema = createSelectSchema(entity);
 
-export const createEntitySchema = createInsertSchema(entity, {
+export const entityIdInputSchema = z.object({
+  id: z.uuid('id must be a valid UUID')
+});
+
+export const createEntityInputSchema = createInsertSchema(entity, {
   name: (schema) => schema.min(1, 'name is required').max(200),
   description: (schema) => schema.max(2000).nullish()
 }).pick({ name: true, description: true });
 
-export const updateEntitySchema = createUpdateSchema(entity, {
+export const updateEntityInputSchema = createUpdateSchema(entity, {
   name: (schema) => schema.min(1).max(200),
   description: (schema) => schema.max(2000).nullish()
 })
   .pick({ name: true, description: true })
-  .refine((data) => Object.keys(data).length > 0, { message: 'at least one field is required' });
+  .extend({ id: z.uuid('id must be a valid UUID') })
+  .refine((input) => Object.keys(input).some((key) => key !== 'id'), { message: 'at least one field is required' });
 
-export const entityIdParamSchema = z.object({
-  id: z.string().uuid('id must be a valid UUID')
+export const entityFilterInputSchema = createFilterInputSchema({
+  id: idFilterInputSchema,
+  name: stringFilterInputSchema,
+  description: stringFilterInputSchema,
+  createdAt: dateFilterInputSchema,
+  updatedAt: dateFilterInputSchema
 });
 
-export type CreateEntityInput = z.infer<typeof createEntitySchema>;
-export type UpdateEntityInput = z.infer<typeof updateEntitySchema>;
+export const entitySortInputSchema = createSortInputSchema(['name', 'createdAt', 'updatedAt']);
 
-// --- List query (filter / sort / pagination) ------------------------------
-// Adding a filterable column is one line here; adding an operator is one
-// line in `models/query/predicates.ts`.
-
-export const entityWhereSchema = whereSchema({
-  name: textPredicate,
-  description: textPredicate,
-  createdAt: dateTimePredicate,
-  updatedAt: dateTimePredicate
+export const listEntityInputSchema = createListInputSchema({
+  filter: entityFilterInputSchema,
+  sort: entitySortInputSchema
 });
 
-export const entityListQuerySchema = listQuerySchema({
-  where: entityWhereSchema,
-  sortFields: ['name', 'createdAt', 'updatedAt'] as const
-});
+export const entityDefaultSort: EntitySortInput = { field: 'createdAt', direction: 'DESC' };
 
-export type EntityWhere = z.infer<typeof entityWhereSchema>;
-export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
+export type Entity = z.infer<typeof selectEntitySchema>;
+export type CreateEntityInput = z.infer<typeof createEntityInputSchema>;
+export type UpdateEntityInput = z.infer<typeof updateEntityInputSchema>;
+export type EntityFilterInput = z.infer<typeof entityFilterInputSchema>;
+export type EntitySortInput = z.infer<typeof entitySortInputSchema>;
+export type EntitySortField = EntitySortInput['field'];
+export type ListEntityInput = z.infer<typeof listEntityInputSchema>;
+```
+
+## `api/src/db/schema.ts`
+
+The table registry handed to `drizzle(pool, { schema })` in `db/client.ts`, which imports it as `{ schema }`. drizzle-kit
+does not read this object: `drizzle.config.ts` points at `src/db/schemas/*.schema.ts`, because drizzle-kit discovers
+tables from module exports.
+
+```ts
+import { entity } from './schemas/entity.schema.js';
+
+/**
+ * Every drizzle table, passed to `drizzle(pool, { schema })`. Each table is
+ * defined with its zod inputs in `schemas/<resource>.schema.ts`; register new
+ * tables here.
+ */
+export const schema = { entity };
 ```
 
 ## `api/src/daos/entity.dao.ts`
 
+The DAO only runs queries. `implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput>` is the whole
+type surface: it never names the filter or sort-field types, and it passes the `entity` table to the shared helpers.
+
 ```ts
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import type { DbClient } from '../db/client.js';
 import {
   type CreateEntityInput,
   type Entity,
-  type EntityListQuery,
   entity,
-  entityListQuerySchema,
+  entityDefaultSort,
+  type ListEntityInput,
   type UpdateEntityInput
-} from '../db/schema.js';
-import type { Dao, ListResult } from '../models/dao.model.js';
+} from '../db/schemas/entity.schema.js';
+import { filterToSql, sortToSql, toPaginatedResult } from '../helpers/dao.helper.js';
+import type { Dao, IdInput, PaginatedResult } from '../models/dao.model.js';
 import { NotFoundError } from '../models/error.model.js';
-import { type ColumnMap, countRows, orderByToSql, whereToSql } from './query.js';
 
-const ENTITY_COLUMNS: ColumnMap = {
-  name: entity.name,
-  description: entity.description,
-  createdAt: entity.createdAt,
-  updatedAt: entity.updatedAt
-};
-
-export class EntityDao implements Dao<Entity, CreateEntityInput, UpdateEntityInput, EntityListQuery> {
+export class EntityDao implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput> {
   constructor(private readonly db: DbClient) {}
 
-  async findOne({ id }: { id: string }): Promise<Entity | null> {
+  async get({ id }: IdInput): Promise<Entity | null> {
     const [row] = await this.db.select().from(entity).where(eq(entity.id, id)).limit(1);
     return row ?? null;
   }
 
-  async list(params?: EntityListQuery): Promise<ListResult<Entity>> {
-    // When called without args, resolve defaults from the schema itself so
-    // they're defined once (in db/schema.ts) rather than duplicated here.
-    const { where, orderBy, limit, offset } = params ?? entityListQuerySchema.parse({});
-    const whereSql = whereToSql(where, ENTITY_COLUMNS);
-    const orderBySql = orderByToSql(orderBy, ENTITY_COLUMNS);
+  async list({ filter, sort = entityDefaultSort, page, pageSize }: ListEntityInput): Promise<PaginatedResult<Entity>> {
+    const where = filter && filterToSql(filter, entity);
+    const orderBy = sortToSql(sort, entity);
 
-    const rowsQuery = this.db.select().from(entity).$dynamic();
-    if (whereSql) {
-      rowsQuery.where(whereSql);
-    }
-    if (orderBySql.length > 0) {
-      rowsQuery.orderBy(...orderBySql);
-    }
-    rowsQuery.limit(limit).offset(offset);
-
-    const [items, total] = await Promise.all([rowsQuery, countRows(this.db, entity, whereSql)]);
-    return { items, total, limit, offset };
+    const items = await this.db
+      .select()
+      .from(entity)
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [counted] = await this.db.select({ total: count() }).from(entity).where(where);
+    return toPaginatedResult(items, counted?.total ?? 0, { page, pageSize });
   }
 
-  async create({ attrs }: { attrs: CreateEntityInput }): Promise<Entity> {
-    const [row] = await this.db.insert(entity).values(attrs).returning();
+  async create(input: CreateEntityInput): Promise<Entity> {
+    const [row] = await this.db.insert(entity).values(input).returning();
     if (!row) {
       throw new Error('Entity insert did not return a row');
     }
     return row;
   }
 
-  async update({ id, attrs }: { id: string; attrs: UpdateEntityInput }): Promise<Entity> {
+  async update({ id, ...attrs }: UpdateEntityInput): Promise<Entity> {
     const [row] = await this.db
       .update(entity)
       .set({ ...attrs, updatedAt: new Date() })
@@ -149,24 +176,17 @@ export class EntityDao implements Dao<Entity, CreateEntityInput, UpdateEntityInp
     return row;
   }
 
-  async delete({ id }: { id: string }): Promise<void> {
+  async delete({ id }: IdInput): Promise<void> {
     const [row] = await this.db.delete(entity).where(eq(entity.id, id)).returning({ id: entity.id });
     if (!row) {
       throw new NotFoundError('Entity', id);
     }
   }
-
-  async deleteMany({ ids }: { ids: readonly string[] }): Promise<void> {
-    if (ids.length === 0) {
-      return;
-    }
-    await this.db.delete(entity).where(inArray(entity.id, [...ids]));
-  }
 }
 ```
 
-The DAO is the only code that touches Drizzle, and it needs a live database, so it has no unit test. Its SQL building
-is covered by the `daos/query.ts` tests; its wiring is covered by the smoke test in the SKILL.md Review Checklist.
+The DAO is the only code that touches Drizzle, and it needs a live database, so it has no unit test. Its SQL building is
+covered by the `dao.helper` tests, and its wiring by the smoke test in the SKILL.md Review Checklist.
 
 ## `api/src/controllers/home.controller.ts`
 
@@ -209,38 +229,60 @@ export async function healthController(req: Request, res: Response, next: NextFu
 
 ## `api/src/controllers/entity.controller.ts`
 
-Thin HTTP edge. Everything on-request is inlined: zod validation per field with explicit 400s, `NotFoundError` → 404
-in the catch, `QueryParseError` → 400 in the catch for the list endpoint. No cross-cutting helpers in this file.
+Thin HTTP edge. Each handler validates with the resource's input schemas, calls the DAO, and translates errors itself:
+an invalid query, id or body → 400, `NotFoundError` → 404 for update and delete. The list handler decodes the URL
+itself (unknown params, the JSON filter, sort, page numbers) and then validates the structured input with `safeParse`
+like the others. No cross-cutting helpers in this file.
 
 ```ts
 import type { NextFunction, Request, Response } from 'express';
 import createError from 'http-errors';
 import { z } from 'zod';
-import { createEntitySchema, entityIdParamSchema, entityListQuerySchema, updateEntitySchema } from '../db/schema.js';
-import { parseQuery } from '../helpers/query-parser.helper.js';
-import { NotFoundError, QueryParseError } from '../models/error.model.js';
+import {
+  createEntityInputSchema,
+  entityIdInputSchema,
+  listEntityInputSchema,
+  updateEntityInputSchema
+} from '../db/schemas/entity.schema.js';
+import { normalizeQuery } from '../helpers/query-parser.helper.js';
+import { NotFoundError } from '../models/error.model.js';
 
 export async function listEntities(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const query = parseQuery(req.query, entityListQuerySchema);
-    const result = await req.app.locals.context.entityDao.list(query);
+    const { filter, sortField, sortDirection, page, pageSize, ...unknownParams } = normalizeQuery(req.query);
+    const unknownKeys = Object.keys(unknownParams);
+    if (unknownKeys.length > 0) {
+      throw createError(400, `Unknown query params: ${unknownKeys.join(', ')}`, { expose: true });
+    }
+    let decodedFilter: unknown;
+    try {
+      decodedFilter = typeof filter === 'string' ? JSON.parse(filter) : filter;
+    } catch {
+      throw createError(400, 'filter must be valid JSON', { expose: true });
+    }
+    const input = listEntityInputSchema.safeParse({
+      filter: decodedFilter,
+      sort: sortField === undefined ? undefined : { field: sortField, direction: sortDirection ?? 'ASC' },
+      page: page === undefined ? undefined : Number(page),
+      pageSize: pageSize === undefined ? undefined : Number(pageSize)
+    });
+    if (!input.success) {
+      throw createError(400, 'Invalid query', { expose: true, cause: z.flattenError(input.error) });
+    }
+    const result = await req.app.locals.context.entityDao.list(input.data);
     res.json(result);
   } catch (err) {
-    if (err instanceof QueryParseError) {
-      next(createError(400, err.message, { expose: true, cause: err.details ?? err }));
-      return;
-    }
     next(err);
   }
 }
 
 export async function getEntity(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const params = entityIdParamSchema.safeParse(req.params);
+    const params = entityIdInputSchema.safeParse(req.params);
     if (!params.success) {
       throw createError(400, 'Invalid id', { expose: true, cause: z.flattenError(params.error) });
     }
-    const row = await req.app.locals.context.entityDao.findOne({ id: params.data.id });
+    const row = await req.app.locals.context.entityDao.get(params.data);
     if (!row) {
       throw createError(404, `Entity not found: ${params.data.id}`, { expose: true });
     }
@@ -252,11 +294,11 @@ export async function getEntity(req: Request, res: Response, next: NextFunction)
 
 export async function createEntity(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const body = createEntitySchema.safeParse(req.body);
-    if (!body.success) {
-      throw createError(400, 'Invalid body', { expose: true, cause: z.flattenError(body.error) });
+    const input = createEntityInputSchema.safeParse(req.body);
+    if (!input.success) {
+      throw createError(400, 'Invalid body', { expose: true, cause: z.flattenError(input.error) });
     }
-    const row = await req.app.locals.context.entityDao.create({ attrs: body.data });
+    const row = await req.app.locals.context.entityDao.create(input.data);
     res.status(201).json(row);
   } catch (err) {
     next(err);
@@ -265,16 +307,16 @@ export async function createEntity(req: Request, res: Response, next: NextFuncti
 
 export async function updateEntity(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const params = entityIdParamSchema.safeParse(req.params);
+    const params = entityIdInputSchema.safeParse(req.params);
     if (!params.success) {
       throw createError(400, 'Invalid id', { expose: true, cause: z.flattenError(params.error) });
     }
-    const body = updateEntitySchema.safeParse(req.body);
-    if (!body.success) {
-      throw createError(400, 'Invalid body', { expose: true, cause: z.flattenError(body.error) });
+    const input = updateEntityInputSchema.safeParse({ ...req.body, id: params.data.id });
+    if (!input.success) {
+      throw createError(400, 'Invalid body', { expose: true, cause: z.flattenError(input.error) });
     }
     try {
-      const row = await req.app.locals.context.entityDao.update({ id: params.data.id, attrs: body.data });
+      const row = await req.app.locals.context.entityDao.update(input.data);
       res.json(row);
     } catch (err) {
       if (err instanceof NotFoundError) {
@@ -289,12 +331,12 @@ export async function updateEntity(req: Request, res: Response, next: NextFuncti
 
 export async function deleteEntity(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const params = entityIdParamSchema.safeParse(req.params);
+    const params = entityIdInputSchema.safeParse(req.params);
     if (!params.success) {
       throw createError(400, 'Invalid id', { expose: true, cause: z.flattenError(params.error) });
     }
     try {
-      await req.app.locals.context.entityDao.delete({ id: params.data.id });
+      await req.app.locals.context.entityDao.delete(params.data);
     } catch (err) {
       if (err instanceof NotFoundError) {
         throw createError(404, err.message, { expose: true, cause: err });
@@ -326,12 +368,11 @@ const ID = '00000000-0000-4000-8000-000000000001';
 
 function fakeDao() {
   return {
-    findOne: vi.fn(),
+    get: vi.fn(),
     list: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn(),
-    deleteMany: vi.fn()
+    delete: vi.fn()
   };
 }
 
@@ -352,24 +393,53 @@ afterEach(async () => {
 });
 
 describe('GET /entities', () => {
-  it('passes the parsed list query to the DAO', async () => {
+  it('passes the parsed list input to the DAO', async () => {
     // Arrange
-    dao.list.mockResolvedValue({ items: [], total: 0, limit: 5, offset: 0 });
-    const where = encodeURIComponent(JSON.stringify({ name: { _ilike: '%a%' } }));
+    dao.list.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 5, totalPages: 0 });
+    const filter = encodeURIComponent(JSON.stringify({ name: { contains: 'a' } }));
 
     // Act
-    const res = await fetch(`${baseUrl}/entities?limit=5&where=${where}`);
+    const res = await fetch(`${baseUrl}/entities?filter=${filter}&sortField=name&sortDirection=DESC&page=2&pageSize=5`);
 
     // Assert
     expect(res.status).toBe(200);
-    expect(dao.list).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { name: { _ilike: '%a%' } }, limit: 5, offset: 0 })
-    );
+    expect(dao.list).toHaveBeenCalledWith({
+      filter: { name: { contains: 'a' } },
+      sort: { field: 'name', direction: 'DESC' },
+      page: 2,
+      pageSize: 5
+    });
   });
 
-  it('rejects a malformed where with 400 without reaching the DAO', async () => {
+  it('decodes the URL params: numbers, and ASC when only a sort field is given', async () => {
+    // Arrange
+    dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 10, totalPages: 0 });
+
     // Act
-    const res = await fetch(`${baseUrl}/entities?where=${encodeURIComponent('{"name":{"_gt":1}}')}`);
+    const res = await fetch(`${baseUrl}/entities?sortField=createdAt&page=3&pageSize=10`);
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(dao.list).toHaveBeenCalledWith({ sort: { field: 'createdAt', direction: 'ASC' }, page: 3, pageSize: 10 });
+  });
+
+  it.each([
+    ['a filter that is not JSON', 'filter=%7B'],
+    ['an unknown param', 'nme=a'],
+    ['a page that is not a number', 'page=abc'],
+    ['a sort field outside the allowlist', 'sortField=description']
+  ])('rejects %s with 400 without reaching the DAO', async (_label, query) => {
+    // Act
+    const res = await fetch(`${baseUrl}/entities?${query}`);
+
+    // Assert
+    expect(res.status).toBe(400);
+    expect(dao.list).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed filter with 400 without reaching the DAO', async () => {
+    // Act
+    const res = await fetch(`${baseUrl}/entities?filter=${encodeURIComponent('{"name":{"gt":1}}')}`);
 
     // Assert
     expect(res.status).toBe(400);
@@ -391,7 +461,7 @@ describe('POST /entities', () => {
 
     // Assert
     expect(res.status).toBe(201);
-    expect(dao.create).toHaveBeenCalledWith({ attrs: { name: 'first' } });
+    expect(dao.create).toHaveBeenCalledWith({ name: 'first' });
   });
 
   it('rejects an empty name with 400', async () => {
@@ -430,6 +500,7 @@ describe('/entities/:id', () => {
 
     // Assert
     expect(res.status).toBe(404);
+    expect(dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
   });
 
   it('returns 204 on delete', async () => {
@@ -446,16 +517,97 @@ describe('/entities/:id', () => {
 });
 ```
 
+## `api/tests/db/schemas/entity.schema.test.ts`
+
+Tests the list input schema on the structured input the DAO receives: the page defaults, a nested filter, and every
+rejection the strict schemas promise. No URL strings appear here; the controller test covers decoding.
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { listEntityInputSchema } from '../../../src/db/schemas/entity.schema.js';
+
+describe('listEntityInputSchema', () => {
+  it('applies the page defaults', () => {
+    // Act
+    const input = listEntityInputSchema.parse({});
+
+    // Assert
+    expect(input).toEqual({ page: 1, pageSize: 20 });
+  });
+
+  it('accepts a nested filter with sort and pagination', () => {
+    // Arrange
+    const raw = {
+      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }] },
+      sort: { field: 'name', direction: 'DESC' },
+      page: 2,
+      pageSize: 5
+    };
+
+    // Act
+    const input = listEntityInputSchema.parse(raw);
+
+    // Assert
+    expect(input).toEqual({
+      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: new Date('2026-01-01T00:00:00Z') } }] },
+      sort: { field: 'name', direction: 'DESC' },
+      page: 2,
+      pageSize: 5
+    });
+  });
+
+  it('accepts a date-only value in a date filter', () => {
+    // Act
+    const input = listEntityInputSchema.parse({ filter: { createdAt: { ge: '2026-01-01' } } });
+
+    // Assert
+    expect(input.filter).toEqual({ createdAt: { ge: new Date('2026-01-01') } });
+  });
+
+  it.each([
+    ['an unknown filter field', { filter: { title: { eq: 'a' } } }],
+    ['an unknown operator', { filter: { name: { startsWith: 'a' } } }],
+    ['a wrongly typed operand', { filter: { name: { eq: 1 } } }],
+    ['an invalid id', { filter: { id: { eq: 'nope' } } }],
+    ['a between that is not a pair', { filter: { name: { between: ['a'] } } }],
+    ['an in list of the wrong type', { filter: { name: { in: [1] } } }],
+    ['an in list over 100 values', { filter: { name: { in: Array.from({ length: 101 }, String) } } }],
+    ['an invalid nested filter', { filter: { and: [{ not: { name: { gt: true } } }] } }],
+    ['an unknown key', { nope: 'a' }],
+    ['a sort field outside the allowlist', { sort: { field: 'description', direction: 'ASC' } }],
+    ['a lowercase sort direction', { sort: { field: 'name', direction: 'desc' } }],
+    ['an out-of-range pageSize', { pageSize: 500 }],
+    ['a zero page', { page: 0 }],
+    ['a fractional pageSize', { pageSize: 1.5 }],
+    ['a page that is not a number', { page: Number('abc') }]
+  ])('rejects %s', (_label, raw) => {
+    // Act + Assert
+    expect(listEntityInputSchema.safeParse(raw).success).toBe(false);
+  });
+});
+```
+
 ## Adding another resource
 
 The entity example is the template. For a second resource (say `user`):
 
-1. `db/schema.ts`: add the `user` drizzle table and its `createUserSchema`, `updateUserSchema`, `userIdParamSchema`,
-   `userWhereSchema = whereSchema({...})` and `userListQuerySchema = listQuerySchema({...})`.
-2. `daos/user.dao.ts`: copy `entity.dao.ts`, swap the types.
-3. `models/app-context.model.ts`: add `userDao: UserDao`.
-4. `server.ts`: instantiate `new UserDao(db)` in the context literal.
-5. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the types and paths.
-6. `app.ts`: wire the routes.
-7. `tests/controllers/user.controller.test.ts`: copy the entity controller test, swap the fake DAO.
-8. `pnpm --filter api db:generate --name add-user`, then `db:migrate`.
+1. `db/schemas/user.schema.ts`: copy `entity.schema.ts` (no comments, as in the original). Define the `user` table, `createUserInputSchema` /
+   `updateUserInputSchema` / `userIdInputSchema`, `userFilterInputSchema = createFilterInputSchema({ … })` with one
+   scalar filter input per filterable column (keyed by the column name), `userSortInputSchema =
+   createSortInputSchema([...])`, `ListUserInput`, `listUserInputSchema` and `userDefaultSort`.
+2. `db/schema.ts`: register the table, `export const schema = { entity, user }`.
+3. `daos/user.dao.ts`: copy `entity.dao.ts`, swap the table and types:
+   `implements Dao<User, ListUserInput, CreateUserInput, UpdateUserInput>`.
+4. `models/app-context.model.ts`: add `userDao: UserDao`.
+5. `server.ts`: instantiate `new UserDao(db)` in the context literal.
+6. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the schemas and the DAO.
+7. `app.ts`: wire the routes.
+8. `tests/controllers/user.controller.test.ts` and `tests/db/schemas/user.schema.test.ts`: copy the entity tests,
+   swap the fake DAO and the schema.
+9. Web: mirror `User`, `UserFilterInput`, `UserSortInput` and `ListUserInput` in `models/user.model.ts`, then add the
+   page slices `store/user-list-page/`, `store/user-detail-page/` and `store/user-form-page/` and register each on its
+   route (see [web.md](web.md#9-shared-model-and-page-slices)).
+10. `pnpm --filter api db:generate --name add-user`, then `db:migrate`.
+
+Adding a filterable column to an existing resource is one line in its filter input schema; adding a sortable one is
+one entry in its `createSortInputSchema([...])` call. The compiler rejects either if the column does not exist.

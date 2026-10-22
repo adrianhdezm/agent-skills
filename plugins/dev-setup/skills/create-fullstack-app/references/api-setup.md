@@ -1,6 +1,6 @@
 # API setup
 
-The `api/` package's manifest, configs, app shell and container. The query layer is in `api-query.md` and the entity
+The `api/` package's manifest, configs, app shell and container. The DAO layer is in `api-dao.md` and the entity
 example in `api-entity.md`.
 
 ## Contents
@@ -45,22 +45,26 @@ api/
 │   ├── server.ts            # http listener + DAO wiring
 │   ├── db/
 │   │   ├── client.ts
-│   │   └── schema.ts        # api-entity.md
+│   │   ├── schema.ts        # table registry, api-entity.md
+│   │   └── schemas/
+│   │       └── entity.schema.ts  # api-entity.md
 │   ├── models/
 │   │   ├── app-context.model.ts
-│   │   ├── dao.model.ts     # api-query.md
-│   │   ├── error.model.ts   # api-query.md
-│   │   └── query/           # api-query.md
+│   │   ├── dao.model.ts     # api-dao.md
+│   │   ├── list-input.model.ts   # api-dao.md
+│   │   └── error.model.ts   # api-dao.md
 │   ├── helpers/
-│   │   └── query-parser.helper.ts  # api-query.md
-│   ├── daos/                # api-query.md (query.ts), api-entity.md (entity.dao.ts)
+│   │   ├── dao.helper.ts    # api-dao.md
+│   │   └── query-parser.helper.ts  # api-dao.md
+│   ├── daos/                # entity.dao.ts, api-entity.md
 │   ├── controllers/         # api-entity.md
 │   └── middleware/
 │       ├── error.middleware.ts
 │       └── not-found.middleware.ts
 └── tests/                   # mirrors src/, one *.test.ts per module
+    ├── helpers/dao.helper.test.ts
     ├── helpers/query-parser.helper.test.ts
-    ├── daos/query.test.ts
+    ├── db/schemas/entity.schema.test.ts
     └── controllers/entity.controller.test.ts
 ```
 
@@ -184,7 +188,7 @@ if (!process.env.DATABASE_URL) {
 
 export default defineConfig({
   out: './db/migrations',
-  schema: './src/db/schema.ts',
+  schema: './src/db/schemas/*.schema.ts',
   dialect: 'postgresql',
   dbCredentials: {
     url: process.env.DATABASE_URL
@@ -197,7 +201,8 @@ export default defineConfig({
 }) satisfies Config;
 ```
 
-No fallback for `DATABASE_URL`: it throws loud and early.
+No fallback for `DATABASE_URL`: it throws loud and early. `schema` points at the per-resource schema files, not at
+`db/schema.ts`: drizzle-kit discovers tables from module exports, and `db/schema.ts` only groups them in an object.
 
 ## `api/vitest.config.ts`
 
@@ -277,7 +282,7 @@ export const logger = pino({
 ```ts
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from './schema.js';
+import { schema } from './schema.js';
 import { logger } from '../logger.js';
 
 const connectionString = process.env.DATABASE_URL ?? 'postgres://postgres:s3cr3t@localhost:5432/app';

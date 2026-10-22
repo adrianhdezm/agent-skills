@@ -7,7 +7,8 @@ convention, so a rejected alternative is not reintroduced by accident.
 
 - [Infrastructure](#infrastructure): API URL, Docker build context, Postgres data, migrations, env file
 - [Tooling](#tooling): TypeScript, catalog, tsconfig, Prettier vs ESLint, dev loop, tests
-- [API](#api): context, routers, controllers, DAOs, errors, logging, query vocabulary
+- [API](#api): context, routers, controllers, errors, logging, query parsing
+- [DAO layer](#dao-layer): contract, filter inputs, sorting, pagination, file layout, naming
 - [Web](#web): URL as state, slice placement, file layout, templates, styling
 
 ## Infrastructure
@@ -82,7 +83,7 @@ Node's `--watch` provides the restart loop and `--import=tsx` the TypeScript loa
 
 ### Tests need no database
 
-The API is tested at two levels that run without Postgres: the query translator through the SQL it renders with
+The API is tested at two levels that run without Postgres: the filter / sort translator through the SQL it renders with
 `PgDialect`, and the controllers through `createApp` with a fake DAO on the context. The DAO itself is covered by the
 Compose smoke test. The web tests the URL (de)serializer every list page depends on. `test` is a required check in both
 projects.
@@ -101,8 +102,9 @@ projects.
 ### Controllers are fully inlined
 
 Each handler validates, calls its DAO, and translates errors itself, so it reads top to bottom. Helpers like
-`parseOr400` or `translateNotFound` would hide which errors each handler can throw. The one shared piece is
-`parseQuery`, which is transport-agnostic and lives in `helpers/`.
+`parseOr400` or `translateNotFound` would hide which errors each handler can throw, so the list handler validates
+its query with `safeParse` like the body and id, rather than through a throwing `parseQuery` helper. The one shared
+piece is `normalizeQuery`, which is transport-agnostic and lives in `helpers/`.
 
 ### Data access goes through DAOs, never Drizzle in controllers
 
@@ -116,8 +118,9 @@ yet. A later domain layer can add repositories that compose DAOs.
 
 ### DAOs throw sentinel errors; controllers translate them
 
-DAOs throw `NotFoundError` and the parser throws `QueryParseError`, both from `models/error.model.ts`. Controllers turn
-them into 404 and 400 with `http-errors`. DAOs stay callable from non-HTTP code.
+DAOs throw `NotFoundError` from `models/error.model.ts`, and controllers turn it into a 404 with `http-errors`. DAOs
+stay callable from non-HTTP code. Validation failures need no sentinel: the controller sees the `safeParse` result
+directly and answers 400. A `QueryParseError` thrown by a `parseQuery` helper was removed with that helper.
 
 ### Error severity follows status
 
@@ -137,48 +140,176 @@ A `checkDatabase()` helper would wrap one line. The probe is not a resource, so 
 `models/` holds `*.model.ts` type files and error classes, matching the web's model convention. `helpers/` holds
 transport-agnostic functions. `express.d.ts` stays at the `src/` root: it is TypeScript tooling, not a model.
 
-### The query parser takes a plain params dict
+### The query normalizer takes a plain params dict
 
-`parseQuery(params, schema)` works with `req.query`, another framework, `URLSearchParams.entries()` or a test fixture.
+`normalizeQuery(params)` works with `req.query`, another framework, `URLSearchParams.entries()` or a test fixture.
 Taking an Express `Request` would tie it to one transport.
 
-### The query vocabulary is Hasura's JSON tree, not compact triples
+## DAO layer
 
-`?where={"name":{"_ilike":"%foo%"},"_or":[...]}` was chosen over `?filter=name:ilike:foo`:
+### Filter inputs follow AppSync's `Model<Type>FilterInput`
 
-- nestable `_and` / `_or` / `_not` at any depth;
-- per-column-type operator sets with no custom parser;
-- a model many developers already know;
-- the UI filter builder serializes to JSON, which is cheaper than a bespoke DSL.
+| approach | verdict | why |
+| --- | --- | --- |
+| Hasura `where` tree (`_eq`, `_ilike`, `_and`, …) | rejected | the zod side was typed, but the SQL translator worked on `Record<string, unknown>` and a string-keyed column map, so the types stopped where they mattered most |
+| flat per-resource filters (`name`, `createdAfter`) | rejected | every new case is a new field plus a new SQL clause, and OR / NOT cannot be expressed |
+| **typed filter input per column kind** | chosen | `IdFilterInput`, `StringFilterInput`, `NumberFilterInput`, `DateFilterInput`, `BooleanFilterInput`, plus nestable `and` / `or` / `not`: a familiar model, fully inferred, and one translator for all kinds |
 
-The UI builder is flat by default (one top-level `_and` or `_or`); the API accepts the full tree, so the UI can add
-groups later without a protocol change.
+AppSync's set is adapted: `between` is a validated `[from, to]` pair, `in` exists for every kind except boolean,
+`contains` / `notContains` / `beginsWith` are case-insensitive, and ids drop the string operators that make no sense
+on a uuid.
 
-### Predicates are per column type
+### One contract, single-input methods
 
-`models/query/predicates.ts` defines one schema per column type, each listing only its valid operators. A single
-predicate for every field made `_ilike` on a timestamp parse and then fail in SQL.
+`Dao<T, ListInput, CreateInput, UpdateInput>` with `get({ id })`, `list(input)`, `create(input)`, `update(input)` and
+`delete({ id })`. Each method takes one named input object, so new fields never break call sites. The update input
+carries its `id`, as AppSync's `UpdateXInput` does. `delete` returns `void`. The list input is one generic
+(`ListEntityInput`), not separate filter and sort-field generics, so a DAO never names those types. `findOne`,
+`getMany`, an `{ attrs }` wrapper and `deleteMany` were dropped.
 
-### Query types come from `z.infer`
+### Page-based pagination with a total, not cursors
 
-The zod schemas are the source of truth (`type EntityWhere = z.infer<typeof entityWhereSchema>`). Hand-written TS
-mirrors of a recursive schema drift on every operator change.
+`page` / `pageSize` with `{ items, total, page, pageSize, totalPages }` suits admin tables: jump to any page, show
+"page X of Y". Cursor pagination (`limit` + `nextToken`) has no total and no random access. Revisit it for feeds or
+very large tables.
+
+### Filter and sort fields are named after their columns
+
+The DAO passes the drizzle table itself to `filterToSql` / `sortToSql`, and `FilterTable` / `SortTable` make a field
+without a matching column a compile error. Explicit field-to-column maps, and later a `ListConfig` object holding
+them, were tried and removed: they repeated the table line for line. If an API field ever needs a different name or a
+computed expression, that resource brings a map back.
+
+### `list` runs its two queries one after the other
+
+The page query and the count query run in sequence, not with `Promise.all`. In parallel they would take two pool
+connections per request to save one round trip; in sequence the code reads top to bottom and each request holds one
+connection at a time. Neither form is a consistent snapshot: when `total` must match the page exactly, wrap both in a
+transaction. A single query with `count(*) over ()` was rejected because a page past the end returns no rows and so
+no total.
+
+### Every resource declares a default sort
+
+Without `ORDER BY`, Postgres returns rows in no guaranteed order, so pages can repeat or skip rows. The DAO uses
+`<resource>DefaultSort` when no sort is given, and `sortToSql` always appends an `id` tie-breaker.
+
+### Resource-specific pieces live in the resource schema file
+
+`db/schemas/<resource>.schema.ts` holds the table, the create / update / list inputs and their schemas, and the
+default sort, so the DAO only runs queries. `db/schema.ts` is a registry, `export const schema = { entity }`, imported
+by the client as `{ schema }`. `drizzle.config.ts` points at `src/db/schemas/*.schema.ts`, because drizzle-kit finds
+tables from module exports, not inside an object.
+
+### The vocabulary is built with `create<Thing>Schema` builders, kept together
+
+`createFilterInputSchema({ column: scalarFilterInputSchema, … })`, `createSortInputSchema([...])` and
+`createListInputSchema({ filter, sort })` make every list piece read the same way in each resource schema, and all
+three live in `models/list-input.model.ts` with the scalar inputs, `SortInput` and the page-size limits.
+`models/dao.model.ts` keeps only the contract (`Dao`, `PaginatedResult`, `IdInput`), with no zod and no drizzle.
+
+### The list input type is inferred from its schema
+
+`ListEntityInput = z.infer<typeof listEntityInputSchema>`, like every other input. A hand-written generic `List<Filter,
+SortField>` in `dao.model.ts` was removed: it was the one input type not derived from a schema, and it described page
+fields as optional although the schema always fills them in. `Dao`'s list parameter needs no constraint, because
+`sortToSql` already rejects a sort field that is not a column of the table.
+
+### One translator for every scalar kind
+
+The zod schemas already reject operators a kind does not support, so `filterToSql` handles every operator without
+knowing the kind. Five per-kind translators were tried first and collapsed into one. `FieldFilterInput`, the
+translator's input type, is derived from the scalar inputs, so the two cannot drift.
+
+### Types come from `z.infer`
+
+The zod schemas are the source of truth (`type EntityFilterInput = z.infer<typeof entityFilterInputSchema>`). The row
+type follows the same rule, `type Entity = z.infer<typeof selectEntitySchema>` rather than `typeof entity.$inferSelect`,
+so every type in a resource schema file comes from a schema. The
+recursive filter type is inferred through the builder's getters; a hand-written mirror would drift on every operator
+change.
+
+### The controller decodes the URL; the list input schema does not
+
+The list input schema validates the structured `{ filter, sort, page, pageSize }` the DAO takes, and the list
+controller turns the URL into that shape in plain sight: reject unknown params, `JSON.parse` the filter, build `sort`
+from `sortField` / `sortDirection`, convert the page numbers. A schema that also decoded JSON strings and coerced
+numbers (a `jsonQueryParam` inside it) made the DAO's input type depend on the HTTP encoding, so the DAO could not be
+called cleanly from code that already holds objects.
+
+### Names follow the operation
+
+Inputs are `<Operation><Resource>Input` (`CreateEntityInput`, `UpdateEntityInput`, `ListEntityInput`) with schemas
+`<operation><Resource>InputSchema`; per-resource list pieces are `<resource><Kind>` (`entityFilterInputSchema`,
+`entitySortInputSchema`, `entityDefaultSort`). `PaginatedResult` was chosen over AppSync's `Connection`, which names a
+cursor-paginated result.
 
 ## Web
 
+### Web list types mirror the API by hand
+
+`models/<resource>.model.ts` repeats `EntityFilterInput`, `EntitySortInput`, `ListEntityInput` and
+`PaginatedResult` with the API's names and shapes. Sharing a types package between the projects was not worth its
+build wiring at this size; keeping the names identical makes a drift easy to spot in review.
+
 ### The URL is the source of truth for list queries
 
-List pages dispatch `router.navigate([], { queryParams })`, and a `routerNavigatedAction` effect fetches. The
+List pages dispatch `AppRouterActions.navigate({ commands: [], queryParams })`, and the list effect loads whenever
+the list input in the URL changes. The
 alternative, a query slice synced to the URL by an effect, needs two-way sync. URL-first gets refresh, back, forward,
-deep links and bookmarkable views for free. The entities slice holds only server data; the query is derived from
-`router.state.queryParams` by a selector.
+deep links and bookmarkable views for free. The list page slice holds only server data; the list input is derived
+from `router.state.queryParams` by a selector.
 
-### One shared slice per resource, registered globally
+### One slice per page, registered on its route
 
-A resource's list, detail and form pages all mutate the same data, so per-page slices would mean three copies of the
-actions and three cache-invalidation stories. A slice shared across a resource's pages lives at `store/<resource>/` and
-is registered in `app.config.ts`. A slice only one page needs lives at `store/<page-name>/` and is registered on its
-route.
+Each page owns `store/<page-name>/` and registers it with `provideState` + `provideEffects` on its route. A single
+global `entities` slice shared by the list, detail and form pages was tried and replaced: in practice each page read
+almost only its own fields (only the current entity was shared), and the cross-page reducer updates (prepend on
+create, patch on update) were redundant once the list fetches fresh data on every visit and after a delete. Per-page
+slices keep each page's actions and state together. The cost is that detail and form each load the entity, one extra
+request when going from detail to edit. Resource types shared by the slices live in `models/`, and only `appContext`
+and the router state (`appRouter`) stay global.
+
+### Pages inject only the Store
+
+Pages read the route from the app-router slice (`selectRouteParam`, `selectQueryParams`) and navigate by dispatching
+`AppRouterActions.navigate`, whose effect is the only caller of the Angular `Router`; forms are built with
+`new FormGroup`. With `ActivatedRoute`, `Router` and `FormBuilder` injected into pages, routing was split between
+the store and the components, and a navigation after a save lived in a page `effect()` watching a `savedId` flag.
+Keeping pages to the store makes every route read and every navigation visible as state and actions, and leaves
+service injection to effects.
+
+### Data access lives in a service, called from effects
+
+`services/entity.service.ts` holds every HTTP call for the resource. Effects used to build URLs, params and the
+`apiBaseUrl` lookup themselves, repeated across three page slices; with one service the request shape is written once,
+and effects only map results to actions. The service is injected only in effects, so pages still talk to the store
+alone.
+
+### One status union per page, not boolean flags
+
+Each page state has `status: 'idle' | 'loading' | 'loaded' | … | 'error'` and an `error` message. Independent
+booleans (`loading`, `saving`, `deleting`, plus separate error fields) could contradict each other, `loading` and an
+error at once, and made templates combine flags. A single union names every state the page can be in, and the
+template switches on it.
+
+### Pages load through Load and Leave
+
+Every page dispatches `Load` on init and `Leave` on destroy, and reducers reset on both. The list page used to load
+from `routerNavigatedAction` alone; it now dispatches `Load` like the others, and its effect follows the list input
+in the URL until `Leave`, dispatching `Fetch({ input })` for each value, so the first load and later query changes
+take the same path.
+
+### Actions name intent, not lifecycle
+
+The page action was first called `Enter`, which names a moment of the component lifecycle rather than what the page
+asks for. It is `Load`: the page wants its data, and the same action would fit a refresh button or a retry. The list's
+per-request action is `Fetch` (one request for one input), and results are `<Action> Success` / `<Action> Failure`. A selector that returns
+`null` while the URL belongs to another page stops a navigation away from loading the list once more.
+
+### A page on several routes registers its slice once
+
+The form page serves `entities/new` and `entities/:id/edit`. Registering its slice on both routes would add its
+effects twice, so the two routes sit under one componentless parent route that provides the slice.
 
 ### Store code lives under `store/`, mirroring `pages/`
 
