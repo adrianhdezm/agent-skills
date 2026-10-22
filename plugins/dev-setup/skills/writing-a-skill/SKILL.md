@@ -58,6 +58,8 @@ Omit any section that doesn't apply — don't leave empty placeholders.
 
 Prefer gerund form: `processing-pdfs`, `analyzing-spreadsheets`, `setting-up-npm-block`. Lowercase letters, numbers, and hyphens only, max 64 chars.
 
+Exception: a skill that scaffolds a new project is named `create-<thing>`, after the `pnpm create` / `npm init` convention users already search for: `create-node-project`, `create-cloudflare-worker`, `create-fullstack-app`.
+
 ## Description
 
 Third person. First sentence: what it does. Second sentence: `Use when [specific triggers/keywords]`. Max 1024 chars.
@@ -113,7 +115,7 @@ For reference files longer than 100 lines, add a table of contents at the top so
 
 ## Review Checklist
 
-- [ ] Name uses gerund form
+- [ ] Name uses gerund form, or `create-<thing>` for a project scaffolder
 - [ ] Description includes "Use when..." with specific triggers
 - [ ] SKILL.md body under 500 lines
 - [ ] No time-sensitive information
