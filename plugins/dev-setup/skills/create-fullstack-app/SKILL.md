@@ -1,6 +1,6 @@
 ---
 name: create-fullstack-app
-description: Scaffolds a pnpm-workspace monorepo with an Express 5 + Drizzle + Postgres + zod API, an Angular 22 + NgRx + Tailwind web app built as a statechart where the router feeds the store and pages read only their slice, Docker Compose, and an entity CRUDL example wired end to end, with build, typecheck, test, lint and format checks passing. Use when creating a new full-stack TypeScript app, an Angular + Express or Angular + Postgres project, a monorepo with an API and a web frontend, or when the user asks to bootstrap, scaffold, init or start a full-stack project.
+description: Scaffolds a pnpm-workspace monorepo with an Express 5 + Drizzle + Postgres + zod API, an Angular 22 + NgRx + Tailwind web app with route-driven state where the router feeds the store, pages read only their slice and requests end with their page, Docker Compose, and an entity CRUDL example wired end to end, with build, typecheck, test, lint and format checks passing. Use when creating a new full-stack TypeScript app, an Angular + Express or Angular + Postgres project, a monorepo with an API and a web frontend, or when the user asks to bootstrap, scaffold, init or start a full-stack project.
 disable-model-invocation: true
 ---
 
@@ -12,9 +12,10 @@ Creates a pnpm-workspace monorepo with this shape:
   DAOs, and DAOs are the only code that touches Drizzle. The DAO layer follows an AppSync-style contract: `get` /
   `list` / `create` / `update` / `delete`, typed `<Type>FilterInput`s with `and` / `or` / `not`, and page-based lists
   (see [The DAO layer](#the-dao-layer)).
-- **`web/`: Angular 22 + NgRx + `@ngrx/router-store` + Tailwind v4, built as a statechart.** Each page route is a
-  state and actions are the only transitions. The URL enters the store one way (`routerNavigatedAction` → the page
-  reducer whose state matches), pages read only their slice, and each page loads its data from its own lifecycle.
+- **`web/`: Angular 22 + NgRx + `@ngrx/router-store` + Tailwind v4, with route-driven state.** Each page route names
+  a state. The URL enters the store one way (`routerNavigatedAction` → the page reducer whose state matches), pages
+  read only their slice, each page loads its data from its own lifecycle, and its requests end with it: reads are
+  cancelled on `Leave`, and a save's follow-up runs only while the form that started it is open.
   Templates are inline, and there are no `.html` or `.scss` files. Fundamental NGX + SAP Horizon is opt-in.
 - **Docker Compose** runs `db` + `api` + `web`, both images built from the repo root; Nginx serves the web app
   statically. A single root `.env` feeds everything.
@@ -302,18 +303,19 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
 
 ### Web
 
-- **The app is a statechart.** Each page route declares its state in `data: { state }` (`entity-list`,
-  `entity-detail`, `entity-new`, `entity-edit`, typed by `AppState`); each page's `status` union holds its sub-states;
-  actions are the only transitions.
+- **State is route-driven.** Each page route declares its state in `data: { state }` (`entity-list`,
+  `entity-detail`, `entity-new`, `entity-edit`, typed by `AppState`); each page's `status` union names what the page
+  is doing. Reducers do not guard transitions, so do not call it a statechart.
 - **The router only writes state.** `AppRouterSerializer` reduces each navigation to `{ url, state, params,
   queryParams }`; on `routerNavigatedAction` the page reducer whose state matches copies its route state (the list
   input, the detail id, the form target), read with `navigatedRoute(action)`. No effect reacts to a navigation.
   Router actions fire after activation (`navigationActionTiming: PostActivation`).
 - **Components never use the store**; they take `input()` / `output()`. Pages and layouts may read it.
 - **Pages inject only the `Store` and read only their slice.** Route params and the list query come from the page's
-  own selectors, never from router selectors; navigation is `AppRouterActions.navigate` (its effect is the only
-  `Router` caller, and it takes `replaceUrl`), and forms are `new FormGroup` rather than an injected `FormBuilder`.
-  Services are injected only in effects.
+  own selectors, never from router selectors. Plain links are `routerLink` in the template; a navigation computed in
+  code or caused by a result is `AppRouterActions.navigate` (its effect is the only `Router` caller, and it takes
+  `replaceUrl`). Forms are `new FormGroup` rather than an injected `FormBuilder`. Services are injected only in
+  effects.
 - **Data access lives in `services/`.** `EntityService` is the only `HttpClient` user and is called only from effects.
   Each method writes its URL explicitly and builds its params inline, with no private URL or params helper.
 - **Every page loads the same way:** a watch started in `ngOnInit` (never the constructor) on the slice's route state
@@ -329,6 +331,13 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   registers it on its route with `provideState` + `provideEffects`; a page reads only its own slice. Detail and form
   each load the entity themselves. The form serves two states, so it registers its slice once on a shared parent
   route. Route-level slices outlive the page, so each resets on `Leave`, and a new id or target starts it over.
+- **Requests belong to their page.** Route-level effects keep running after `Leave`, so:
+  - every read's inner observable ends with `takeUntil(<Page>.leave)`, and the form's `Load` with a `null` id returns
+    `EMPTY` inside `switchMap` (never filtered out before it), so it still cancels the edit form's request;
+  - writes complete, but carry the form's `navigationId` (the opening `NavigationEnd.id`, cleared on `Leave`); the
+    reducer and `navigateAfterSave$` ignore a result from another visit, so a save after _Cancel_ redirects nowhere;
+  - an effect reading route state samples the nullable value and filters afterwards, never inside `withLatestFrom`,
+    and a follow-up reads the request it follows (`Fetch Success` carries its `input`).
 - **A list query change is a navigation.** The list page builds the next input from its slice and dispatches
   `AppRouterActions.navigate({ commands: [], queryParams: toParams(next) })`; the reducer copies the new input and the
   watch fetches it. Refresh, back, forward and deep links take the same path.
@@ -384,7 +393,7 @@ pnpm workspace, then:
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
 - **Coding conventions** (copied to the repo root: architecture and building blocks of both projects, HTTP contract,
-  list queries, the web statechart, the store and the router, where web state lives, naming, code style, the test
+  list queries, route-driven state, the store and the router, request lifetimes, where web state lives, naming, code style, the test
   tiers, adding a resource, a before-you-merge checklist): [references/coding-conventions.md](references/coding-conventions.md)
 - **Decisions and their reasons**: [references/decisions.md](references/decisions.md)
 
@@ -406,6 +415,8 @@ pnpm workspace, then:
 - [ ] `coding-conventions.md` is at the repo root
 - [ ] Every page route in `app.routes.ts` declares its `data: { state }`, and no file outside `store/app-router/`
       imports a router-store selector or reacts to `routerNavigatedAction` in an effect
+- [ ] Every read effect's request ends on its page's `Leave`, and `navigateAfterSave$` checks the form's
+      `navigationId`; the late-response cases in `app.routes.spec.ts` pass
 - [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook --smoke-test --ci` starts and exits 0, and
       `storybook-static/index.json` lists the three `ConfirmDialog` stories
 - [ ] `pnpm test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)

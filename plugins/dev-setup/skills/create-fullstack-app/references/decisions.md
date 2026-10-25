@@ -9,7 +9,7 @@ convention, so a rejected alternative is not reintroduced by accident.
 - [Tooling](#tooling): TypeScript, catalog, tsconfig, Prettier vs ESLint, dev loop, tests
 - [API](#api): context, routers, controllers, errors, logging, query parsing
 - [DAO layer](#dao-layer): contract, filter inputs, sorting, pagination, file layout, naming
-- [Web](#web): the statechart, store and router, slice placement, file layout, templates, styling, Storybook, the three test layers
+- [Web](#web): route-driven state, store and router, request lifetimes, slice placement, file layout, templates, styling, Storybook, the three test layers
 
 ## Infrastructure
 
@@ -302,12 +302,17 @@ cursor-paginated result.
 `PaginatedResult` with the API's names and shapes. Sharing a types package between the projects was not worth its
 build wiring at this size; keeping the names identical makes a drift easy to spot in review.
 
-### The app is a statechart: routes are states, actions are transitions
+### Route-driven state: routes name the states
 
-Each page route declares its state in `data: { state }`, typed by `AppState`, and each page's `status` union holds its
-sub-states. Naming the states makes the app's shape readable from `app.routes.ts` alone, gives page reducers one
-string to match a navigation on, and makes a missing or misspelled state a compile error and an `app.routes.spec.ts`
-failure, instead of a path comparison (`url === '/entities'`) repeated in selectors.
+Each page route declares its state in `data: { state }`, typed by `AppState`, and each page's `status` union names
+what the page is doing. Naming the states makes the app's shape readable from `app.routes.ts` alone, gives page
+reducers one string to match a navigation on, and makes a missing or misspelled state a compile error and an
+`app.routes.spec.ts` failure, instead of a path comparison (`url === '/entities'`) repeated in selectors.
+
+This was called a statechart, and a review showed the name promised more than the code does: reducers apply any action
+in any status, and nothing rejected a completion that belonged to a page already left. Making it a real statechart
+would mean a guard on every reducer handler, for each slice; the bugs it would have prevented are closed more cheaply
+by the request-lifetime rules below. The states and status unions stay; the name is route-driven state.
 
 ### The router writes URL state into the page slice; pages read only their slice
 
@@ -339,14 +344,19 @@ slices keep each page's actions and state together. The cost is that detail and 
 request when going from detail to edit. Resource types shared by the slices live in `models/`, and only `appContext`
 and the router state (`appRouter`) stay global.
 
-### Pages inject only the Store
+### Pages inject only the Store; templates link with `routerLink`
 
-Pages read the route from their own slice (`selectListInput`, `selectId`, `selectTarget`) and navigate by dispatching
-`AppRouterActions.navigate`, whose effect is the only caller of the Angular `Router`; forms are built with
+Pages read the route from their own slice (`selectListInput`, `selectId`, `selectTarget`); forms are built with
 `new FormGroup`. With `ActivatedRoute`, `Router` and `FormBuilder` injected into pages, routing was split between
 the store and the components, and a navigation after a save lived in a page `effect()` watching a `savedId` flag.
-Keeping pages to the store makes every route read and every navigation visible as state and actions, and leaves
-service injection to effects.
+Keeping pages to the store makes every route read visible as state, and leaves service injection to effects.
+
+Navigation has two forms. A plain link (open a row, _Edit_, _New entity_, _Back_, _Cancel_) is a `routerLink` in the
+template: it is a real anchor, opens in a new tab and needs no code. A navigation computed in code (a new list query)
+or caused by a result (after a save, stepping back off an empty page) dispatches `AppRouterActions.navigate`, whose
+effect is the only caller of the Angular `Router`. The docs once said every navigation was an action while the
+templates already used `routerLink`; links are the right tool for links, and the rule now says so. Either way the
+navigation reaches the slices through `routerNavigatedAction`.
 
 ### Data access lives in a service, called from effects
 
@@ -394,6 +404,33 @@ the new id. Keeping the previous entity until the new one loads showed entity 42
 lands at `RoutesRecognized`, so `appRouter` holds the target URL while guards run and rolls it back on
 `ROUTER_CANCEL`; after activation, the store only ever holds a URL the router committed. Page reducers react to
 `routerNavigatedAction`, which fires at `NavigationEnd` either way.
+
+### Requests belong to the page that started them
+
+Route-level `provideEffects` registers effects when the route is first activated, and they stay active after the
+component is destroyed; resetting the slice on `Leave` cleans up state but not requests. A review drove the real
+router and store through three delayed-response sequences, and each one leaked a request across pages:
+
+- an edit form's GET that returned after moving to `/entities/new` filled the new form with the old entity. `Load`
+  with a `null` id was filtered out before `switchMap`, so it cancelled nothing, and nothing cancelled on `Leave`;
+- a save that succeeded after _Cancel_ redirected from the list to the saved entity: `navigateAfterSave$` navigated
+  on every success;
+- a list response past the end that returned after moving to a detail page rewrote `/entities/e1` to
+  `/entities/e1?page=2&pageSize=1`: `filter(non-null)` inside `withLatestFrom` kept the input from before `Leave`, and
+  `commands: []` navigates relative to whatever URL is current.
+
+The rules that close them:
+
+| request | rule | why not the alternative |
+| --- | --- | --- |
+| read (`Load`, `Fetch`) | the inner observable ends with `takeUntil(<Page>.leave)`; a load that needs no request returns `EMPTY` inside `switchMap` | a reducer guard per result would also need an id on every failure; ending the request removes the result instead of filtering it |
+| write (`Create`, `Update`, `Delete`) | completes; its result carries the form's `navigationId` (the opening navigation's `NavigationEnd.id`), and the reducer and `navigateAfterSave$` ignore a result from another visit | cancelling a write on `Leave` would drop a save the user asked for; a reducer-generated session id would make reducers impure, and the router already numbers its navigations |
+| effect reading route state | sample the nullable value, filter afterwards | filtering the source of `withLatestFrom` keeps the last non-null value forever |
+| follow-up computed from a result | read the input from the result (`fetchSuccess` carries its `input`) | reading the slice gives the next request's input, or `null`, not the one this result answers |
+
+A delete stays a plain write: its only follow-up refetches, and after `Leave` the sampled input is `null`, so it does
+nothing. The cost is a `navigationId` field and two props on the form slice, and a `takeUntil` on each read. The
+sequences are unit cases in each effects spec and, on the real router and store, in `app.routes.spec.ts`.
 
 ### A page on several routes registers its slice once
 

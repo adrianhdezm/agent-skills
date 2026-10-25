@@ -23,7 +23,7 @@ change this file in the same commit.
 
 ## 1. How to use this file
 
-Read the architecture section of the project you are changing ([API](#31-architecture), [Web](#41-architecture-the-app-is-a-statechart))
+Read the architecture section of the project you are changing ([API](#31-architecture), [Web](#41-architecture-route-driven-state))
 once, then look things up. The quickest way in is the question you have:
 
 | I want to…                                    | where it goes                                                              | section                                   |
@@ -272,11 +272,12 @@ allowlist; a new operator is one line in its scalar schema plus one branch in `d
 
 ## 4. Web
 
-### 4.1 Architecture: the app is a statechart
+### 4.1 Architecture: route-driven state
 
-The web app is a statechart. Each page route is a **state**, named in its `data: { state }` and typed by `AppState`;
-each page's `status` union holds its **sub-states**; **actions** are the only transitions. The route table in
-`app.routes.ts` is the list of states.
+The web app's state is driven by the route. Each page route is a **state**, named in its `data: { state }` and typed
+by `AppState`; each page's `status` union names what the page is doing. The route table in `app.routes.ts` is the list
+of states. The names are for reading and matching: reducers do not restrict which action may follow which, so a
+request's result is kept from the wrong page by the [request rules](#45-the-page-contract), not by the reducer.
 
 ```
                        open row                          Edit
@@ -302,7 +303,8 @@ each page's `status` union holds its **sub-states**; **actions** are the only tr
 Data moves one way, in two loops that share the page reducer and the page:
 
 ```
-navigation   user intent ──► AppRouterActions.navigate ──► navigate$ ──► Router ──► URL
+             routerLink in a template ─────────────────────────────────────┐
+navigation   from code ────► AppRouterActions.navigate ──► navigate$ ──► Router ──► URL
                                                                            │  ▲ back · forward · deep link
                                                                            ▼
                                                      routerNavigatedAction (@ngrx/router-store)
@@ -316,11 +318,11 @@ data         page ◄── selectors ◄── page slice ◄── page reduce
 - **The router only writes state; the page decides when to load.** No effect reacts to a navigation, and no
   navigation starts a request.
 - **Pages talk to the store, effects talk to the world.** A page reads selectors of its own slice and dispatches
-  actions; effects call the service and map results to actions; `navigate$` is the only code that calls the Angular
-  `Router`.
+  actions; its template links with `routerLink`; effects call the service and map results to actions; `navigate$` is
+  the only code that calls the Angular `Router`.
 - **Each page owns one slice, registered on its route** (`provideState` + `provideEffects` in `app.routes.ts`). Only
   `appContext` and `appRouter` are global, in `app.config.ts`. Route-level slices and effects stay registered after the
-  page is left, which is why every page resets its slice on `Leave`.
+  page is left, which is why every page resets its slice on `Leave` and every read ends on it.
 
 ### 4.2 Store and router
 
@@ -329,7 +331,7 @@ single source of truth.
 
 | state                                 | written by                                                   | read by                                 |
 | ------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
-| the URL                               | the Angular `Router`, called only by `navigate$`             | `@ngrx/router-store`                    |
+| the URL                               | the Angular `Router`, through `routerLink` or `navigate$`    | `@ngrx/router-store`                    |
 | `appRouter` (`{ url, state, params, queryParams }`) | `routerReducer`, through `AppRouterSerializer`  | devtools; no page, no page slice        |
 | a page's route state (list input, detail id, form target) | its page reducer, on `routerNavigatedAction` for its own state | that page, through its selectors |
 | server data and `status`              | its page reducer, on `Fetch` / `Load` results                | that page                               |
@@ -350,16 +352,16 @@ of its own:
 | an edited URL or a link to another id | reuses the detail page                                   | the reducer stores the id and drops the old entity; the watch loads it   |
 | a guard cancels                      | `NavigationCancel`, no `NavigationEnd`                    | no `routerNavigatedAction`: no slice changes                             |
 
-**When the app changes what the URL holds,** it dispatches `AppRouterActions.navigate` and waits: the new value
-reaches the slice only through `routerNavigatedAction`. Nothing writes URL-backed state into a slice directly, so
-nothing has to sync back.
+**When the app changes what the URL holds,** it follows a link or dispatches `AppRouterActions.navigate`, and waits:
+the new value reaches the slice only through `routerNavigatedAction`. Nothing writes URL-backed state into a slice
+directly, so nothing has to sync back.
 
-| situation                                         | who dispatches `navigate`                | with                                                          |
+| situation                                         | who navigates                            | with                                                          |
 | ------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| the user changes filter, sort, page or page size  | the list page                            | `{ commands: [], queryParams: toParams(next) }`               |
-| the user opens a row, edits, cancels              | the page                                 | `{ commands: ['/entities', id] }` and the like                |
-| a save succeeds                                   | `navigateAfterSave$`                     | `{ commands: ['/entities', entity.id] }`                      |
-| a page past the end (a delete, a stale deep link) | `stepBackPastLastPage$`                  | `{ commands: [], queryParams, replaceUrl: true }`             |
+| the user opens a row, edits, creates, cancels     | a `routerLink` in the page's template    | `['/entities', id]`, `'/entities/new'` and the like           |
+| the user changes filter, sort, page or page size  | the list page, `navigate`                | `{ commands: [], queryParams: toParams(next) }`               |
+| a save succeeds, and its form is still open       | `navigateAfterSave$`, `navigate`         | `{ commands: ['/entities', entity.id] }`                      |
+| a page past the end (a delete, a stale deep link) | `stepBackPastLastPage$`, `navigate`      | `{ commands: [], queryParams, replaceUrl: true }`             |
 
 A user's change adds a history entry, so back undoes it; a correction the user did not ask for replaces the entry.
 State that does not belong in the URL — a filter draft, a row pending delete, server data — never goes through
@@ -376,6 +378,13 @@ State that does not belong in the URL — a filter draft, a row pending delete, 
   can cancel before activation).
 - **The watch's `distinctUntilChanged` is the only dedupe.** A navigation that lands on an equal input fetches nothing;
   reducers never compare to avoid an update.
+- **A response can outlive its page.** Route-level effects keep running after `Leave`. A read without
+  `takeUntil(<Page>.leave)` lands in the next visit's slice; a write's follow-up without a page check navigates from
+  wherever the user went. See [the page contract](#45-the-page-contract).
+- **Filter after `withLatestFrom`, never inside it.** `withLatestFrom(store.select(x).pipe(filter(nonNull)))` keeps the
+  last non-null value after `Leave` resets the slice; sample `store.select(x)` and filter the pair afterwards.
+- **`commands: []` is relative to the current URL,** whatever page that is by the time the action runs. Use it only
+  from the page itself or from an effect whose request ended on `Leave`.
 
 ### 4.3 Where state lives
 
@@ -396,9 +405,9 @@ an `effect()`.
 | ---------------- | ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
 | component        | `components/<name>.component.ts`           | a store-free UI piece: signal `input()` / `output()`            | other components                                           | inject the `Store`, a service or the `Router`                  |
 | layout           | `layouts/<name>-layout.component.ts`       | the shell around the pages                                      | the `Store` (read)                                         | inject services                                                |
-| page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`; select from `appRouter` |
-| slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's route state, data and transitions | resource models, helpers, `navigatedRoute`         | hold another page's data, read another state's route           |
-| effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly; react to `routerNavigatedAction` |
+| page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), `RouterLink`, components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`; select from `appRouter` |
+| slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's route state, data and status | resource models, helpers, `navigatedRoute`         | hold another page's data, read another state's route           |
+| effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly; react to `routerNavigatedAction`; let a read outlive `Leave` |
 | app-router slice | `store/app-router/`                        | `AppState`, the serializer, `navigatedRoute`, `Navigate` + `navigate$` | the Angular `Router` (`navigate$` only)             | —                                                              |
 | app-context slice| `store/app-context/`                       | `apiBaseUrl` + `appName`, seeded from `environment`             | `environment`                                              | change after start                                             |
 | service          | `services/<resource>.service.ts`           | every HTTP call for one resource (`providedIn: 'root'`)          | `HttpClient`, `selectApiBaseUrl`, helpers                  | be injected outside effects, keep state                        |
@@ -428,9 +437,18 @@ an `effect()`.
   form. The action group's `source` is the page name (`'Entity List Page'`).
 - **Writes use `concatMap`, reads `switchMap`.** A second save never cancels the first; a newer fetch cancels an older
   one.
-- **Navigation after a write is an effect**, never page code: `navigateAfterSave$` goes to the detail page; on the
-  list, `fetchAfterDelete$` refetches and `stepBackPastLastPage$` moves off a page past the end, replacing the history
-  entry.
+- **Reads end on `Leave`.** Each read's inner observable ends with `takeUntil(actions$.pipe(ofType(<Page>.leave)))`.
+  A load that needs no request (the new form's `null` id) returns `EMPTY` inside `switchMap` rather than being
+  filtered out before it, so it still cancels the read before it.
+- **Writes finish, and carry their page.** A save is never cancelled. The form slice keeps the `navigationId` of the
+  navigation that opened it (`routerNavigatedAction`'s `event.id`), `null` after `Leave`; `create$` / `update$` record it
+  with `withLatestFrom` as the save starts and put it on `Save Success` / `Save Failure`. The reducer and
+  `navigateAfterSave$` act on a result only when its `navigationId` is the slice's.
+- **A follow-up reads the request it follows.** `Fetch Success` carries the `input` it was made for, and
+  `stepBackPastLastPage$` steps back from that input, not from the slice's.
+- **Navigation after a result is an effect**, never page code: `navigateAfterSave$` goes to the detail page when the
+  form that saved is still open; on the list, `fetchAfterDelete$` refetches (unless the page was left) and
+  `stepBackPastLastPage$` moves off a page past the end, replacing the history entry. Plain links are `routerLink`.
 - **A page used by several routes registers its slice once,** on a shared componentless parent route (the form on
   `new` and `:id/edit`), so its effects do not run twice.
 
@@ -577,8 +595,9 @@ Storybook is not a test: it is where components are built and their states revie
 - *Assert:* services — method, URL, params and body of each call; reducers — every action's resulting state, as plain
   function calls, with each navigation a `navigated({ state, params, queryParams })` fixture (into the page's own state
   and into another); selectors — `.projector(…)` for anything with logic; effects — the action each input maps to,
-  plus the RxJS operators that matter (`switchMap` cancellation, `concatMap` ordering), driven by a `Subject` of
-  actions; routes — every path renders its page and lands its `data.state` through `RouterTestingHarness`; the
+  plus the RxJS operators that matter (`switchMap` cancellation, `concatMap` ordering, `takeUntil` on `Leave`), driven
+  by a `Subject` of actions; routes — every path renders its page and lands its `data.state` through
+  `RouterTestingHarness`, and a response that returns after its page was left changes nothing, on the real router; the
   serializer — the deepest state and the merged params; helpers — a happy case and an edge case each.
 - *Not here:* rendering details and styling — the browser spec owns those.
 - *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect,
@@ -618,6 +637,7 @@ Storybook is not a test: it is where components are built and their states revie
 | change to `app.ts` (middleware, body limit)    | the API test                                                                            |
 | new service method                             | the service spec                                                                        |
 | new action / page state                        | reducer and selectors specs, the effects spec if it requests, the page's browser spec   |
+| new effect that requests                       | the effects spec, including a response after `Leave` (read) or after the page changed (write) |
 | new component                                  | its browser spec and its story                                                          |
 | new page or user flow                          | the slice specs, the page's browser spec, an e2e spec, a route in `app.routes.spec.ts`  |
 | new resource                                   | all of the above — see [Adding a resource](#8-adding-a-resource)                         |
@@ -705,7 +725,10 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - **No `types/` folder** — `models/` holds shapes and errors; `express.d.ts` stays at `src/`.
 - **No global per-resource slice** — each page owns its slice, with the route state it needs.
 - **No `ActivatedRoute`, `Router`, router selectors or `FormBuilder` in pages** — every route read reaches a page through
-  its slice, and every navigation is an action.
+  its slice; links are `routerLink`, and every other navigation is an action.
+- **No "statechart" claim** — routes name states, but reducers do not guard transitions; the request rules keep late
+  results out instead.
+- **No cancelling a save on `Leave`** — the user asked for it; its result carries its page instead.
 - **No loading from the router** — no effect reacts to `routerNavigatedAction`; the page's watch decides when to load.
 - **No query written to a slice by the app** — a filter, sort or page change navigates, and the reducer copies the new
   URL; there is no store → URL sync to keep in step.
@@ -726,6 +749,7 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - [ ] `pnpm test:browser` passes if you touched a component or page; `pnpm test:e2e` if you changed a user flow or the
       web↔API contract.
 - [ ] A new page route declares its `data: { state }`, and the page reads only its slice and loads from its watch.
+- [ ] A new read effect ends on its page's `Leave`; a write's follow-up acts only for the page that started it.
 - [ ] A schema change comes with its migration (`db:generate`), committed.
 - [ ] An API type change is mirrored in the web's `models/`.
 - [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists; a new component has a story.

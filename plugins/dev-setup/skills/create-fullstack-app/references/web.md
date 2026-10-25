@@ -4,10 +4,11 @@ Angular 22 + NgRx 22 + `@ngrx/router-store` + Tailwind v4. This file covers the 
 reference layers FD-NGX on top.
 
 The scaffold ships a complete **entity CRUDL** example wired end to end: a list page with filter / sort / pagination
-controls, a detail page, a shared form page for create and edit, and a confirm dialog for delete. The app is a
-statechart: each page route is a state, and actions are the only transitions. The URL enters the store one way, from
-`routerNavigatedAction` into the page reducer whose state matches; each page reads only its own slice, registered on
-its route, and loads its data from its own lifecycle.
+controls, a detail page, a shared form page for create and edit, and a confirm dialog for delete. State is
+route-driven: each page route names its state, and the URL enters the store one way, from `routerNavigatedAction` into
+the page reducer whose state matches. Each page reads only its own slice, registered on its route, loads its data from
+its own lifecycle, and owns the requests it starts: a read ends when the page is left, and a write's follow-up runs
+only while the page that started it is still open.
 
 ## Contents
 
@@ -185,7 +186,7 @@ web/
     └── app/
         ├── app.component.ts         # root
         ├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
-        ├── app.routes.ts            # the statechart: one route per state (data.state), each registering its page slice
+        ├── app.routes.ts            # one route per state (data.state), each registering its page slice
         ├── components/
         │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
         │   ├── confirm-dialog.component.browser.spec.ts   # its browser-mode test
@@ -232,11 +233,12 @@ only code that uses `HttpClient`: `list`, `get`, `create`, `update` and `delete`
 reads `apiBaseUrl` from the app-context slice. Effects inject the service and map its results to success and failure
 actions; pages never call it.
 
-**The app is a statechart.** Each page route is a state, named in its `data: { state }` (`entity-list`,
-`entity-detail`, `entity-new`, `entity-edit`, typed by `AppState`), and actions are the only transitions. Each page's
-`status` union holds its sub-states (`'idle' | 'loading' | 'loaded' | …`). Data moves one way, in two loops:
+**State is route-driven.** Each page route names its state in `data: { state }` (`entity-list`, `entity-detail`,
+`entity-new`, `entity-edit`, typed by `AppState`), and each page's `status` union names what the page is doing
+(`'idle' | 'loading' | 'loaded' | …`). The names make the app readable from `app.routes.ts`; reducers do not enforce
+which action may follow which. Data moves one way, in two loops:
 
-- **Navigation:** user intent → `AppRouterActions.navigate` → `navigate$` → Angular `Router` →
+- **Navigation:** a `routerLink`, or `AppRouterActions.navigate` → `navigate$` → Angular `Router` →
   `routerNavigatedAction` → the page reducer whose state matches stores the params or query it needs. Back, forward,
   deep links and refresh enter through the same `routerNavigatedAction`.
 - **Data:** the page watches its slice's query or id from `ngOnInit` and dispatches `Fetch` / `Load` for each new
@@ -257,10 +259,25 @@ data, failure sets `'error'` with a message. Each slice has one `status` field, 
 of boolean flags such as `loading` / `saving` / `deleting`, and the template switches its status-driven body on it
 with `@switch (status())`; the error banner over it is an `@if (status() === 'error')`.
 
+**Requests belong to the page that started them.** Route-level effects stay registered after their page is gone, so
+resetting the slice on `Leave` is not enough: a response still in flight would land in the next page's slice or
+navigate from the next page's URL. Two rules close that:
+
+- **Reads end on `Leave`.** Every read's inner observable ends with `takeUntil(actions$.pipe(ofType(<Page>.leave)))`,
+  and a load that needs no request (the new form's `null` id) is handled inside `switchMap`, returning `EMPTY`, so it
+  still cancels the read before it. An effect that reads route state from the store samples the nullable value and
+  filters afterwards: filtering inside `withLatestFrom` keeps the last non-null value after `Leave`.
+- **Writes finish, but carry their page.** A save is never cancelled. The form slice keeps the `navigationId` of the
+  router navigation that opened it (`routerNavigatedAction`'s `event.id`), cleared on `Leave`; the write effect records
+  it when the save starts, and the result carries it back. The reducer and `navigateAfterSave$` ignore a result whose
+  `navigationId` is not the slice's, so a save that completes after Cancel neither changes the next form nor
+  redirects.
+
 **Pages inject only the `Store` and read only their slice.** Route params and the list query reach a page through its
-own slice, never through router selectors; navigation is `AppRouterActions.navigate`; forms are built with
-`new FormGroup` / `new FormControl` instead of an injected `FormBuilder`. Only effects inject services
-(`HttpClient`, `Router`).
+own slice, never through router selectors. A plain link is a `routerLink` in the template; a navigation the page
+computes (a new list query) is `AppRouterActions.navigate`, and one that follows a request's result (after a save,
+stepping back off an empty page) is an effect. Forms are built with `new FormGroup` / `new FormControl` instead of an
+injected `FormBuilder`. Only effects inject services (`HttpClient`, `Router`).
 
 ## 7. Core files
 
@@ -342,8 +359,9 @@ export const appConfig: ApplicationConfig = {
     //   - application context (api base URL, app name)
     //   - router (@ngrx/router-store turns every navigation into actions; page reducers copy
     //     what their state needs from routerNavigatedAction, so pages read only their slice)
-    // Page slices are registered on their routes (see app.routes.ts). Navigation is an
-    // action: the app-router effects are the only code that calls the Angular Router.
+    // Page slices are registered on their routes (see app.routes.ts). Templates navigate
+    // with routerLink; everything else dispatches AppRouterActions.navigate, and the
+    // app-router effects are the only code that calls the Angular Router.
     provideStore({
       [APP_CONTEXT_FEATURE_KEY]: appContextReducer,
       [ROUTER_FEATURE_KEY]: routerReducer
@@ -362,12 +380,12 @@ export const appConfig: ApplicationConfig = {
 
 ### `web/src/app/app.routes.ts`
 
-The route table is the app's statechart: each page route is one state, named in `data: { state }` and typed by
+The route table lists the app's states: each page route is one state, named in `data: { state }` and typed by
 `AppState` (`satisfies` makes a typo a compile error). The serializer copies the deepest route's state into every
 router action, and each page reducer reacts only to its own. Each page route registers its slice. The form page
 serves `new` and `:id/edit`, two states, so the two routes sit under one componentless parent that registers the form
 slice once; registering it on both routes would run its effects twice. Route-level slices and effects stay registered
-after the page is left, which is why every page resets its slice on `Leave`.
+after the page is left, which is why every page resets its slice on `Leave` and every read ends on it.
 
 ```ts
 import type { Routes } from '@angular/router';
@@ -387,8 +405,8 @@ import * as entityListPageEffects from './store/entity-list-page/entity-list-pag
 import { entityListPageReducer } from './store/entity-list-page/entity-list-page.reducer';
 import { ENTITY_LIST_PAGE_FEATURE_KEY } from './store/entity-list-page/entity-list-page.selectors';
 
-// The app's statechart: each page route is one state (data.state), and actions are
-// the only transitions between them. Each page registers its own slice on its route.
+// Each page route is one state (data.state) and registers its own slice on its route.
+// Route-level effects outlive the page: reads end on Leave, writes check their page.
 // The form page serves two states, so they share one provider group and its effects run once.
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'entities' },
@@ -468,15 +486,17 @@ export const selectAppName = createSelector(selectAppContext, (s) => s.appName);
 
 ### App-router slice
 
-The router side of the statechart. `@ngrx/router-store` turns every navigation into actions and keeps the last
+The router side of the store. `@ngrx/router-store` turns every navigation into actions and keeps the last
 route under the `appRouter` key (not router-store's default `router`, so the key is passed to `provideRouterStore`).
 `AppRouterSerializer` reduces each snapshot to `{ url, state, params, queryParams }`, where `state` is the deepest
 route's `data.state`. The URL enters the store one way only: page reducers handle `routerNavigatedAction`, read it
 with `navigatedRoute(action)`, and copy what their own state needs when `state` is theirs. Pages and page effects
 never select from `appRouter`.
 
-Navigation is an action too: pages and page effects dispatch `AppRouterActions.navigate`, and the app-router
-`navigate$` effect is the only code that calls the Angular `Router`. It is registered globally in `app.config.ts`.
+Templates navigate with `routerLink` (open a row, _Edit_, _New entity_, _Back_, _Cancel_). A navigation computed in
+code is an action: the list page dispatches `AppRouterActions.navigate` for a new query, and page effects dispatch it
+after a result (a save, a page past the end). The app-router `navigate$` effect is the only code that calls the
+Angular `Router`; it is registered globally in `app.config.ts`.
 
 #### `store/app-router/app-router.model.ts`
 
@@ -904,7 +924,7 @@ page's sub-states, plus an `error` message set only when `status` is `'error'`, 
 (the list input, the detail id, the form target), `null` until the router writes it. The reducer writes that route
 state on `routerNavigatedAction` when the route's `state` is the page's, and only then: navigating away never
 rewrites a slice. Pages dispatch `Leave` on destroy and the reducers reset to the initial state, so a revisit never
-shows stale data.
+shows stale data; every read effect ends its request on the same `Leave`, so nothing in flight lands after it.
 
 ### `store/entity-list-page/`
 
@@ -942,7 +962,8 @@ export const EntityListPageActions = createActionGroup({
 
     /** One request for one list input: the page's watch sends one per new input, and a delete one more. */
     Fetch: props<{ input: ListEntityInput }>(),
-    'Fetch Success': props<{ items: Entity[]; total: number }>(),
+    /** `input` is the one the request was made for. */
+    'Fetch Success': props<{ input: ListEntityInput; items: Entity[]; total: number }>(),
     'Fetch Failure': props<{ error: string }>(),
 
     Delete: props<{ id: string }>(),
@@ -1009,18 +1030,22 @@ export const selectError = createSelector(selectEntityListPageState, (s) => s.er
 #### `store/entity-list-page/entity-list-page.effects.ts`
 
 The page fetches each new list input itself (its watch, in [Pages](#pages)); the effects cover what is not a new
-input. `fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the
-current page. `stepBackPastLastPage$` handles the page that ends up past the end — a delete emptied the last page, or a
-deep link names a page that no longer exists: an empty result with a non-zero total on a page above 1 navigates to the
-last page with `replaceUrl`, since the user did not ask for that step, and the new input reaches the page's watch
-through the reducer like any other navigation.
+input. `fetch$` ends its request on `Leave`, so a list response never arrives after the page is gone.
+`fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the current
+page; a delete is a write and is not cancelled, so the effect samples the slice's input as it is now and drops `null`
+(the page was left) afterwards — filtering inside `withLatestFrom` would keep the input from before `Leave`.
+`stepBackPastLastPage$` handles the page that ends up past the end — a delete emptied the last page, or a deep link
+names a page that no longer exists: an empty result with a non-zero total on a page above 1 navigates to the last page
+with `replaceUrl`, since the user did not ask for that step, and the new input reaches the page's watch through the
+reducer like any other navigation. It reads the input from the result, the one the request was made for, so it needs
+no store.
 
 ```ts
 import { inject } from '@angular/core';
 import { type HttpErrorResponse } from '@angular/common/http';
 import { Store } from '@ngrx/store';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { catchError, concatMap, filter, map, of, switchMap, withLatestFrom } from 'rxjs';
+import { catchError, concatMap, filter, map, of, switchMap, takeUntil, withLatestFrom } from 'rxjs';
 import { toParams } from '../../helpers/entity-list-params.helper';
 import { httpErrorMessage } from '../../helpers/http-error.helper';
 import { EntityService } from '../../services/entity.service';
@@ -1028,25 +1053,27 @@ import { AppRouterActions } from '../app-router/app-router.actions';
 import { EntityListPageActions } from './entity-list-page.actions';
 import { selectListInput } from './entity-list-page.selectors';
 
-// A delete changes the totals and shifts later rows onto the current page, so the list is fetched again.
+// A delete changes the totals and shifts later rows onto the current page, so the list is fetched again,
+// unless the page has been left (the input is null after Leave).
 export const fetchAfterDelete$ = createEffect(
   (actions$ = inject(Actions), store = inject(Store)) =>
     actions$.pipe(
       ofType(EntityListPageActions.deleteSuccess),
-      withLatestFrom(store.select(selectListInput).pipe(filter((input) => input !== null))),
-      map(([, input]) => EntityListPageActions.fetch({ input }))
+      withLatestFrom(store.select(selectListInput)),
+      map(([, input]) => input),
+      filter((input) => input !== null),
+      map((input) => EntityListPageActions.fetch({ input }))
     ),
   { functional: true }
 );
 
 // A page past the end (a delete emptied the last page, or a stale deep link) steps back to the last page.
 export const stepBackPastLastPage$ = createEffect(
-  (actions$ = inject(Actions), store = inject(Store)) =>
+  (actions$ = inject(Actions)) =>
     actions$.pipe(
       ofType(EntityListPageActions.fetchSuccess),
-      withLatestFrom(store.select(selectListInput).pipe(filter((input) => input !== null))),
-      filter(([{ items, total }, input]) => items.length === 0 && total > 0 && input.page > 1),
-      map(([{ total }, input]) =>
+      filter(({ input, items, total }) => items.length === 0 && total > 0 && input.page > 1),
+      map(({ input, total }) =>
         AppRouterActions.navigate({
           commands: [],
           queryParams: toParams({ ...input, page: Math.ceil(total / input.pageSize) }),
@@ -1063,8 +1090,9 @@ export const fetch$ = createEffect(
       ofType(EntityListPageActions.fetch),
       switchMap(({ input }) =>
         entityService.list(input).pipe(
-          map((res) => EntityListPageActions.fetchSuccess({ items: res.items, total: res.total })),
-          catchError((err: HttpErrorResponse) => of(EntityListPageActions.fetchFailure({ error: httpErrorMessage(err) })))
+          map((res) => EntityListPageActions.fetchSuccess({ input, items: res.items, total: res.total })),
+          catchError((err: HttpErrorResponse) => of(EntityListPageActions.fetchFailure({ error: httpErrorMessage(err) }))),
+          takeUntil(actions$.pipe(ofType(EntityListPageActions.leave)))
         )
       )
     ),
@@ -1180,11 +1208,12 @@ export const selectError = createSelector(selectEntityDetailPageState, (s) => s.
 import { inject } from '@angular/core';
 import { type HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { catchError, map, of, switchMap } from 'rxjs';
+import { catchError, map, of, switchMap, takeUntil } from 'rxjs';
 import { httpErrorMessage } from '../../helpers/http-error.helper';
 import { EntityService } from '../../services/entity.service';
 import { EntityDetailPageActions } from './entity-detail-page.actions';
 
+// A newer id cancels the older request (switchMap), and leaving the page cancels it too.
 export const load$ = createEffect(
   (actions$ = inject(Actions), entityService = inject(EntityService)) =>
     actions$.pipe(
@@ -1192,7 +1221,8 @@ export const load$ = createEffect(
       switchMap(({ id }) =>
         entityService.get(id).pipe(
           map((entity) => EntityDetailPageActions.loadSuccess({ entity })),
-          catchError((err: HttpErrorResponse) => of(EntityDetailPageActions.loadFailure({ error: httpErrorMessage(err) })))
+          catchError((err: HttpErrorResponse) => of(EntityDetailPageActions.loadFailure({ error: httpErrorMessage(err) }))),
+          takeUntil(actions$.pipe(ofType(EntityDetailPageActions.leave)))
         )
       )
     ),
@@ -1203,8 +1233,17 @@ export const load$ = createEffect(
 ### `store/entity-form-page/`
 
 States `entity-new` and `entity-edit`, one slice. The reducer copies the target from the URL: `{ id: null }` on
-`/entities/new`, `{ id }` on `/entities/:id/edit`. The page's watch dispatches `Load` with the target's id, or `null`,
-and only an id triggers a request. Status: `'idle' | 'loading' | 'ready' | 'saving' | 'error'`, where `ready` is a new form or an edit form whose entity has loaded. After a successful save, `navigateAfterSave$` dispatches `AppRouterActions.navigate` to the detail page. Writes use `concatMap`, so a second save never cancels the first.
+`/entities/new`, `{ id }` on `/entities/:id/edit`, with the `navigationId` of the navigation that opened it. The page's
+watch dispatches `Load` with the target's id, or `null`; only an id makes a request, but `null` still goes through
+`switchMap`, so moving from an edit form to a new one cancels the edit form's request. Status:
+`'idle' | 'loading' | 'ready' | 'saving' | 'error'`, where `ready` is a new form or an edit form whose entity has
+loaded.
+
+Writes use `concatMap`, so a second save never cancels the first, and they are never cancelled on `Leave`: the user
+asked for the save, and it completes. Its result carries the `navigationId` that was current when it started, and
+applies only while the slice still has that id: the reducer ignores any other, and `navigateAfterSave$` goes to the
+detail page only then. After Cancel (`Leave` clears the id) or on a later visit to the form (a new navigation, a new
+id), a late success changes nothing and redirects nowhere.
 
 #### `store/entity-form-page/entity-form-page.model.ts`
 
@@ -1222,6 +1261,8 @@ export interface EntityFormTarget {
 export interface EntityFormPageState {
   /** Copied from the URL; `null` until the router has navigated to the form. */
   target: EntityFormTarget | null;
+  /** The router navigation that opened the form for `target`; `null` until then and after `Leave`. */
+  navigationId: number | null;
   status: EntityFormPageStatus;
   /** The entity being edited; `null` when creating. */
   entity: Entity | null;
@@ -1246,8 +1287,9 @@ export const EntityFormPageActions = createActionGroup({
 
     Create: props<{ input: CreateEntityInput }>(),
     Update: props<{ id: string; input: UpdateEntityInput }>(),
-    'Save Success': props<{ entity: Entity }>(),
-    'Save Failure': props<{ error: string }>(),
+    /** `navigationId` is the slice's when the save started: the result belongs to that visit of the form. */
+    'Save Success': props<{ entity: Entity; navigationId: number | null }>(),
+    'Save Failure': props<{ error: string; navigationId: number | null }>(),
 
     Leave: emptyProps()
   }
@@ -1266,6 +1308,7 @@ import { type EntityFormPageState, type EntityFormTarget } from './entity-form-p
 
 export const initialEntityFormPageState: EntityFormPageState = {
   target: null,
+  navigationId: null,
   status: 'idle',
   entity: null,
   error: null
@@ -1273,10 +1316,12 @@ export const initialEntityFormPageState: EntityFormPageState = {
 
 export const entityFormPageReducer = createReducer(
   initialEntityFormPageState,
-  // A new target starts the slice over: nothing of the previous form survives.
+  // A new target starts the slice over: nothing of the previous form survives, and its saves no longer apply.
   on(routerNavigatedAction, (state, action) => {
     const target = formTarget(navigatedRoute(action));
-    return target !== null && target.id !== state.target?.id ? { ...initialEntityFormPageState, target } : state;
+    return target !== null && target.id !== state.target?.id
+      ? { ...initialEntityFormPageState, target, navigationId: action.payload.event.id }
+      : state;
   }),
   on(EntityFormPageActions.load, (state, { id }) => ({
     ...state,
@@ -1288,8 +1333,13 @@ export const entityFormPageReducer = createReducer(
   on(EntityFormPageActions.loadFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
 
   on(EntityFormPageActions.create, EntityFormPageActions.update, (state) => ({ ...state, status: 'saving' as const, error: null })),
-  on(EntityFormPageActions.saveSuccess, (state, { entity }) => ({ ...state, status: 'ready' as const, entity })),
-  on(EntityFormPageActions.saveFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
+  // A save's result applies only to the visit of the form that started it.
+  on(EntityFormPageActions.saveSuccess, (state, { entity, navigationId }) =>
+    navigationId === state.navigationId ? { ...state, status: 'ready' as const, entity } : state
+  ),
+  on(EntityFormPageActions.saveFailure, (state, { error, navigationId }) =>
+    navigationId === state.navigationId ? { ...state, status: 'error' as const, error } : state
+  ),
 
   on(EntityFormPageActions.leave, () => initialEntityFormPageState)
 );
@@ -1303,7 +1353,8 @@ function formTarget(route: AppRouterState): EntityFormTarget | null {
 ```
 
 `target.id !== state.target?.id` is `true` for the first `{ id: null }` too, because the initial `target` is `null` and
-`state.target?.id` is then `undefined`.
+`state.target?.id` is then `undefined`. `action.payload.event` is the router's `NavigationEnd`, whose `id` is unique
+per navigation, so leaving and reopening the same form gives it a new `navigationId`.
 
 #### `store/entity-form-page/entity-form-page.selectors.ts`
 
@@ -1317,6 +1368,8 @@ export const selectEntityFormPageState = createFeatureSelector<EntityFormPageSta
 
 /** The target the reducer copied from the URL; `null` until the router has navigated to the form. */
 export const selectTarget = createSelector(selectEntityFormPageState, (s) => s.target);
+/** For the effects: which visit of the form a save belongs to. */
+export const selectNavigationId = createSelector(selectEntityFormPageState, (s) => s.navigationId);
 export const selectStatus = createSelector(selectEntityFormPageState, (s) => s.status);
 export const selectEntity = createSelector(selectEntityFormPageState, (s) => s.entity);
 export const selectError = createSelector(selectEntityFormPageState, (s) => s.error);
@@ -1327,37 +1380,45 @@ export const selectError = createSelector(selectEntityFormPageState, (s) => s.er
 ```ts
 import { inject } from '@angular/core';
 import { type HttpErrorResponse } from '@angular/common/http';
+import { Store } from '@ngrx/store';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { catchError, concatMap, filter, map, of, switchMap } from 'rxjs';
+import { catchError, concatMap, EMPTY, filter, map, of, switchMap, takeUntil, withLatestFrom } from 'rxjs';
 import { httpErrorMessage } from '../../helpers/http-error.helper';
 import { EntityService } from '../../services/entity.service';
 import { AppRouterActions } from '../app-router/app-router.actions';
 import { EntityFormPageActions } from './entity-form-page.actions';
+import { selectNavigationId } from './entity-form-page.selectors';
 
+// A new form (id null) needs no request, but still goes through switchMap to cancel the one before it;
+// leaving the page cancels it too.
 export const load$ = createEffect(
   (actions$ = inject(Actions), entityService = inject(EntityService)) =>
     actions$.pipe(
       ofType(EntityFormPageActions.load),
-      filter((action): action is typeof action & { id: string } => action.id !== null),
       switchMap(({ id }) =>
-        entityService.get(id).pipe(
-          map((entity) => EntityFormPageActions.loadSuccess({ entity })),
-          catchError((err: HttpErrorResponse) => of(EntityFormPageActions.loadFailure({ error: httpErrorMessage(err) })))
-        )
+        id === null
+          ? EMPTY
+          : entityService.get(id).pipe(
+              map((entity) => EntityFormPageActions.loadSuccess({ entity })),
+              catchError((err: HttpErrorResponse) => of(EntityFormPageActions.loadFailure({ error: httpErrorMessage(err) }))),
+              takeUntil(actions$.pipe(ofType(EntityFormPageActions.leave)))
+            )
       )
     ),
   { functional: true }
 );
 
-// Writes use concatMap so a second save never cancels the first.
+// Writes use concatMap so a second save never cancels the first, and are not cancelled on Leave.
+// Each records the form's navigationId as the save starts, so its result can tell whether that visit is still open.
 export const create$ = createEffect(
-  (actions$ = inject(Actions), entityService = inject(EntityService)) =>
+  (actions$ = inject(Actions), store = inject(Store), entityService = inject(EntityService)) =>
     actions$.pipe(
       ofType(EntityFormPageActions.create),
-      concatMap(({ input }) =>
+      withLatestFrom(store.select(selectNavigationId)),
+      concatMap(([{ input }, navigationId]) =>
         entityService.create(input).pipe(
-          map((entity) => EntityFormPageActions.saveSuccess({ entity })),
-          catchError((err: HttpErrorResponse) => of(EntityFormPageActions.saveFailure({ error: httpErrorMessage(err) })))
+          map((entity) => EntityFormPageActions.saveSuccess({ entity, navigationId })),
+          catchError((err: HttpErrorResponse) => of(EntityFormPageActions.saveFailure({ error: httpErrorMessage(err), navigationId })))
         )
       )
     ),
@@ -1365,24 +1426,28 @@ export const create$ = createEffect(
 );
 
 export const update$ = createEffect(
-  (actions$ = inject(Actions), entityService = inject(EntityService)) =>
+  (actions$ = inject(Actions), store = inject(Store), entityService = inject(EntityService)) =>
     actions$.pipe(
       ofType(EntityFormPageActions.update),
-      concatMap(({ id, input }) =>
+      withLatestFrom(store.select(selectNavigationId)),
+      concatMap(([{ id, input }, navigationId]) =>
         entityService.update(id, input).pipe(
-          map((entity) => EntityFormPageActions.saveSuccess({ entity })),
-          catchError((err: HttpErrorResponse) => of(EntityFormPageActions.saveFailure({ error: httpErrorMessage(err) })))
+          map((entity) => EntityFormPageActions.saveSuccess({ entity, navigationId })),
+          catchError((err: HttpErrorResponse) => of(EntityFormPageActions.saveFailure({ error: httpErrorMessage(err), navigationId })))
         )
       )
     ),
   { functional: true }
 );
 
+// Only the visit of the form that started the save moves on to the detail page.
 export const navigateAfterSave$ = createEffect(
-  (actions$ = inject(Actions)) =>
+  (actions$ = inject(Actions), store = inject(Store)) =>
     actions$.pipe(
       ofType(EntityFormPageActions.saveSuccess),
-      map(({ entity }) => AppRouterActions.navigate({ commands: ['/entities', entity.id] }))
+      withLatestFrom(store.select(selectNavigationId)),
+      filter(([{ navigationId }, current]) => navigationId === current),
+      map(([{ entity }]) => AppRouterActions.navigate({ commands: ['/entities', entity.id] }))
     ),
   { functional: true }
 );
@@ -1546,7 +1611,8 @@ ngOnDestroy(): void {
   until the refetch after the delete delivers a new page of items, and closes then. On a failed delete the items do
   not change, so the dialog stays open, no longer busy, over the error banner. The row button and the dialog's
   confirm are both named _Delete_, so specs scope to `page.getByRole('dialog')` or the row.
-- Rows show the name (a link to the detail page), the description and `createdAt | date: 'medium'`.
+- Rows show the name (a `routerLink` to the detail page), the description and `createdAt | date: 'medium'`. _New
+  entity_ is a `routerLink` too: plain links need no action.
 - `status() === 'error'` shows `error()` in a banner. The empty row switches on the status: _Loading…_ while
   `'loading'`, otherwise _No entities match the filter._ when a filter is active, or _No entities yet._
 - Every input and select has a `name`; the free-text inputs also set `autocomplete="off"`, since they are not
@@ -1561,8 +1627,8 @@ ngOnDestroy(): void {
   `leave()` on destroy. A link to another entity reuses the component; the watch loads the new id.
 - Shows the description (`—` when it is `null`) and `createdAt` / `updatedAt` with `date: 'medium'`.
 - The error banner is an `@if (status() === 'error')`; under it, `@switch (status())` renders _Loading…_ or (on
-  `'loaded'`) the entity with a link to the edit page.
-- Accessible names: the entity's name as the heading, link _Edit_, link _← Back to entities_.
+  `'loaded'`) the entity with a `routerLink` to the edit page.
+- Accessible names: the entity's name as the heading, link _Edit_, link _← Back to entities_ (both `routerLink`).
 
 ### `pages/entity-form-page.component.ts`
 
@@ -1571,8 +1637,9 @@ ngOnDestroy(): void {
   destroy.
 - The form is `new FormGroup({ name: new FormControl(…), description: new FormControl(…) })`, with no injected
   `FormBuilder`; an `effect(() => …)` fills it when `selectEntity` delivers the edited entity.
-- After a save, the slice's `navigateAfterSave$` effect dispatches `AppRouterActions.navigate` to the detail page; the
-  page itself never navigates.
+- After a save, the slice's `navigateAfterSave$` effect dispatches `AppRouterActions.navigate` to the detail page, if
+  this visit of the form is still open; the page itself never navigates after a result. _← Cancel_ is a `routerLink`
+  to the list, and works while a save is in flight: the save completes, and nothing redirects.
 - `status() === 'error'` shows `error()` in a banner. The Save button is disabled while `'loading'` or `'saving'`
   and its label switches on the status (_Loading…_, _Saving…_, _Save_).
 - Validation mirrors the API's create schema: `name` is `Validators.required` + `Validators.maxLength(200)`,
