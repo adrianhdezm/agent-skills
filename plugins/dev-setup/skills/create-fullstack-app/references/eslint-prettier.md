@@ -245,7 +245,8 @@ export default defineConfig([
   `*.reducer.ts` → `complexity` off (grows with actions by design); tests → `max-lines-per-function` off (and, in web,
   `max-nested-callbacks` off, since `describe`/`it`/callback nesting is idiomatic).
 - **Web only: `eslint-plugin-storybook` + extra ignores** (`storybook-static/**` is build output; `playwright.config.ts`
-  is a root config that isn't in a TS project). `...storybook.configs['flat/recommended']` lints `*.stories.ts`. The
-  browser-mode and e2e specs live outside `tsconfig.app`/`tsconfig.spec`, so `tsconfig.browser.json` (referenced from
-  `tsconfig.json`) and `e2e/tsconfig.json` give ESLint's project service a home for `*.browser.spec.ts`, `src/testing/`
-  and `e2e/`. The browser config (`vitest.browser.config.mts`) is an `.mts` file, so `**/*.ts` rules don't apply to it.
+  sits at the web root, where the project service looks in `tsconfig.json`, but only `e2e/tsconfig.json` includes it —
+  so it is type-checked by `typecheck`, not linted). `...storybook.configs['flat/recommended']` lints `*.stories.ts`.
+  Every spec, unit and browser alike, plus `src/test-setup.ts` and `src/testing/`, is in `tsconfig.spec.json`, and
+  `e2e/tsconfig.json` is the nearest tsconfig for `e2e/`, so the project service finds every file. The test config
+  (`vitest.config.mts`) is an `.mts` file, so `**/*.ts` rules don't apply to it.

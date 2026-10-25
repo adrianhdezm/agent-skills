@@ -83,35 +83,46 @@ API. To share one config later, add a root `.prettierrc` and delete the per-proj
 
 Node's `--watch` provides the restart loop and `--import=tsx` the TypeScript loader: stock Node, one concern each.
 
-### Tests run in three projects; only the DAO tier needs a database
+### Tests run in four projects: controller unit tests apart from end-to-end API tests
 
-The API is tested in three vitest `projects`. `unit` and `api` run without Postgres: the filter / sort translator
-through the SQL it renders with `PgDialect`, the list-input builders directly, and the controllers through `createApp`
-with a fake DAO on the context, driven over real HTTP with `fetch` (not `supertest`). The `db` project uses
-Testcontainers (`@testcontainers/postgresql`) to run the real DAO against a throwaway `postgres:17-alpine`, migrated
-with the drizzle migrator. The DAO used to be covered only by the Compose smoke test; the `db` tier now exercises
-`list`'s filter, sort and pagination exhaustively (each alone and combined) against real Postgres, plus the create /
-get / update / delete happy and edge paths. It is a separate `pnpm test:db` script so the default `pnpm test`
-(`unit` + `api`) stays Docker-free and runs in CI without a daemon; `test:db` needs Docker and an existing
-`db/migrations/` (so it runs after the first `db:generate`). The web tests the URL (de)serializer every list page
-depends on. `test` is a required check in both projects.
+The API is tested in four vitest `projects`. `unit` and `controllers` run without Postgres: the filter / sort
+translator through the SQL it renders with `PgDialect`, the list-input builders directly, and each controller through
+`createApp` with a fake DAO on the context, driven over real HTTP with `fetch` (not `supertest`). `db` and `api` use
+Testcontainers (`@testcontainers/postgresql`) with a throwaway `postgres:17-alpine`, migrated with the drizzle
+migrator: `db` runs the real DAO directly, exercising `list`'s filter, sort and pagination exhaustively (each alone and
+combined) plus the create / get / update / delete happy and edge paths; `api` serves the real app on the real DAO and
+drives each route end to end.
+
+The two HTTP tiers answer different questions. A controller test checks what the controller does with whatever the
+DAO returns, so it can test every validation and error branch cheaply, but it cannot show that the real DAO accepts
+what the controller sends or returns what the controller serializes. The API test shows exactly that, per resource.
+The fake-DAO tests used to live in `tests/api/` and the one real round trip in `tests/db/entity.full-stack.test.ts`,
+so the folder named `api` held the unit-style tests; the folders now say what each tier is.
+
+The Docker tiers are a separate `pnpm test:integration` script (it was `test:db` while it ran only the DAO suite), so the
+default `pnpm test` (`unit` + `controllers`) stays Docker-free and runs in CI without a daemon; `test:integration`
+needs Docker and an existing `db/migrations/` (so it runs after the first `db:generate`). The web's layers are under [Web](#web). `test` is a
+required check in both projects.
 
 ### One vitest config with projects, not multiple config files
 
-A single `api/vitest.config.ts` defines named `projects` (`unit`, `api`, `db`) selected by folder glob, with shared
+A single `api/vitest.config.ts` defines named `projects` (`unit`, `controllers`, `db`, `api`) selected by folder glob, with shared
 options at the root that each project inherits. A second `vitest.config.db.ts` was tried and dropped: two config files
 duplicated the shared setup and drifted. Scripts pick projects on the command line — `test` runs
-`--project unit --project api`, `test:db` runs `--project db` — so one config serves every suite.
+`--project unit --project controllers`, `test:integration` runs `--project db --project api` — so one config serves
+every suite.
 
 ### Tests are grouped by kind, each file one describe
 
-`api/tests/` is split into `unit/`, `api/`, `db/` and `utils/` by test kind, not mirrored against `src/`. Each test
-file wraps its suites in a single top-level `describe` named for the module under test (`describe('entity.dao')`,
-`describe('dao.helper')`, …), with nested describes only where a file covers several functions. There is one route-test
-file per controller (`entity` / `home` / `health`). `utils/` holds shared, non-test helpers: the Testcontainers
-bootstrap (`pg-container.ts`), the fake-DAO / app factory (`fake-dao.ts`), the HTTP test-server helper
-(`test-server.ts`) and seed generators (`entity-seed.ts`). Grouping by kind is what lets the vitest `projects` select a
-suite by folder and keeps the Docker-free tiers apart from the DB tier.
+`api/tests/` is split into `unit/`, `controllers/`, `db/`, `api/` and `utils/` by test kind, not mirrored against
+`src/`. Each test file wraps its suites in a single top-level `describe` named for the file's module
+(`describe('entity.dao')`, `describe('dao.helper')`, `describe('entity.api')`, …), with nested describes only where a
+file covers several functions. There is one controller-test file per controller (`entity` / `home` / `health`) plus
+`error.middleware.test.ts` for the terminal handler, one DAO test and one API test per resource. `utils/` holds shared,
+non-test helpers: the Testcontainers bootstrap (`pg-container.ts`), the fake-DAO / app factory (`fake-dao.ts`), the
+HTTP test-server helper (`test-server.ts`, whose `serve(app)` both the controller and API tests use) and seed
+generators (`entity-seed.ts`). Grouping by kind is what lets the vitest `projects` select a suite by folder and keeps
+the Docker-free tiers apart from the Docker ones.
 
 ## API
 
@@ -372,28 +383,39 @@ reset clobbers FD-NGX's base styles, and `body` margin and font are set by hand.
 Components (`components/`, `input()`/`output()`, store-free) are developed and documented in Storybook. The Angular
 webpack builder (`@storybook/angular`) would pull a second, webpack toolchain into a project that is deliberately
 esbuild/Vite (`@angular/build`). `@storybook/angular-vite` compiles Angular through `@analogjs/vite-plugin-angular` on
-Vite instead, so Storybook shares the app's toolchain (and the one the browser tests use). `zone.js` and
-`@angular/animations` come along as peers of the Storybook Angular tooling, not because the app uses them — the app is
-zoneless.
+Vite instead, so Storybook shares the app's toolchain (and the plugin `ng test` uses). `@angular/animations` comes
+along as a required peer of `@storybook/angular-vite`, not because the app uses it. `zone.js` was installed with it
+until it turned out to be an optional peer: the builder runs zoneless by default, like the app, so it was dropped.
 
-### Web tests are three layers, and `web` is pinned to Vitest 4
+### Web tests run on Analog's Vitest builder, one config with two projects
 
-`ng test` (Vitest + jsdom, via the Angular builder) covers services, every slice and the helpers as `*.spec.ts` beside
-the file — the required `test` check. On top, **browser-mode** page tests (`pnpm test:browser`, Vitest browser mode +
-Playwright) render each page in real Chromium with a mocked store, and **full-stack e2e** (`pnpm test:e2e`, Playwright
-Test) drives the real app → API → Postgres. The jsdom layer is kept fast and Docker-free; the real browser and the
-backend only enter the two opt-in scripts.
+`ng test` runs on `@analogjs/vitest-angular:test`, not the CLI's `@angular/build:unit-test`. One `vitest.config.mts`
+holds two projects: `unit` (jsdom — services, every slice, helpers, routes; the required `test` check) and `browser`
+(real Chromium through Playwright — components and pages with a mock store; `ng test -c browser`). The angular.json
+target's `project` option picks which one runs. On top, **full-stack e2e** (`pnpm test:e2e`, Playwright Test) drives
+the real app → API → Postgres. The jsdom layer is kept fast and Docker-free; the real browser and the backend only
+enter the two opt-in scripts.
 
-`web` is pinned to **Vitest 4** (`vitest`, `@vitest/browser`, `@vitest/browser-playwright` all pinned to the one exact
-version `4.1.12`, no caret — so the tightly-coupled browser-mode family cannot drift to different 4.x minors, the same
-reasoning as the exact TypeScript pin). Vitest 5's
-browser mode never injects its `@vitest/browser/context` virtual module here — the toolchain (Storybook, Analog,
-`@angular/build`, the API) resolves several `vitest@5` realms, so the `vitest` running the browser plugin and the
-`@vitest/browser` the test imports are different instances and `page` throws. `@angular/build` accepts
-`vitest ^4.0.8 || ^5.0.0`, so `ng test` is unaffected; the API, a separate package, stays on Vitest 5. Revisit when
-browser mode works on 5 in this workspace.
+The CLI's builder ran the unit specs while a separate `vitest.browser.config.mts` ran the browser ones, with its own
+tsconfig, an `exclude` on the test target and two compile paths. One builder and one config give one compile path
+(the Analog plugin Storybook already uses), the same project layout as the API's `vitest.config.ts`, and one place to
+change test options. It is named `vitest.config.*` so Storybook, which reads `vite.config.*`, never loads it.
 
-### The web e2e is full-stack, not stubbed
+`web` and the API share **Vitest 5** through the catalog. `web` was pinned to Vitest 4.1.12 while the browser specs had
+their own config, because Vitest 5's browser mode failed there (`page` threw); on the single config through the Analog
+builder, both projects pass on 5, so the pin was dropped.
+
+### Every spec is in `tsconfig.spec.json`
+
+Under Vitest, the Analog plugin compiles only the files in `tsconfig.spec.json`'s program; any other file falls through
+to Vite's plain TypeScript transform, which skips the Angular compiler. The browser specs used to sit in a separate
+`tsconfig.browser.json`, and components reached only from them were compiled without their signal `input()` /
+`output()` metadata, so `setInput` and template bindings failed (`NG0303` / `NG0315`) and `ConfirmDialog` was left to
+Storybook and e2e. With every spec, unit and browser, plus both setup files in `tsconfig.spec.json`, signal-input
+components are browser-tested like pages, and `ConfirmDialog` has its own spec. Keep `input()` / `output()` on
+components; never switch to `@Input()` to make a component testable.
+
+### The web e2e is full-stack, not stubbed, and isolated from the dev stack
 
 `pnpm test:e2e` starts the real app (`ng serve`), the real API (node) and real Postgres (compose), applies migrations
 and truncates, then drives CRUD through the browser, seeding setup data through the API `request` fixture. Stubbing the
@@ -401,13 +423,19 @@ API with `page.route` was the first cut and dropped: the point of the e2e layer 
 mirrors the API types by hand), which a stub cannot catch. The cost is that `test:e2e` needs Docker and the root
 `.env`; the fast jsdom and browser-mode layers do not, so only this script depends on the backend.
 
-### Signal-input components are covered by Storybook + e2e, not browser-mode unit tests
+It runs in its own `app_e2e` database, with its own API on `:3100` and `ng serve -c e2e` on `:4300`. The first version
+used the dev `app` database, `:3000` and `:4200`: setup truncated the developer's `entity` table, the servers reused a
+running dev or Compose API that pointed at that same database, and teardown ran `docker compose down`, stopping the
+whole stack. Now teardown stops Postgres only if setup started it, and the dev stack can stay up during the run.
 
-Analog's browser-mode compile emits empty `inputs`/`outputs` metadata for components that use signal `input()` /
-`output()` (a rendered component's `ɵcmp.inputs` is `[]`), so neither a parent template binding nor `setInput` can
-reach them in Vitest browser mode (`NG0303` / `NG0315`). AOT, JIT, split projects/processes and the
-`vitest-browser-angular` helper were all tried; none recovered the metadata. Rather than drop signal inputs (switching
-`ConfirmDialog` to `@Input()`/`@Output()` would make it browser-testable but abandons the component convention), such
-components are exercised in **Storybook** and through the **e2e** flow, and the browser-mode layer sticks to the pages
-(which read the store, not component inputs). The list page's browser spec therefore asserts rendering only; the delete
-flow through `ConfirmDialog` is an e2e test.
+### A page past the end steps back in the list slice
+
+When a delete empties the last page, or a deep link names a page that no longer exists, `stepBackPastLastPage$`
+navigates to the last page after `Fetch Success`. It used to be a page `effect()` watching the slice, the same pattern
+the post-save navigation was moved out of (see [Pages inject only the Store](#pages-inject-only-the-store)): in the
+slice, the step back is an action like every other navigation, and a unit test covers it.
+
+### Components keep Angular's default change detection
+
+`OnPush` is the default in Angular 22, so no component sets `changeDetection`; writing it on one component made it look
+like the others were eager.

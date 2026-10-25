@@ -14,12 +14,12 @@ real resource, and the template for every later one. The resource-agnostic piece
 - [`api/src/controllers/entity.controller.ts`](#apisrccontrollersentitycontrollerts)
 - [Test layout](#test-layout)
 - [`api/tests/utils/`](#apitestsutils)
-- [`api/tests/api/entity.controller.test.ts`](#apitestsapientitycontrollertestts)
-- [`api/tests/api/home.controller.test.ts`](#apitestsapihomecontrollertestts)
-- [`api/tests/api/health.controller.test.ts`](#apitestsapihealthcontrollertestts)
-- [`api/tests/api/error.middleware.test.ts`](#apitestsapierrormiddlewaretestts)
+- [`api/tests/controllers/entity.controller.test.ts`](#apitestscontrollersentitycontrollertestts)
+- [`api/tests/controllers/home.controller.test.ts`](#apitestscontrollershomecontrollertestts)
+- [`api/tests/controllers/health.controller.test.ts`](#apitestscontrollershealthcontrollertestts)
+- [`api/tests/controllers/error.middleware.test.ts`](#apitestscontrollerserrormiddlewaretestts)
 - [`api/tests/db/entity.dao.test.ts`](#apitestsdbentitydaotestts)
-- [`api/tests/db/entity.full-stack.test.ts`](#apitestsdbentityfull-stacktestts)
+- [`api/tests/api/entity.api.test.ts`](#apitestsapientityapitestts)
 - [`api/tests/unit/entity.schema.test.ts`](#apitestsunitentityschematestts)
 - [Adding another resource](#adding-another-resource)
 
@@ -362,21 +362,28 @@ export async function deleteEntity(req: Request, res: Response, next: NextFuncti
 
 Tests are grouped by kind, not mirrored against `src/` (full rules in `coding-conventions.md`):
 
-- `tests/unit/` — fast, database-free (the `dao.helper`, `list-input.helper` and `entity.schema` tests);
-- `tests/api/` — one file per controller, driving `createApp` over `fetch` with a fake DAO, plus `error.middleware.test.ts`
-  for the terminal handler;
-- `tests/db/` — the DAO against a real Postgres via Testcontainers, plus `entity.full-stack.test.ts` which drives the real
-  app over HTTP against a real DAO + DB (no fake);
-- `tests/utils/` — shared helpers (not tests).
+| folder | what it tests | DAO / DB | project, script |
+| --- | --- | --- | --- |
+| `tests/unit/` | helpers and schemas: `dao.helper`, `list-input.helper`, `query-parser.helper`, `entity.schema` | none | `unit`, `pnpm test` |
+| `tests/controllers/` | **controller unit tests**: one file per controller plus `error.middleware.test.ts` — validation, status codes, error mapping, response shape | fake DAO | `controllers`, `pnpm test` |
+| `tests/db/` | the DAO itself: one `<resource>.dao.test.ts`, every query path | real DAO, Testcontainers Postgres | `db`, `pnpm test:integration` |
+| `tests/api/` | **API tests, end to end**: one `<resource>.api.test.ts`, real HTTP → controller → DAO → Postgres | real DAO, Testcontainers Postgres | `api`, `pnpm test:integration` |
+| `tests/utils/` | shared helpers, not tests | — | — |
 
-Each test file wraps its suites in one top-level `describe` named for the module (`describe('entity.controller')`,
-`describe('entity.dao')`, …). `vitest.config.ts` defines three projects (`unit`, `api`, `db`); `pnpm --filter api test`
-runs `unit` + `api` (no Docker), and `pnpm --filter api test:db` runs `db`.
+A controller test proves what the controller does with whatever the DAO returns; it cannot prove the real DAO accepts
+what the controller sends or returns what the controller serializes. The API test closes that gap per resource, and the
+DAO test covers every query path without HTTP in between.
+
+Each test file wraps its suites in one top-level `describe` named for the file's module (`describe('entity.controller')`,
+`describe('entity.dao')`, `describe('entity.api')`, …). `vitest.config.ts` defines four projects (`unit`,
+`controllers`, `db`, `api`); `pnpm --filter api test` runs `unit` + `controllers` (no Docker), and
+`pnpm --filter api test:integration` runs `db` + `api`.
 
 ## `api/tests/utils/`
 
-Shared test helpers, not tests themselves. The `api` suites use `test-server.ts` + `fake-dao.ts`; the `db` suite uses
-`pg-container.ts` + `entity-seed.ts`.
+Shared test helpers, not tests themselves. The `controllers` suites use `test-server.ts` + `fake-dao.ts`; the `db`
+suite uses `pg-container.ts` + `entity-seed.ts`; the `api` suite uses `pg-container.ts`, `entity-seed.ts` and
+`test-server.ts`'s `serve`.
 
 ### `api/tests/utils/fake-dao.ts`
 
@@ -420,33 +427,40 @@ export function createTestApp(): { app: ReturnType<typeof createApp>; dao: FakeD
 
 ### `api/tests/utils/test-server.ts`
 
-Starts the app on an ephemeral port and hands back the base URL plus the fake DAO and db, so each controller test is a
-few lines of `fetch`.
+Starts an app on an ephemeral port and hands back its base URL. `startTestServer` serves the app with the fake DAO and
+db, so each controller test is a few lines of `fetch`; `serve` takes any app, which is how the API test serves the real
+one.
 
 ```ts
-import { createServer, type Server } from 'node:http';
+import { createServer, type RequestListener, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createTestApp, type FakeDao, type FakeDb } from './fake-dao.js';
 
-export interface TestServer {
+export interface ServedApp {
   readonly baseUrl: string;
-  readonly dao: FakeDao;
-  readonly db: FakeDb;
   readonly close: () => Promise<void>;
 }
 
-/** Start the app (with a fake DAO + db) on an ephemeral port and hand back its base URL and mocks. */
-export async function startTestServer(): Promise<TestServer> {
-  const { app, dao, db } = createTestApp();
+export interface TestServer extends ServedApp {
+  readonly dao: FakeDao;
+  readonly db: FakeDb;
+}
+
+/** Serve an app on an ephemeral port and hand back its base URL. */
+export async function serve(app: RequestListener): Promise<ServedApp> {
   const server: Server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const { port } = server.address() as AddressInfo;
   return {
     baseUrl: `http://127.0.0.1:${port}`,
-    dao,
-    db,
     close: () => new Promise<void>((resolve) => server.close(() => resolve()))
   };
+}
+
+/** Start the app (with a fake DAO + db) on an ephemeral port and hand back its base URL and mocks. */
+export async function startTestServer(): Promise<TestServer> {
+  const { app, dao, db } = createTestApp();
+  return { ...(await serve(app)), dao, db };
 }
 ```
 
@@ -531,7 +545,7 @@ export function seedCanonical(db: DbClient): Promise<Entity[]> {
 }
 ```
 
-## `api/tests/api/entity.controller.test.ts`
+## `api/tests/controllers/entity.controller.test.ts`
 
 Runs the real app from `createApp` on a random port, with a fake DAO on the context (via `startTestServer`). This is what
 the context singleton buys: no database, no module mocking. Uses `fetch`, not `supertest`, and asserts status **and**
@@ -808,7 +822,7 @@ describe('entity.controller', () => {
 });
 ```
 
-## `api/tests/api/home.controller.test.ts`
+## `api/tests/controllers/home.controller.test.ts`
 
 One file per controller: the home descriptor, and the unmatched-path 404 (the not-found middleware's job, exercised at
 the app edge).
@@ -847,7 +861,7 @@ describe('home.controller', () => {
 });
 ```
 
-## `api/tests/api/health.controller.test.ts`
+## `api/tests/controllers/health.controller.test.ts`
 
 The health probe both ways: `ok` when the db stub resolves, `503` when it rejects.
 
@@ -890,7 +904,7 @@ describe('health.controller', () => {
 });
 ```
 
-## `api/tests/api/error.middleware.test.ts`
+## `api/tests/controllers/error.middleware.test.ts`
 
 Exercises the terminal error handler through the real app (fake DAO). The key guarantee is that an **unexpected** error
 (a non-`http-error`) becomes a `500` whose body does **not** leak the original message — only `4xx` errors created with
@@ -962,7 +976,7 @@ second date column, `and` / `or` / `not`, empty `in`), the three combined, and a
 value is parameterized, not executed.
 
 Needs a running Docker daemon **and** an existing `db/migrations/` (run `pnpm --filter api db:generate` first). It runs
-under `pnpm --filter api test:db`, not the default `test`.
+under `pnpm --filter api test:integration`, not the default `test`.
 
 ```ts
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -1292,40 +1306,45 @@ describe('entity.dao', () => {
 });
 ```
 
-## `api/tests/db/entity.full-stack.test.ts`
+## `api/tests/api/entity.api.test.ts`
 
-The one test that wires the **whole** API stack together: a real HTTP request → controller → real `EntityDao` → real
-Postgres (Testcontainers), with no fake DAO. The `tests/api/*` controller tests mock the DAO and the `tests/db/*` DAO
-tests bypass HTTP; this closes the seam between them, catching any controller↔DAO contract drift (e.g. the `sort` object
-the controller builds vs. what the DAO expects). Lives in `tests/db/` so it runs under `pnpm --filter api test:db`.
+The resource's API, end to end: the real app served by `serve` on the real `EntityDao` and a Testcontainers Postgres,
+driven over `fetch`, with no fake. Where the controller test programs the DAO's answers, this one gets them from real
+rows, so it covers what only the real stack can show:
+
+- `POST` creates a row, and the response carries ISO-8601 `createdAt` / `updatedAt` strings.
+- `GET /entities` answers a `filter` (with `or`), `sortField` / `sortDirection` and `page` / `pageSize` sent as a real
+  query string from seeded rows, with the right `total` and `totalPages`; an unknown filter field is a 400.
+- `GET` / `PATCH` / `DELETE /entities/:id` read, update and delete a stored row, and a deleted row then 404s.
+- A row that does not exist is a 404 on `GET`, `PATCH` and `DELETE` — the `NotFoundError` the real DAO throws.
+
+Every route's happy path and every DAO-raised error belong here; validation edge cases (malformed JSON, oversize
+bodies, each invalid field) stay in the controller test. Needs Docker and `db/migrations/`, like the DAO test.
 
 ```ts
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { EntityDao } from '../../src/daos/entity.dao.js';
 import { entity } from '../../src/db/schemas/entity.schema.js';
 import type { AppContext } from '../../src/models/app-context.model.js';
+import { seedCanonical } from '../utils/entity-seed.js';
 import { startTestDb, type TestDb } from '../utils/pg-container.js';
+import { serve, type ServedApp } from '../utils/test-server.js';
 
-// Unlike tests/api/* (which mock the DAO), this exercises the whole stack:
-// real HTTP request -> controller -> real EntityDao -> real Postgres.
+const MISSING_ID = '00000000-0000-4000-8000-000000000000';
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
 let testDb: TestDb;
-let server: Server;
-let baseUrl: string;
+let server: ServedApp;
 
 beforeAll(async () => {
   testDb = await startTestDb();
   const context: AppContext = { db: testDb.db, entityDao: new EntityDao(testDb.db) };
-  server = createServer(createApp(context));
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const { port } = server.address() as AddressInfo;
-  baseUrl = `http://127.0.0.1:${port}`;
+  server = await serve(createApp(context));
 });
 
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await server.close();
   await testDb.stop();
 });
 
@@ -1333,45 +1352,74 @@ beforeEach(async () => {
   await testDb.db.delete(entity);
 });
 
-describe('entity full-stack', () => {
-  it('round-trips create -> list -> get -> update -> delete through the real DAO and DB', async () => {
-    // Create
-    const createRes = await fetch(`${baseUrl}/entities`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'roundtrip', description: 'hello' })
+function request(path: string, init?: { method: string; body?: unknown }): Promise<Response> {
+  return fetch(`${server.baseUrl}${path}`, {
+    method: init?.method ?? 'GET',
+    headers: init?.body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: init?.body === undefined ? undefined : JSON.stringify(init.body)
+  });
+}
+
+describe('entity.api', () => {
+  describe('POST /entities', () => {
+    it('creates a row and returns it with ISO dates', async () => {
+      // Act
+      const res = await request('/entities', { method: 'POST', body: { name: 'alpha', description: 'first' } });
+
+      // Assert
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({ name: 'alpha', description: 'first' });
+      expect(body['createdAt']).toMatch(ISO);
+      expect(body['updatedAt']).toMatch(ISO);
     });
-    expect(createRes.status).toBe(201);
-    const created = (await createRes.json()) as { id: string; name: string; description: string | null };
-    expect(created).toMatchObject({ name: 'roundtrip', description: 'hello' });
-    expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
 
-    // List sees it
-    const listRes = await fetch(`${baseUrl}/entities`);
-    expect(listRes.status).toBe(200);
-    expect(await listRes.json()).toMatchObject({ items: [{ id: created.id, name: 'roundtrip' }], total: 1, totalPages: 1 });
+  describe('GET /entities', () => {
+    it('answers a filter, sort and page from real rows', async () => {
+      // Arrange
+      await seedCanonical(testDb.db);
+      const filter = encodeURIComponent(JSON.stringify({ or: [{ name: { beginsWith: 'a' } }, { description: { contains: 'F' } }] }));
 
-    // Get by id
-    const getRes = await fetch(`${baseUrl}/entities/${created.id}`);
-    expect(getRes.status).toBe(200);
-    expect(await getRes.json()).toMatchObject({ id: created.id, name: 'roundtrip' });
+      // Act
+      const res = await request(`/entities?filter=${filter}&sortField=name&sortDirection=DESC&page=2&pageSize=2`);
 
-    // Update
-    const patchRes = await fetch(`${baseUrl}/entities/${created.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'renamed' })
+      // Assert
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { items: { name: string }[]; total: number; page: number; pageSize: number; totalPages: number };
+      expect(body.items).toEqual([expect.objectContaining({ name: 'alpha' })]);
+      expect(body).toMatchObject({ total: 3, page: 2, pageSize: 2, totalPages: 2 });
     });
-    expect(patchRes.status).toBe(200);
-    expect(await patchRes.json()).toMatchObject({ id: created.id, name: 'renamed', description: 'hello' });
 
-    // Delete
-    const deleteRes = await fetch(`${baseUrl}/entities/${created.id}`, { method: 'DELETE' });
-    expect(deleteRes.status).toBe(204);
+    it('rejects an unknown filter field with 400', async () => {
+      const res = await request(`/entities?filter=${encodeURIComponent(JSON.stringify({ title: { eq: 'x' } }))}`);
+      expect(res.status).toBe(400);
+    });
+  });
 
-    // Gone
-    const goneRes = await fetch(`${baseUrl}/entities/${created.id}`);
-    expect(goneRes.status).toBe(404);
+  describe('GET / PATCH / DELETE /entities/:id', () => {
+    it('reads, updates and deletes a stored row', async () => {
+      // Arrange
+      const [row] = await seedCanonical(testDb.db);
+
+      // Act + Assert
+      const got = await request(`/entities/${row.id}`);
+      expect(got.status).toBe(200);
+      expect(await got.json()).toMatchObject({ id: row.id, name: 'alpha' });
+
+      const patched = await request(`/entities/${row.id}`, { method: 'PATCH', body: { name: 'renamed' } });
+      expect(patched.status).toBe(200);
+      expect(await patched.json()).toMatchObject({ id: row.id, name: 'renamed', description: 'first' });
+
+      expect((await request(`/entities/${row.id}`, { method: 'DELETE' })).status).toBe(204);
+      expect((await request(`/entities/${row.id}`)).status).toBe(404);
+    });
+
+    it('answers 404 for a row that does not exist, on every id route', async () => {
+      expect((await request(`/entities/${MISSING_ID}`)).status).toBe(404);
+      expect((await request(`/entities/${MISSING_ID}`, { method: 'PATCH', body: { name: 'x' } })).status).toBe(404);
+      expect((await request(`/entities/${MISSING_ID}`, { method: 'DELETE' })).status).toBe(404);
+    });
   });
 });
 ```
@@ -1445,8 +1493,9 @@ createSortInputSchema([...])`, `ListUserInput`, `listUserInputSchema` and `userD
 5. `server.ts`: instantiate `new UserDao(db)` in the context literal.
 6. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the schemas and the DAO.
 7. `app.ts`: wire the routes.
-8. Tests: copy `tests/api/user.controller.test.ts` (routes, fake DAO), `tests/db/user.dao.test.ts` (Testcontainers) and
-   `tests/unit/user.schema.test.ts` (schema wiring) from the entity ones, swapping the schema and DAO. Add a
+8. Tests: copy `tests/controllers/user.controller.test.ts` (routes, fake DAO), `tests/db/user.dao.test.ts`
+   (Testcontainers), `tests/api/user.api.test.ts` (end to end over HTTP) and `tests/unit/user.schema.test.ts` (schema
+   wiring) from the entity ones, swapping the schema and DAO. Add a
    `tests/utils/user-seed.ts` seed generator for the DAO suite; `fake-dao.ts`, `test-server.ts` and `pg-container.ts` are
    reused as-is.
 9. Web: mirror `User`, `UserFilterInput`, `UserSortInput` and `ListUserInput` in `models/user.model.ts`, then add the

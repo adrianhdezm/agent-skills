@@ -31,6 +31,15 @@ In `web/angular.json`, the build config's `styles` array becomes:
 ]
 ```
 
+That array only feeds the app build. Storybook's canvas and the browser-mode tests load their stylesheets by import, so
+add the same two files above the `styles.css` import in `web/.storybook/preview.ts` and
+`web/src/testing/browser-setup.ts`:
+
+```ts
+import '@sap-theming/theming-base-content/content/Base/baseLib/sap_horizon/css_variables.css';
+import '@fundamental-ngx/core/styles/fundamental-ngx-core.css';
+```
+
 ## 3. Tailwind + FD-NGX co-existence
 
 Tailwind v4 **must skip preflight** when FD-NGX is in the project — Tailwind's reset would clobber the Fundamental styles. The default `web/src/styles.css` imports Tailwind's layers one by one; delete the preflight line and set the margin and the SAP font on `body` by hand:
@@ -56,7 +65,8 @@ Tailwind v4's CSS-variable shorthand plays nicely with the Horizon tokens:
 - `bg-(--sapBackgroundColor)`
 - `text-(--sapContent_LabelColor)`
 
-Do **not** use the arbitrary `bg-[var(--sapShellColor)]` form — ESLint (if angular-eslint tailwindcss rules are enabled) will flag it, and the shorthand is the canonical Tailwind v4 syntax.
+Use the shorthand rather than the arbitrary `bg-[var(--sapShellColor)]` form: both compile to the same CSS, but the
+shorthand is Tailwind v4's canonical syntax for a CSS variable, and it is shorter to read in a template.
 
 ## 5. Import FD-NGX components à la carte
 

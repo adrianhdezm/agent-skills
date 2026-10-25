@@ -1,48 +1,202 @@
 # Web tests
 
-The web app has **three** test layers, each with its own runner:
+The web app has **three** test layers. The first two are one Vitest setup run through Analog's Angular builder; the
+third is Playwright Test:
 
-| layer                  | runner                                   | what it covers                                               | command            |
-| ---------------------- | ---------------------------------------- | ------------------------------------------------------------ | ------------------ |
-| unit                   | `ng test` (Vitest + jsdom, Angular CLI)  | services, every NgRx slice, helpers — `*.spec.ts` beside the file | `pnpm test`        |
-| component / page browser | Vitest **browser mode** + Playwright     | pages rendered in real Chromium with a mocked store          | `pnpm test:browser`|
-| full-stack e2e         | **Playwright Test**                      | the real app → real API → real Postgres                      | `pnpm test:e2e`    |
+| layer                    | runner                                                    | what it covers                                                   | command             |
+| ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- |
+| unit                     | `ng test` → Vitest project `unit` (jsdom)                 | services, every NgRx slice, helpers, routes, the app shell       | `pnpm test`         |
+| component / page browser | `ng test -c browser` → Vitest project `browser` (Chromium) | components and pages rendered in real Chromium with a mock store | `pnpm test:browser` |
+| full-stack e2e           | **Playwright Test**                                       | the real app → real API → real Postgres, in its own database     | `pnpm test:e2e`     |
 
-`ng test` is the required check (`test`); `test:browser` and `test:e2e` are additional scripts.
-
-> **Web is pinned to Vitest 4** (`vitest`, `@vitest/browser`, `@vitest/browser-playwright` all `4.1.12`). Vitest 5's
-> browser mode does not inject its `@vitest/browser/context` virtual module in this workspace (peer fan-out produces
-> several `vitest` realms), so `page` throws. `@angular/build` accepts `vitest ^4.0.8 || ^5.0.0`, so `ng test` runs on
-> 4 unchanged. The **API stays on Vitest 5**. Revisit when upstream browser mode works on 5 here.
+`ng test` is the required check (`test`); `test:browser` and `test:e2e` are additional scripts. Every spec imports
+`{ describe, it, expect }` from `vitest`, follows Arrange / Act / Assert (with `// Arrange` / `// Act` / `// Assert`
+comments once a case has more than one line per phase), and wraps its cases in one top-level `describe`
+named for the file's module (`entity.service`, `entity-list-page.effects`, `confirm-dialog.component`, …).
 
 ## Contents
 
-- [1. Unit tests (`ng test`)](#1-unit-tests-ng-test)
-- [2. Browser-mode page tests](#2-browser-mode-page-tests)
-- [3. Full-stack e2e](#3-full-stack-e2e)
+- [Spec inventory](#spec-inventory)
+- [1. Setup: Analog's Vitest builder](#1-setup-analogs-vitest-builder)
+- [2. Unit tests](#2-unit-tests)
+- [3. Browser-mode tests](#3-browser-mode-tests)
+- [4. Full-stack e2e](#4-full-stack-e2e)
 
-## 1. Unit tests (`ng test`)
+## Spec inventory
 
-Specs sit beside the file they cover as `*.spec.ts`; `ng test` runs them with Vitest in jsdom via the Angular builder.
-Every spec imports `{ describe, it, expect }` from `vitest`, follows Arrange / Act / Assert, and wraps its cases in one
-top-level `describe` named for the module. What the scaffold ships:
+The scaffold ships exactly these specs; each must cover at least the cases listed. Code blocks further down show the
+patterns; the cases come from here. Names follow the `describe` rule above.
 
-- **`services/entity.service.spec.ts`** — `TestBed` with `provideHttpClient()` + `provideHttpClientTesting()` and a
-  `provideMockStore` overriding `selectApiBaseUrl`; asserts the URL, method, params and body of each call via
-  `HttpTestingController`.
-- **Per page slice** (`entity-list-page`, `entity-detail-page`, `entity-form-page`): a `*.reducer.spec.ts`
-  (pure: each action → state), a `*.selectors.spec.ts` (test the `.projector(...)` of selectors that carry logic), and
-  a `*.effects.spec.ts` (functional effects via `provideMockActions` + `TestBed.runInInjectionContext`). The list page's
-  effects spec adds an **operator-details** block that drives the RxJS pipeline itself (`distinctUntilChanged`,
-  `takeUntil(leave)`, the null-input filter, `switchMap` cancellation, `concatMap` serialization) — see below.
-- **`store/app-context/`** — `app-context.reducer.spec.ts` (initial state seeded from `environment`) and
-  `app-context.selectors.spec.ts`. **`store/app-router/app-router.effects.spec.ts`** — `navigate$` calls the
-  Angular `Router`.
-- **App shell & routing**: `app.routes.spec.ts` drives every route with `RouterTestingHarness` (redirect + each page +
-  the shared form slice); `app.component.spec.ts` and `layouts/main-layout.component.spec.ts` smoke-render the shell
-  (router-outlet present, app name from the store).
-- **Helpers**: `entity-list-params.helper.spec.ts` (the URL ↔ input round-trip), `entity-filter-form.helper.spec.ts`
-  (the filter strip mapping + date round-trip) and `http-error.helper.spec.ts`.
+**Unit (`ng test`, `src/**/*.spec.ts`)**
+
+| file | cases |
+| --- | --- |
+| `app.component.spec.ts` | renders the main layout with its router outlet |
+| `app.routes.spec.ts` | `''` redirects to `/entities`; `/entities`, `/entities/:id`, `/entities/new` and `/entities/:id/edit` render their pages |
+| `layouts/main-layout.component.spec.ts` | shows the app name from the store and a router outlet |
+| `services/entity.service.spec.ts` | `list` drops default `page` / `pageSize`; `list` sends the list input as the shared URL params; `get`, `create`, `update`, `delete` each send the right method, URL and body |
+| `helpers/entity-list-params.helper.spec.ts` | the four cases in `web.md` §11 |
+| `helpers/entity-filter-form.helper.spec.ts` | `toFilterInput`: empty form → `undefined`, trimmed `contains` filters, the date range as local midnight; `toFilterForm`: no filter → empty form, round trip, unsupported operators and invalid dates ignored; `formatRange`: `0 of 0`, the row range with total and page |
+| `helpers/http-error.helper.spec.ts` | uses the API's message; falls back to the response's |
+| `store/app-context/app-context.reducer.spec.ts` | seeds the initial state from `environment`; an unknown action returns it unchanged |
+| `store/app-context/app-context.selectors.spec.ts` | picks `apiBaseUrl` and `appName` |
+| `store/app-router/app-router.effects.spec.ts` | `navigate$` calls the `Router` with the commands and query params |
+| `store/<page>/<page>.reducer.spec.ts` (×3) | every action → its state: `Load` / `Leave` reset, each request → its loading status, each success and failure |
+| `store/<page>/<page>.selectors.spec.ts` (×3) | the slice fields; the list's `selectListInput` (parse, defaults, `ASC` default direction) and `selectListInputOnListPage` (`null` off the list URL) |
+| `store/entity-list-page/entity-list-page.effects.spec.ts` | `fetchOnListInputChange$`, `fetchAfterDelete$`, `fetch$` and `delete$` success / failure, `stepBackPastLastPage$` (steps back; stays on a page with rows; stays on an empty first page), and the operator details below |
+| `store/entity-detail-page/entity-detail-page.effects.spec.ts` | `load$` success and failure |
+| `store/entity-form-page/entity-form-page.effects.spec.ts` | `load$` (loads an id, skips a new form, failure), `create$` and `update$` success / failure, saves run one after the other (`concatMap`), `navigateAfterSave$` |
+
+**Browser (`ng test -c browser`, `src/**/*.browser.spec.ts`)**
+
+| file | cases |
+| --- | --- |
+| `components/confirm-dialog.component.browser.spec.ts` | the full spec below |
+| `pages/entity-list-page.component.browser.spec.ts` | lifecycle; the UI states (rows + range label, loading, no-entities-yet, filtered-empty, error banner, Previous / Next disabled at the ends and enabled in the middle); the delete flow (confirm dispatches `delete`, cancel dispatches nothing); the URL-building actions (sort, page size, Next, Apply, Clear) |
+| `pages/entity-detail-page.component.browser.spec.ts` | loaded entity with an _Edit_ link, error banner, _Loading…_, lifecycle (`load({ id })` / `leave()`) |
+| `pages/entity-form-page.component.browser.spec.ts` | lifecycle on `new` (`load({ id: null })`) and edit (`load({ id })`); fills the form on load; dispatches `create` / `update` with the form values; does not save an empty name; Save disabled with its label while loading or saving; error banner |
+
+**e2e (`pnpm test:e2e`, `e2e/pages/*.spec.ts`)**
+
+| file | cases |
+| --- | --- |
+| `entity-list-page.spec.ts` | lists entities seeded through the API; filters by name through the strip, and the filter lands in the URL; deletes through the dialog; cancel keeps the row; steps back a page when a delete empties the last one |
+| `entity-detail-page.spec.ts` | the spec below |
+| `entity-form-page.spec.ts` | creates an entity and lands on its detail page; edits a seeded entity and sees the change |
+
+## 1. Setup: Analog's Vitest builder
+
+The Angular CLI's `@angular/build:unit-test` builder is replaced by `@analogjs/vitest-angular:test`, which runs Vitest
+with a project-level config and compiles Angular through `@analogjs/vite-plugin-angular` — the same plugin Storybook
+uses. The app build stays on `@angular/build`.
+
+### Dependencies
+
+Run in SKILL step 5, after Storybook's install:
+
+```sh
+pnpm --filter web add -D @analogjs/vitest-angular@2 @vitest/browser@5 @vitest/browser-playwright@5
+```
+
+The Chromium download both browser layers use runs once, after `@playwright/test` is added
+([§4](#dependencies-and-script)).
+
+`@analogjs/vite-plugin-angular` comes with Storybook's dependencies; `vitest` itself is in the catalog (shared with the
+API, see `monorepo-root.md`); the CLI's `jsdom` stays as generated. `@vitest/browser` and `@vitest/browser-playwright`
+must share `vitest`'s major.
+
+### `web/angular.json` test target
+
+Replace the generated `test` target. `project` is passed through to Vitest and picks the project to run; the `browser`
+configuration switches it. The builder runs once by default (`--watch` turns watch mode on).
+
+```jsonc
+"test": {
+  "builder": "@analogjs/vitest-angular:test",
+  "options": { "project": ["unit"] },
+  "configurations": { "browser": { "project": ["browser"] } }
+}
+```
+
+The scripts are `test` = `ng test` (set in `web.md`) and `test:browser`:
+
+```sh
+pnpm --filter web pkg set "scripts['test:browser']=ng test -c browser"
+```
+
+### `web/vitest.config.mts`
+
+One config with two projects, like the API's `vitest.config.ts`. It is named `vitest.config.*`, not `vite.config.*`, so
+Storybook's Vite builder (which reads `vite.config.*`) does not pick up the test settings.
+
+```ts
+import angular from '@analogjs/vite-plugin-angular';
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+// One config, two projects: `ng test` runs `unit` (jsdom), `ng test -c browser` runs `browser` (real Chromium).
+export default defineConfig({
+  plugins: [angular()],
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          include: ['src/**/*.spec.ts'],
+          exclude: ['src/**/*.browser.spec.ts'],
+          setupFiles: ['src/test-setup.ts']
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'browser',
+          include: ['src/**/*.browser.spec.ts'],
+          setupFiles: ['src/testing/browser-setup.ts'],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [{ browser: 'chromium' }]
+          }
+        }
+      }
+    ]
+  }
+});
+```
+
+Both `include` globs start at `src/`, so the Playwright specs under `e2e/` never reach Vitest.
+
+### `web/src/test-setup.ts`
+
+```ts
+import '@angular/compiler';
+import { setupTestBed } from '@analogjs/vitest-angular/setup-testbed';
+
+setupTestBed();
+```
+
+### `web/src/testing/browser-setup.ts`
+
+The same, plus the global stylesheet so Tailwind utilities apply in Chromium:
+
+```ts
+import '@angular/compiler';
+import { setupTestBed } from '@analogjs/vitest-angular/setup-testbed';
+import '../styles.css';
+
+setupTestBed();
+```
+
+`setupTestBed()` is zoneless by default, like the app.
+
+### tsconfigs
+
+Under Vitest, Analog compiles **only the files in `tsconfig.spec.json`'s program**; any other file is handed to Vite's
+plain TypeScript transform, which skips the Angular compiler and loses signal `input()` / `output()` metadata. So
+`tsconfig.spec.json` holds every spec, unit and browser alike, plus both setup files:
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "vite/client"]
+  },
+  "include": ["src/**/*.spec.ts", "src/test-setup.ts", "src/testing/**/*.ts", "src/**/*.d.ts"]
+}
+```
+
+`vite/client` declares the `*.css` module that `browser-setup.ts` imports; TypeScript 6 rejects an undeclared
+side-effect import. `tsconfig.app.json` excludes the same files: `"exclude": ["src/**/*.spec.ts", "src/test-setup.ts",
+"src/testing/**/*.ts"]`. There is no separate tsconfig for the browser specs, and no `exclude` on the test target.
+
+## 2. Unit tests
+
+Specs sit beside the file they cover as `*.spec.ts` and run in jsdom. Which specs ship, and the cases each covers, is
+the [spec inventory](#spec-inventory); this section shows the patterns they use.
 
 A new resource copies the service + slice specs; a new helper gets a spec beside it with a happy case and an edge case.
 
@@ -54,7 +208,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideMockStore } from '@ngrx/store/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Entity } from '../models/entity.model';
 import { selectApiBaseUrl } from '../store/app-context/app-context.selectors';
 import { EntityService } from './entity.service';
 
@@ -149,12 +302,13 @@ describe('entity-detail-page.effects', () => {
 - **Selector specs** call `selector.projector(input)` directly. Each page slice and the `app-context` slice ships a
   `*.selectors.spec.ts` for parallelism across slices, even where the selectors are trivial field pickers; the list
   page's `selectListInput` / `selectListInputOnListPage` additionally carry URL-parsing logic worth asserting in depth.
-- **Store effects** that read the store (the list page's `fetchOnListInputChange$` / `fetchAfterDelete$`) add a
-  `provideMockStore` with the relevant selectors overridden.
+- **Store effects** that read the store (the list page's `fetchOnListInputChange$` / `fetchAfterDelete$` /
+  `stepBackPastLastPage$`) add a `provideMockStore` with the relevant selectors overridden.
 
 ### Effects — operator details (list page)
 
-The single-action-in → single-action-out style above proves the mapping but **not** the RxJS operators that make the
+An excerpt: `entity`, `result` / `resultB`, `entityService` and the imports come from the rest of the file. The
+single-action-in → single-action-out style above proves the mapping but **not** the RxJS operators that make the
 URL-driven list correct. The list effects spec adds an `operator details` block that drives them with a
 **`Subject`-backed `actions$`** and a **mutable `MockStore`**, collecting every emission synchronously — no scheduler:
 
@@ -215,15 +369,18 @@ describe('operator details', () => {
 ```
 
 The companion cases (`takeUntil(leave)`, the null-input `filter`, and `delete$`'s `concatMap` serialization) follow the
-same two techniques.
+same two techniques. `stepBackPastLastPage$` takes the plain style: override `selectListInput`, emit one
+`fetchSuccess`, and collect with `toArray()` — an empty page past the end (`{ page: 3, pageSize: 1 }`, `total: 2`)
+navigates to page 2; a page with rows, or an empty first page, emits nothing.
 
 ### Routing — `app.routes.spec.ts`
 
-`RouterTestingHarness` works in the zoneless jsdom `ng test` environment with no extra change-detection provider. Provide
-the real `routes`, a root store (`appContext` + `appRouter` reducers) with `provideRouterStore`, the app-router effects,
+`RouterTestingHarness` works in the zoneless jsdom environment with no extra change-detection provider. Provide the
+real `routes`, a root store (`appContext` + `appRouter` reducers) with `provideRouterStore`, the app-router effects,
 and a **fake `EntityService`** (every method returns `of(...)`) so the per-route effects that fire on page load never
 touch HTTP. `navigateByUrl(url, Component)` asserts the activated component's type; read `Router.url` to assert the
-redirect.
+redirect. The block is an excerpt: its imports and the `entity` fixture are the same as in the other specs, and the
+full spec covers every route listed in the [spec inventory](#spec-inventory).
 
 ```ts
 import { provideRouter, Router } from '@angular/router';
@@ -234,7 +391,7 @@ const fakeEntityService = {
   get: () => of(entity), create: () => of(entity), update: () => of(entity), delete: () => of(undefined)
 };
 
-describe('app routes', () => {
+describe('app.routes', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
@@ -260,54 +417,18 @@ describe('app routes', () => {
 });
 ```
 
-## 2. Browser-mode page tests
+## 3. Browser-mode tests
 
-Pages are rendered in **real Chromium** with a mocked store and asserted/driven through the `page` locators. This is
-component-level — no backend; the full request→response path is the e2e suite. Co-located with the page as
-`*.component.browser.spec.ts`.
+Components and pages are rendered in **real Chromium** and asserted/driven through the `page` locators. This is
+component-level — pages get a mock store, there is no backend; the full request→response path is the e2e suite.
+Co-located with the file as `*.browser.spec.ts`: `components/confirm-dialog.component.browser.spec.ts` and one
+`pages/<page>.component.browser.spec.ts` per page.
 
-### Dependencies
+### `web/src/testing/render.ts`
 
-```sh
-pnpm --filter web add -D vitest@4.1.12 @vitest/browser@4.1.12 @vitest/browser-playwright@4.1.12 \
-  @analogjs/vitest-angular @oxc-project/runtime
-pnpm --filter web exec playwright install chromium   # one-time browser download
-```
-
-`@analogjs/vite-plugin-angular` (already added for Storybook) compiles Angular; `@analogjs/vitest-angular` supplies the
-zoneless `setupTestBed`; `@oxc-project/runtime` provides the decorator helper Analog emits in dev mode.
-
-### `web/vitest.browser.config.mts`
-
-```ts
-import angular from '@analogjs/vite-plugin-angular';
-import { playwright } from '@vitest/browser-playwright';
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  plugins: [angular()],
-  test: {
-    include: ['src/app/**/*.browser.spec.ts'],
-    setupFiles: ['src/testing/browser-setup.ts'],
-    browser: {
-      enabled: true,
-      provider: playwright(),
-      headless: true,
-      instances: [{ browser: 'chromium' }]
-    }
-  }
-});
-```
-
-### `web/src/testing/browser-setup.ts` and `render.ts`
-
-```ts
-// browser-setup.ts
-import { setupTestBed } from '@analogjs/vitest-angular/setup-testbed';
-import '../styles.css';
-
-setupTestBed({ zoneless: true, browserMode: true });
-```
+`render()` mounts a **page** — a component without required inputs — and starts change detection at once. A
+component with required `input.required()`s cannot go through it: the first change detection runs before any input is
+set and throws `NG0950`. Component specs mount by hand instead (see the `ConfirmDialog` spec below).
 
 ```ts
 // render.ts — mounts a component into the live document for the `page` locators
@@ -322,15 +443,6 @@ export function render<T>(component: Type<T>, providers: (Provider | Environment
   return fixture;
 }
 ```
-
-### Keeping them out of `ng test` and in a TS project
-
-- `angular.json` test target: `"options": { "exclude": ["**/*.browser.spec.ts"] }` (the builder's default include is
-  `**/*.spec.ts`, independent of `tsconfig.spec`).
-- `tsconfig.spec.json` excludes `src/**/*.browser.spec.ts`; `tsconfig.app.json` excludes `src/**/*.spec.ts` and
-  `src/testing/**`.
-- `tsconfig.browser.json` (referenced from `tsconfig.json`) `include`s `src/**/*.browser.spec.ts` + `src/testing/**`,
-  so ESLint's project service resolves them.
 
 ### Example — `pages/entity-detail-page.component.browser.spec.ts`
 
@@ -360,7 +472,7 @@ function setup(status: EntityDetailPageStatus, value: Entity | null, error: stri
   ]);
 }
 
-describe('EntityDetailPage (browser)', () => {
+describe('entity-detail-page.component', () => {
   it('renders the loaded entity with an edit link', async () => {
     setup('loaded', entity, null);
     await expect.element(page.getByRole('heading', { name: 'Acme' })).toBeVisible();
@@ -374,13 +486,94 @@ describe('EntityDetailPage (browser)', () => {
 });
 ```
 
+### Components — `components/confirm-dialog.component.browser.spec.ts`
+
+A store-free component is driven through its signal inputs and outputs, mounted in this order:
+`TestBed.createComponent` → `fixture.componentRef.setInput(name, value)` for every required input → append to
+`document.body` → `fixture.autoDetectChanges()`, then a `vi.fn()` subscribed to each output. A new component gets the
+same kind of spec beside its story.
+
+```ts
+import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { page } from 'vitest/browser';
+import { describe, expect, it, vi } from 'vitest';
+import { ConfirmDialog } from './confirm-dialog.component';
+
+function setup(inputs: Partial<Record<'title' | 'message' | 'busy', unknown>> = {}): {
+  fixture: ComponentFixture<ConfirmDialog>;
+  confirmed: ReturnType<typeof vi.fn>;
+  cancelled: ReturnType<typeof vi.fn>;
+} {
+  // Set the required inputs before the first change detection, which render() would run at once (NG0950).
+  const fixture = TestBed.createComponent(ConfirmDialog);
+  fixture.componentRef.setInput('title', 'Delete entity');
+  fixture.componentRef.setInput('message', 'Delete “Acme”? This cannot be undone.');
+  for (const [name, value] of Object.entries(inputs)) {
+    fixture.componentRef.setInput(name, value);
+  }
+  document.body.appendChild(fixture.nativeElement as HTMLElement);
+  fixture.autoDetectChanges();
+  const confirmed = vi.fn();
+  const cancelled = vi.fn();
+  fixture.componentInstance.confirmed.subscribe(confirmed);
+  fixture.componentInstance.cancelled.subscribe(cancelled);
+  return { fixture, confirmed, cancelled };
+}
+
+describe('confirm-dialog.component', () => {
+  it('renders a dialog named by its title, with the message', async () => {
+    // Arrange
+    setup();
+
+    // Assert
+    await expect.element(page.getByRole('dialog', { name: 'Delete entity' })).toBeVisible();
+    await expect.element(page.getByText('Delete “Acme”? This cannot be undone.')).toBeVisible();
+  });
+
+  it('emits confirmed once when Delete is clicked', async () => {
+    // Arrange
+    const { confirmed, cancelled } = setup();
+
+    // Act
+    await page.getByRole('button', { name: 'Delete' }).click();
+
+    // Assert
+    expect(confirmed).toHaveBeenCalledTimes(1);
+    expect(cancelled).not.toHaveBeenCalled();
+  });
+
+  it('emits cancelled once when Cancel is clicked', async () => {
+    // Arrange
+    const { confirmed, cancelled } = setup();
+
+    // Act
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // Assert
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect(confirmed).not.toHaveBeenCalled();
+  });
+
+  it('disables both buttons and shows the busy label while busy', async () => {
+    // Arrange
+    setup({ busy: true });
+
+    // Assert
+    await expect.element(page.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  });
+});
+```
+
 ### Lifecycle dispatch, UI states and URL actions
 
-Beyond rendering, the browser specs cover:
+Beyond rendering, the page specs cover:
 
 - **UI states** (list page): loading, filtered-empty vs. no-entities-yet, the error banner, and the `Previous`/`Next`
   disabled logic — one `renderList(state)` helper over `provideMockStore` selector overrides, asserted with
   `toBeDisabled()` / `toBeEnabled()`.
+- **The delete flow** (list page): _Delete_ on a row opens the `ConfirmDialog`; confirming dispatches
+  `EntityListPageActions.delete({ id })`, cancelling closes the dialog and dispatches nothing.
 - **URL-building actions** (list page): changing the Sort / Per-page selects and clicking Next / Clear each dispatch the
   exact `AppRouterActions.navigate({ commands: [], queryParams: toParams(...) })` — the "URL as source of truth" contract.
 - **Lifecycle** (all pages): `ngOnInit` dispatches `load(...)` and `ngOnDestroy` dispatches `leave()`.
@@ -416,35 +609,76 @@ For a URL-building action, `dispatch.mockClear()` after init (to drop the `load(
 `navigate` payload — e.g. `await page.getByLabelText('Sort').selectOptions('name:ASC')` →
 `navigate({ commands: [], queryParams: { filter: null, sortField: 'name', sortDirection: 'ASC', page: null, pageSize: null } })`.
 
-### Limitation: signal-input components can't be browser-tested
+## 4. Full-stack e2e
 
-Analog's browser-mode compile emits **empty `inputs`/`outputs` metadata** on components that use signal `input()` /
-`output()` (verified: a component's `ɵcmp.inputs` is `[]` under AOT). So you cannot bind a page template to a
-signal-input child nor `setInput` one in browser mode — `NG0303` / `NG0315` / `NG0950`. Tried AOT, JIT, separate
-projects/processes, and the `vitest-browser-angular` helper; none fix it. **Consequence:** the list page's browser
-spec asserts rendering only, not the `ConfirmDialog` delete flow; `ConfirmDialog` itself is covered by **Storybook**
-([references/web-storybook.md](web-storybook.md)) and the **e2e** delete flow. Keep `input()`/`output()` on components;
-do not switch to `@Input()` just to browser-test them.
+Playwright Test drives real Chromium against a **running stack of its own**: `ng serve` on `:4300` → the real API
+(node) on `:3100` → real Postgres, in a separate `app_e2e` database. Nothing it does reaches the dev stack: the `app`
+database, `:3000` and `:4200` (local or Compose) stay untouched and can keep running. Specs in `e2e/pages/`, helpers in
+`e2e/utils/`. **Requires Docker running and the root `.env`.**
 
-## 3. Full-stack e2e
+### Dependencies and script
 
-Playwright Test drives real Chromium against the **running stack**: `ng serve` → the real API (node) → real Postgres.
-Specs in `e2e/pages/`, shared API-seeding helper in `e2e/utils/`. **Requires Docker running and the root `.env`.**
-
-### Dependencies
+In SKILL step 5, after the §1 install:
 
 ```sh
-pnpm --filter web add -D @playwright/test
-pnpm --filter web exec playwright install chromium   # shared with the browser tests
+pnpm --filter web add -D @playwright/test@1
+pnpm --filter web exec playwright install chromium   # one-time; shared with the browser tests
+```
+
+The script is set with the other files, in step 4:
+
+```sh
+pnpm --filter web pkg set "scripts['test:e2e']=playwright test"
+```
+
+### `web/src/environments/environment.e2e.ts` and the `e2e` configuration
+
+The e2e web server needs the e2e API's URL, so it gets its own environment file:
+
+```ts
+// The Playwright e2e run: its own API on :3100 (see e2e/utils/env.ts), so the dev API on :3000 is untouched.
+export const environment = {
+  production: false,
+  appName: '<App name>',
+  apiBaseUrl: 'http://localhost:3100'
+};
+```
+
+In `web/angular.json`, `build.configurations.e2e` mirrors `development` (`optimization: false`,
+`extractLicenses: false`, `sourceMap: true`) with `fileReplacements` swapping `src/environments/environment.ts` for
+`src/environments/environment.e2e.ts`, and `serve.configurations.e2e` is `{ "buildTarget": "web:build:e2e" }`.
+
+### `web/e2e/utils/env.ts`
+
+The ports and the database, in one place for the config and the global setup. The `.env` is **parsed, not loaded**:
+loading it would put its `PORT=3000` into the environment the servers inherit, and `ng serve` honours `PORT` over
+`--port`.
+
+```ts
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseEnv } from 'node:util';
+
+// The e2e run owns its own database and ports, so it never touches the dev stack (app DB, :3000, :4200).
+export const repoRoot = resolve(__dirname, '../../..');
+export const E2E_DB = 'app_e2e';
+export const E2E_API_PORT = 3100;
+export const E2E_WEB_PORT = 4300;
+
+/** The root .env's DATABASE_URL, pointed at the e2e database. Parsed, not loaded: its PORT must not reach the servers. */
+export function e2eDatabaseUrl(): string {
+  const env = parseEnv(readFileSync(resolve(repoRoot, '.env'), 'utf8'));
+  const url = new URL(env['DATABASE_URL'] ?? '');
+  url.pathname = `/${E2E_DB}`;
+  return url.toString();
+}
 ```
 
 ### `web/playwright.config.ts`
 
 ```ts
 import { defineConfig, devices } from '@playwright/test';
-import { resolve } from 'node:path';
-
-const repoRoot = resolve(__dirname, '..'); // __dirname: Playwright loads the TS config as CommonJS
+import { E2E_API_PORT, E2E_WEB_PORT, e2eDatabaseUrl, repoRoot } from './e2e/utils/env';
 
 export default defineConfig({
   testDir: './e2e',
@@ -454,42 +688,67 @@ export default defineConfig({
   reporter: 'list',
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
-  use: { baseURL: 'http://localhost:4200', trace: 'on-first-retry' },
+  use: { baseURL: `http://localhost:${E2E_WEB_PORT}`, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
-    { command: 'pnpm --filter web start', url: 'http://localhost:4200', cwd: repoRoot, reuseExistingServer: !process.env['CI'], timeout: 120_000 },
+    {
+      command: `pnpm --filter web exec ng serve -c e2e --port ${E2E_WEB_PORT}`,
+      url: `http://localhost:${E2E_WEB_PORT}`,
+      cwd: repoRoot,
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000
+    },
     // GET / is DB-free, so the API is "ready" before Postgres is up (global-setup brings Postgres up).
-    { command: 'pnpm --filter api dev', url: 'http://localhost:3000/', cwd: repoRoot, reuseExistingServer: !process.env['CI'], timeout: 60_000 }
+    {
+      command: 'pnpm --filter api dev',
+      url: `http://localhost:${E2E_API_PORT}/`,
+      cwd: repoRoot,
+      env: { PORT: String(E2E_API_PORT), DATABASE_URL: e2eDatabaseUrl() },
+      reuseExistingServer: !process.env['CI'],
+      timeout: 60_000
+    }
   ]
 });
 ```
 
-### `web/e2e/global-setup.ts` and `global-teardown.ts`
+The API's `dev` script loads `../.env` with `--env-file`, which never overrides a variable already set, so the
+`PORT` and `DATABASE_URL` passed here win.
+
+### `web/e2e/global-setup.ts`
 
 ```ts
-// global-setup.ts — real Postgres, apply schema, start from an empty table
 import { execSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { E2E_DB, e2eDatabaseUrl, repoRoot } from './utils/env';
 
-const repoRoot = resolve(__dirname, '../..');
-const run = (cmd: string): void => execSync(cmd, { cwd: repoRoot, stdio: 'inherit' });
+const run = (cmd: string, env: NodeJS.ProcessEnv = process.env): string =>
+  execSync(cmd, { cwd: repoRoot, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+const psql = (db: string, query: string): string => run(`docker compose exec -T db psql -U postgres -d ${db} -tAc "${query}"`);
 
+// Real Postgres in its own database: create it once, apply the schema, start from an empty table.
 export default function globalSetup(): void {
+  process.env['E2E_STARTED_DB'] = run('docker compose ps --status running --quiet db').trim() ? '' : '1';
   run('docker compose up -d --wait db');
-  run('pnpm --filter api db:migrate');
-  run('docker compose exec -T db psql -U postgres -d app -c "TRUNCATE TABLE entity RESTART IDENTITY CASCADE"');
+  if (psql('postgres', `SELECT 1 FROM pg_database WHERE datname = '${E2E_DB}'`).trim() !== '1') {
+    psql('postgres', `CREATE DATABASE ${E2E_DB}`);
+  }
+  run('pnpm --filter api db:migrate', { ...process.env, DATABASE_URL: e2eDatabaseUrl() });
+  psql(E2E_DB, 'TRUNCATE TABLE entity RESTART IDENTITY CASCADE');
 }
 ```
 
+`db:migrate` needs `api/db/migrations/`, so the e2e suite runs after the first `db:generate`.
+
+### `web/e2e/global-teardown.ts`
+
 ```ts
-// global-teardown.ts
 import { execSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { repoRoot } from './utils/env';
 
-const repoRoot = resolve(__dirname, '../..');
-
+// Stop Postgres only if global-setup started it; a db the developer had running stays up.
 export default function globalTeardown(): void {
-  execSync('docker compose down', { cwd: repoRoot, stdio: 'inherit' });
+  if (process.env['E2E_STARTED_DB']) {
+    execSync('docker compose stop db', { cwd: repoRoot, stdio: 'inherit' });
+  }
 }
 ```
 
@@ -497,8 +756,9 @@ export default function globalTeardown(): void {
 
 ```ts
 import { type APIRequestContext, expect } from '@playwright/test';
+import { E2E_API_PORT } from './env';
 
-export const API = 'http://localhost:3000';
+export const API = `http://localhost:${E2E_API_PORT}`;
 
 export interface SeededEntity {
   id: string;
@@ -513,13 +773,15 @@ export async function createEntity(request: APIRequestContext, input: { name: st
 }
 ```
 
-`web/e2e/tsconfig.json` extends `../tsconfig.json` with `types: ["node"]` and `include: ["**/*.ts"]` so the specs and
-helpers resolve for ESLint.
+### `web/e2e/tsconfig.json`
+
+Extends `../tsconfig.json` with `types: ["node"]` and `include: ["**/*.ts", "../playwright.config.ts"]`, so the specs,
+the helpers and the Playwright config are type-checked by the web `typecheck` script and resolve for ESLint.
 
 ### Example — `e2e/pages/entity-detail-page.spec.ts`
 
 Tests that need existing data seed it through the API `request` fixture, then drive the UI with `page`. CRUD flows
-create uniquely-named entities (and the list page filters by that name) so parallel-free serial runs stay deterministic.
+create uniquely-named entities (and the list page filters by that name) so serial runs stay deterministic.
 
 ```ts
 import { expect, test } from '@playwright/test';
@@ -543,10 +805,9 @@ test.describe('entity detail page', () => {
 });
 ```
 
-The list page e2e also covers the delete flows that the browser spec can't (the `ConfirmDialog` is a signal-input child):
-delete-via-dialog, cancel-keeps-the-row, and **step-back-on-empty-page** — seed two rows under one filter, land on
-`?pageSize=1&page=2` (URL as source of truth), delete the only row, and assert the URL drops `page=2` as the page steps
-back to page 1.
+The list page e2e covers the delete flows against the real API: delete-via-dialog, cancel-keeps-the-row, and
+**step-back-on-empty-page** — seed two rows under one filter, land on `?pageSize=1&page=2` (URL as source of truth),
+delete the only row, and assert the URL drops `page=2` as the page steps back to page 1.
 
-Add to `web/.gitignore`: `/test-results`, `/playwright-report`, `/blob-report`, `/playwright/.cache`, and
-`.vitest-attachments` (browser-mode run artifacts).
+Add to `web/.gitignore`: `/test-results`, `/playwright-report`, `/blob-report`, `/playwright/.cache` (Playwright
+output), and `/.vitest` (Vitest 5's attachments and browser-mode failure screenshots, under `.vitest/attachments/`).

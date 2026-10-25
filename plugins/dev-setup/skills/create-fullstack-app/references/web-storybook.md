@@ -1,9 +1,9 @@
 # Web Storybook
 
 Storybook develops and documents the reusable **components** under `src/app/components/` (the pieces that take
-`input()` / `output()` and never touch the store). It is **dev/docs only** — not a test runner. Component behaviour
-that needs a real browser is covered by the e2e flow (see [references/web-testing.md](web-testing.md)); Storybook is
-where a component is built and its states are reviewed.
+`input()` / `output()` and never touch the store). It is **dev/docs only** — not a test runner. A component's
+behaviour is tested by its browser-mode spec (see [references/web-testing.md](web-testing.md)); Storybook is where a
+component is built and its states are reviewed.
 
 It runs on the **Vite / Analog** builder (`@storybook/angular-vite`), not the webpack `@storybook/angular` one, so it
 matches the project's esbuild/Vite toolchain (`@angular/build`) and does not pull a second webpack stack of its own.
@@ -18,21 +18,26 @@ matches the project's esbuild/Vite toolchain (`@angular/build`) and does not pul
 
 ## Dependencies
 
+Run in SKILL step 5, after the web's own installs:
+
 ```sh
-pnpm --filter web add -D storybook @storybook/angular-vite \
-  @analogjs/vite-plugin-angular vite @angular/animations zone.js \
-  @angular-devkit/architect @angular-devkit/core eslint-plugin-storybook
+pnpm --filter web add -D storybook@10 @storybook/angular-vite@10 \
+  @analogjs/vite-plugin-angular@2 vite @angular/animations \
+  @angular-devkit/architect @angular-devkit/core eslint-plugin-storybook@10
 ```
 
-- `@storybook/angular-vite` compiles Angular through `@analogjs/vite-plugin-angular` (the same plugin the browser
-  tests use), on `vite`.
-- `@angular/animations` and `zone.js` are peer requirements of the Storybook Angular tooling; `zone.js` is **not** used
-  by the app itself, which is zoneless.
+- `@storybook/angular-vite` compiles Angular through `@analogjs/vite-plugin-angular` (the same plugin `ng test` uses),
+  on `vite`. Storybook reads `vite.config.*`; the tests' `vitest.config.mts` is a different name, so the two configs
+  stay apart.
+- `@angular/animations` is a required peer of `@storybook/angular-vite`, not something the app uses; every install
+  prints `deprecated @angular/animations`, which is expected. There is no `zone.js`: the builder's `zoneless` option
+  defaults to `true` (it only loads `zone.js` when set to `false`), and `zone.js` is an optional peer, so Storybook runs
+  zoneless like the app.
 - `@angular-devkit/{architect,core}` back the `ng run web:storybook` builder targets.
 - `eslint-plugin-storybook` lints `*.stories.ts` (wired in [references/eslint-prettier.md](eslint-prettier.md)).
 
 `@storybook/angular-vite` also pulls `@angular-devkit/build-angular` transitively — it is **not** a direct dependency,
-and the app build/test stay on `@angular/build`.
+and the app build stays on `@angular/build`.
 
 > Equivalent shortcut: `pnpm --filter web dlx storybook@latest init --type angular` detects the `angular-vite`
 > framework and writes the same config + targets. Installing the deps and writing the files below is the deterministic
@@ -153,7 +158,6 @@ import { ConfirmDialog } from './confirm-dialog.component';
 const meta: Meta<ConfirmDialog> = {
   title: 'Components/ConfirmDialog',
   component: ConfirmDialog,
-  tags: ['autodocs'],
   args: {
     title: 'Delete entity',
     message: 'Delete “Acme Corp”? This cannot be undone.',
@@ -193,4 +197,4 @@ export const Busy: Story = {
 ```
 
 **A new component** gets a `*.stories.ts` beside it with one story per meaningful state, args for its inputs, and
-`fn()` for its outputs.
+`fn()` for its outputs, plus a `*.component.browser.spec.ts` for its behaviour.
