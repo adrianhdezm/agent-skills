@@ -9,7 +9,7 @@ convention, so a rejected alternative is not reintroduced by accident.
 - [Tooling](#tooling): TypeScript, catalog, tsconfig, Prettier vs ESLint, dev loop, tests
 - [API](#api): context, routers, controllers, errors, logging, query parsing
 - [DAO layer](#dao-layer): contract, filter inputs, sorting, pagination, file layout, naming
-- [Web](#web): URL as state, slice placement, file layout, templates, styling, Storybook, the three test layers
+- [Web](#web): the statechart, store and router, slice placement, file layout, templates, styling, Storybook, the three test layers
 
 ## Infrastructure
 
@@ -302,13 +302,32 @@ cursor-paginated result.
 `PaginatedResult` with the API's names and shapes. Sharing a types package between the projects was not worth its
 build wiring at this size; keeping the names identical makes a drift easy to spot in review.
 
-### The URL is the source of truth for list queries
+### The app is a statechart: routes are states, actions are transitions
 
-List pages dispatch `AppRouterActions.navigate({ commands: [], queryParams })`, and the list effect loads whenever
-the list input in the URL changes. The
-alternative, a query slice synced to the URL by an effect, needs two-way sync. URL-first gets refresh, back, forward,
-deep links and bookmarkable views for free. The list page slice holds only server data; the list input is derived
-from `router.state.queryParams` by a selector.
+Each page route declares its state in `data: { state }`, typed by `AppState`, and each page's `status` union holds its
+sub-states. Naming the states makes the app's shape readable from `app.routes.ts` alone, gives page reducers one
+string to match a navigation on, and makes a missing or misspelled state a compile error and an `app.routes.spec.ts`
+failure, instead of a path comparison (`url === '/entities'`) repeated in selectors.
+
+### The router writes URL state into the page slice; pages read only their slice
+
+The URL enters the store one way: `routerNavigatedAction` → the page reducer whose state matches copies the params
+or query it needs (the list input, the detail id, the form target). A list query change dispatches
+`AppRouterActions.navigate`, never a store action, and arrives back through the reducer. Pages read only their slice.
+
+Two alternatives were tried or weighed:
+
+- **List input derived from `appRouter` by a selector** (the URL as the store's only copy). Pages read router state,
+  so the store moved to the next URL while the old page was still mounted (`ROUTER_NAVIGATION` precedes the old page's
+  destruction), which needed a `selectListInputOnListPage` guard returning `null` off the list URL; and the detail
+  page, reading its id once on init, did not reload when Angular reused it for another id.
+- **A store-owned query synced to the URL** (a `Change Query` action, then an effect writing the URL). The store is
+  ahead of the URL, but every user change makes a navigation that echoes back as `routerNavigatedAction`, so the
+  reducer had to recognize an equal query, and the effect had to tell a user's change from a browser's.
+
+Router first, slice second keeps one loop with no echo and no guard; refresh, back, forward and deep links all enter
+through the same action. The cost is that a query change waits for a navigation before it fetches (about 14 ms in dev
+mode), which nobody notices.
 
 ### One slice per page, registered on its route
 
@@ -322,7 +341,7 @@ and the router state (`appRouter`) stay global.
 
 ### Pages inject only the Store
 
-Pages read the route from the app-router slice (`selectRouteParam`, `selectQueryParams`) and navigate by dispatching
+Pages read the route from their own slice (`selectListInput`, `selectId`, `selectTarget`) and navigate by dispatching
 `AppRouterActions.navigate`, whose effect is the only caller of the Angular `Router`; forms are built with
 `new FormGroup`. With `ActivatedRoute`, `Router` and `FormBuilder` injected into pages, routing was split between
 the store and the components, and a navigation after a save lived in a page `effect()` watching a `savedId` flag.
@@ -343,19 +362,38 @@ booleans (`loading`, `saving`, `deleting`, plus separate error fields) could con
 error at once, and made templates combine flags. A single union names every state the page can be in, and the
 template switches on it.
 
-### Pages load through Load and Leave
+### Pages load from a watch started in `ngOnInit`
 
-Every page dispatches `Load` on init and `Leave` on destroy, and reducers reset on both. The list page used to load
-from `routerNavigatedAction` alone; it now dispatches `Load` like the others, and its effect follows the list input
-in the URL until `Leave`, dispatching `Fetch({ input })` for each value, so the first load and later query changes
-take the same path.
+Navigation and data loading are separate: the router only writes route state, and the page decides when to load. Each
+page starts a watch on its slice's route state in `ngOnInit` and dispatches `Fetch` / `Load` for each new value until
+it is destroyed; `ngOnDestroy` dispatches `Leave`, which resets the slice. Earlier versions loaded the list from
+`routerNavigatedAction` in an effect, and later from an effect that followed the URL from `Load` to `Leave`. Both put
+the decision to load in the router's hands: route-level effects outlive their page, so each needed a guard against
+the next page's URL. The watch lives exactly as long as the page, and a reused component keeps its watch, so page 2 →
+3 and detail 42 → 43 reload without lifecycle hooks.
+
+`ngOnInit` and not the constructor: Angular constructs the new page before `routerNavigatedAction` and runs
+`ngOnInit` after it, so the first value the watch sees is the URL's. A spike logging every action, router event and
+lifecycle hook (Angular 22.2, NgRx 22.0.1, zoneless) confirmed the order for deep links, back, list → detail and a
+reused detail page, with one request each.
 
 ### Actions name intent, not lifecycle
 
 The page action was first called `Enter`, which names a moment of the component lifecycle rather than what the page
-asks for. It is `Load`: the page wants its data, and the same action would fit a refresh button or a retry. The list's
-per-request action is `Fetch` (one request for one input), and results are `<Action> Success` / `<Action> Failure`. A selector that returns
-`null` while the URL belongs to another page stops a navigation away from loading the list once more.
+asks for. The page asks for data with `Load` (detail, form) or `Fetch` (one list request for one input), results are
+`<Action> Success` / `<Action> Failure`, and `Leave` resets the slice.
+
+### A new id starts the slice over
+
+When the router lands on the same state with another id, the reducer replaces the slice with its initial state plus
+the new id. Keeping the previous entity until the new one loads showed entity 42 under the URL for 43.
+
+### Router actions fire after activation
+
+`provideRouterStore` uses `navigationActionTiming: PostActivation`. With the default timing, `ROUTER_NAVIGATION`
+lands at `RoutesRecognized`, so `appRouter` holds the target URL while guards run and rolls it back on
+`ROUTER_CANCEL`; after activation, the store only ever holds a URL the router committed. Page reducers react to
+`routerNavigatedAction`, which fires at `NavigationEnd` either way.
 
 ### A page on several routes registers its slice once
 
@@ -438,7 +476,8 @@ whole stack. Now teardown stops Postgres only if setup started it, and the dev s
 ### A page past the end steps back in the list slice
 
 When a delete empties the last page, or a deep link names a page that no longer exists, `stepBackPastLastPage$`
-navigates to the last page after `Fetch Success`. It used to be a page `effect()` watching the slice, the same pattern
+navigates to the last page after `Fetch Success`, with `replaceUrl`: the user did not ask for that step, so it
+corrects the history entry instead of adding one. It used to be a page `effect()` watching the slice, the same pattern
 the post-save navigation was moved out of (see [Pages inject only the Store](#pages-inject-only-the-store)): in the
 slice, the step back is an action like every other navigation, and a unit test covers it.
 

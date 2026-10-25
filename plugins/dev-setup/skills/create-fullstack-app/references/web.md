@@ -4,8 +4,10 @@ Angular 22 + NgRx 22 + `@ngrx/router-store` + Tailwind v4. This file covers the 
 reference layers FD-NGX on top.
 
 The scaffold ships a complete **entity CRUDL** example wired end to end: a list page with filter / sort / pagination
-controls, a detail page, a shared form page for create and edit, and a confirm dialog for delete. The list input lives
-entirely in the URL (via router-store), and each page has its own slice, registered on its route.
+controls, a detail page, a shared form page for create and edit, and a confirm dialog for delete. The app is a
+statechart: each page route is a state, and actions are the only transitions. The URL enters the store one way, from
+`routerNavigatedAction` into the page reducer whose state matches; each page reads only its own slice, registered on
+its route, and loads its data from its own lifecycle.
 
 ## Contents
 
@@ -178,12 +180,12 @@ web/
 ├── vitest.config.mts        # Vitest projects `unit` (jsdom) + `browser` (Chromium), run by `ng test`
 └── src/
     ├── test-setup.ts        # setupTestBed() for the unit project
-    ├── testing/             # render() + browser-setup.ts for the browser project
+    ├── testing/             # render() + browser-setup.ts for the browser project; navigated() for reducer specs
     ├── environments/        # environment.ts, environment.development.ts, environment.e2e.ts
     └── app/
         ├── app.component.ts         # root
         ├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
-        ├── app.routes.ts            # routes; each page route registers its page slice
+        ├── app.routes.ts            # the statechart: one route per state (data.state), each registering its page slice
         ├── components/
         │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
         │   ├── confirm-dialog.component.browser.spec.ts   # its browser-mode test
@@ -206,7 +208,7 @@ web/
         │   └── http-error.helper.ts  (+ .spec.ts)          # httpErrorMessage, shared by the page effects
         └── store/
             ├── app-context/          # global slice: apiBaseUrl + appName (+ reducer/selectors specs)
-            ├── app-router/           # global slice: appRouter state, route selectors, Navigate action + effect (+ .effects.spec.ts)
+            ├── app-router/           # global slice: AppState, serializer, navigatedRoute(), Navigate action + effect (+ specs)
             ├── entity-list-page/     # page slice, registered on the list route
             │   ├── entity-list-page.{model,actions,reducer,selectors,effects}.ts
             │   └── entity-list-page.{reducer,selectors,effects}.spec.ts
@@ -215,7 +217,7 @@ web/
 ```
 
 Every page slice gets `*.reducer.spec.ts` / `*.selectors.spec.ts` / `*.effects.spec.ts` beside it; the global
-`app-context` slice gets reducer + selectors specs and `app-router` an effects spec. The service and helpers
+`app-context` slice gets reducer + selectors specs and `app-router` serializer, helper and effects specs. The service and helpers
 get a `*.spec.ts`, and each page and component gets a `*.component.browser.spec.ts`. The test layers are specified in
 [references/web-testing.md](web-testing.md); Storybook in [references/web-storybook.md](web-storybook.md).
 
@@ -230,20 +232,35 @@ only code that uses `HttpClient`: `list`, `get`, `create`, `update` and `delete`
 reads `apiBaseUrl` from the app-context slice. Effects inject the service and map its results to success and failure
 actions; pages never call it.
 
-**Actions are named for intent, not lifecycle.** The page asks for its data with `Load` (dispatched from `ngOnInit`,
-but named for what it does, not for the moment), the list's request for one input is `Fetch`, and results are
-`<Action> Success` / `<Action> Failure` — so the list page's fetch results are `Fetch Success` / `Fetch Failure`,
-while the detail and form pages fetch on `Load` and so report `Load Success` / `Load Failure`.
+**The app is a statechart.** Each page route is a state, named in its `data: { state }` (`entity-list`,
+`entity-detail`, `entity-new`, `entity-edit`, typed by `AppState`), and actions are the only transitions. Each page's
+`status` union holds its sub-states (`'idle' | 'loading' | 'loaded' | …`). Data moves one way, in two loops:
 
-**Every page loads the same way.** The page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`. `Load`
-sets the slice's `status` to `'loading'` and an effect calls the service; success sets `'loaded'` (or `'ready'` for
-the form) with the data, failure sets `'error'` with a message. Each slice has one `status` field, a union of the
-page's states, instead of boolean flags such as `loading` / `saving` / `deleting`, and the template switches its
-status-driven body on it with `@switch (status())`; the error banner over it is an `@if (status() === 'error')`.
+- **Navigation:** user intent → `AppRouterActions.navigate` → `navigate$` → Angular `Router` →
+  `routerNavigatedAction` → the page reducer whose state matches stores the params or query it needs. Back, forward,
+  deep links and refresh enter through the same `routerNavigatedAction`.
+- **Data:** the page watches its slice's query or id from `ngOnInit` and dispatches `Fetch` / `Load` for each new
+  value → an effect calls the service → `<Action> Success` / `Failure` → reducer → the page.
 
-**Pages inject only the `Store`.** Route params come from the app-router selectors, navigation is
-`AppRouterActions.navigate`, and forms are built with `new FormGroup` / `new FormControl` instead of an injected
-`FormBuilder`. Only effects inject services (`HttpClient`, `Router`).
+The router only writes state; it never starts a request. The page decides when to load, for as long as it is mounted.
+
+**Actions are named for intent, not lifecycle.** The page asks for data with `Load` (detail, form) or `Fetch` (the
+list's request for one input), and results are `<Action> Success` / `<Action> Failure`. `Leave` resets the slice when
+the page is destroyed.
+
+**Every page loads the same way.** In `ngOnInit` the page starts a watch on its slice's route state (the list input,
+the detail id, the form target), skips `null`, drops repeats with `distinctUntilChanged`, and dispatches `Fetch` /
+`Load` for each value until it is destroyed (`takeUntilDestroyed`); `ngOnDestroy` dispatches `Leave`. A reused
+component (page 2 → 3, detail 42 → 43) reloads because the watch is still running. `Fetch` / `Load` set the slice's
+`status` to `'loading'` and an effect calls the service; success sets `'loaded'` (or `'ready'` for the form) with the
+data, failure sets `'error'` with a message. Each slice has one `status` field, a union of the page's states, instead
+of boolean flags such as `loading` / `saving` / `deleting`, and the template switches its status-driven body on it
+with `@switch (status())`; the error banner over it is an `@if (status() === 'error')`.
+
+**Pages inject only the `Store` and read only their slice.** Route params and the list query reach a page through its
+own slice, never through router selectors; navigation is `AppRouterActions.navigate`; forms are built with
+`new FormGroup` / `new FormControl` instead of an injected `FormBuilder`. Only effects inject services
+(`HttpClient`, `Router`).
 
 ## 7. Core files
 
@@ -308,11 +325,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideStore } from '@ngrx/store';
 import { provideEffects } from '@ngrx/effects';
 import { provideStoreDevtools } from '@ngrx/store-devtools';
-import { provideRouterStore, routerReducer } from '@ngrx/router-store';
+import { NavigationActionTiming, provideRouterStore, routerReducer } from '@ngrx/router-store';
 import { routes } from './app.routes';
 import { APP_CONTEXT_FEATURE_KEY } from './store/app-context/app-context.selectors';
 import { appContextReducer } from './store/app-context/app-context.reducer';
 import * as appRouterEffects from './store/app-router/app-router.effects';
+import { AppRouterSerializer } from './store/app-router/app-router.serializer';
 import { ROUTER_FEATURE_KEY } from './store/app-router/app-router.selectors';
 
 export const appConfig: ApplicationConfig = {
@@ -322,15 +340,20 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(),
     // Global stores:
     //   - application context (api base URL, app name)
-    //   - router (@ngrx/router-store makes the URL part of the store state;
-    //     list inputs are derived from it, so the URL is the source of truth)
+    //   - router (@ngrx/router-store turns every navigation into actions; page reducers copy
+    //     what their state needs from routerNavigatedAction, so pages read only their slice)
     // Page slices are registered on their routes (see app.routes.ts). Navigation is an
     // action: the app-router effects are the only code that calls the Angular Router.
     provideStore({
       [APP_CONTEXT_FEATURE_KEY]: appContextReducer,
       [ROUTER_FEATURE_KEY]: routerReducer
     }),
-    provideRouterStore({ stateKey: ROUTER_FEATURE_KEY }),
+    // PostActivation: the store never holds a URL the router has not committed (a guard can still cancel before).
+    provideRouterStore({
+      stateKey: ROUTER_FEATURE_KEY,
+      serializer: AppRouterSerializer,
+      navigationActionTiming: NavigationActionTiming.PostActivation
+    }),
     provideEffects(appRouterEffects),
     provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode() })
   ]
@@ -339,7 +362,12 @@ export const appConfig: ApplicationConfig = {
 
 ### `web/src/app/app.routes.ts`
 
-Each page route registers its slice. The form page serves `new` and `:id/edit`, so the two routes sit under one componentless parent that registers the form slice once; registering it on both routes would run its effects twice. Route-level effects stay registered after the page is left, which is why the list effect filters navigation by path.
+The route table is the app's statechart: each page route is one state, named in `data: { state }` and typed by
+`AppState` (`satisfies` makes a typo a compile error). The serializer copies the deepest route's state into every
+router action, and each page reducer reacts only to its own. Each page route registers its slice. The form page
+serves `new` and `:id/edit`, two states, so the two routes sit under one componentless parent that registers the form
+slice once; registering it on both routes would run its effects twice. Route-level slices and effects stay registered
+after the page is left, which is why every page resets its slice on `Leave`.
 
 ```ts
 import type { Routes } from '@angular/router';
@@ -348,6 +376,7 @@ import { provideState } from '@ngrx/store';
 import { EntityDetailPage } from './pages/entity-detail-page.component';
 import { EntityFormPage } from './pages/entity-form-page.component';
 import { EntityListPage } from './pages/entity-list-page.component';
+import { type AppState } from './store/app-router/app-router.model';
 import * as entityDetailPageEffects from './store/entity-detail-page/entity-detail-page.effects';
 import { entityDetailPageReducer } from './store/entity-detail-page/entity-detail-page.reducer';
 import { ENTITY_DETAIL_PAGE_FEATURE_KEY } from './store/entity-detail-page/entity-detail-page.selectors';
@@ -358,8 +387,9 @@ import * as entityListPageEffects from './store/entity-list-page/entity-list-pag
 import { entityListPageReducer } from './store/entity-list-page/entity-list-page.reducer';
 import { ENTITY_LIST_PAGE_FEATURE_KEY } from './store/entity-list-page/entity-list-page.selectors';
 
-// Each page registers its own slice on its route. The form page serves two
-// routes, so they share one provider group and its effects run once.
+// The app's statechart: each page route is one state (data.state), and actions are
+// the only transitions between them. Each page registers its own slice on its route.
+// The form page serves two states, so they share one provider group and its effects run once.
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'entities' },
   {
@@ -369,19 +399,21 @@ export const routes: Routes = [
         path: '',
         pathMatch: 'full',
         component: EntityListPage,
+        data: { state: 'entity-list' satisfies AppState },
         providers: [provideState(ENTITY_LIST_PAGE_FEATURE_KEY, entityListPageReducer), provideEffects(entityListPageEffects)]
       },
       {
         path: '',
         providers: [provideState(ENTITY_FORM_PAGE_FEATURE_KEY, entityFormPageReducer), provideEffects(entityFormPageEffects)],
         children: [
-          { path: 'new', component: EntityFormPage },
-          { path: ':id/edit', component: EntityFormPage }
+          { path: 'new', component: EntityFormPage, data: { state: 'entity-new' satisfies AppState } },
+          { path: ':id/edit', component: EntityFormPage, data: { state: 'entity-edit' satisfies AppState } }
         ]
       },
       {
         path: ':id',
         component: EntityDetailPage,
+        data: { state: 'entity-detail' satisfies AppState },
         providers: [provideState(ENTITY_DETAIL_PAGE_FEATURE_KEY, entityDetailPageReducer), provideEffects(entityDetailPageEffects)]
       }
     ]
@@ -436,26 +468,83 @@ export const selectAppName = createSelector(selectAppContext, (s) => s.appName);
 
 ### App-router slice
 
-`@ngrx/router-store` puts the URL in the store under the `appRouter` key. Pages read everything about the route from
-here: the list input from `selectQueryParams`, the `id` of the detail and form pages from `selectRouteParam('id')`.
-The key is not router-store's default (`router`), so it is passed to
-`provideRouterStore({ stateKey: ROUTER_FEATURE_KEY })` in `app.config.ts`, and the selectors are built from
-`selectRouterState` rather than the default feature.
+The router side of the statechart. `@ngrx/router-store` turns every navigation into actions and keeps the last
+route under the `appRouter` key (not router-store's default `router`, so the key is passed to `provideRouterStore`).
+`AppRouterSerializer` reduces each snapshot to `{ url, state, params, queryParams }`, where `state` is the deepest
+route's `data.state`. The URL enters the store one way only: page reducers handle `routerNavigatedAction`, read it
+with `navigatedRoute(action)`, and copy what their own state needs when `state` is theirs. Pages and page effects
+never select from `appRouter`.
 
 Navigation is an action too: pages and page effects dispatch `AppRouterActions.navigate`, and the app-router
 `navigate$` effect is the only code that calls the Angular `Router`. It is registered globally in `app.config.ts`.
+
+#### `store/app-router/app-router.model.ts`
+
+```ts
+import { type Params } from '@angular/router';
+
+/** The app's states: one per page route, declared on the route as `data: { state }`. */
+export type AppState = 'entity-list' | 'entity-detail' | 'entity-new' | 'entity-edit';
+
+/** What the serializer keeps of a router snapshot: plain, serializable data. */
+export interface AppRouterState {
+  url: string;
+  /** The deepest route's `data.state`; `null` on a route that declares none (the root redirect). */
+  state: AppState | null;
+  /** Route params of the whole matched branch, e.g. `{ id }`. */
+  params: Params;
+  queryParams: Params;
+}
+```
+
+#### `store/app-router/app-router.serializer.ts`
+
+```ts
+import { type Params, type RouterStateSnapshot } from '@angular/router';
+import { type RouterStateSerializer } from '@ngrx/router-store';
+import { type AppRouterState, type AppState } from './app-router.model';
+
+export class AppRouterSerializer implements RouterStateSerializer<AppRouterState> {
+  serialize(snapshot: RouterStateSnapshot): AppRouterState {
+    let route = snapshot.root;
+    let params: Params = {};
+    let state: AppState | null = null;
+    while (route.firstChild) {
+      route = route.firstChild;
+      params = { ...params, ...route.params };
+      state = (route.data['state'] as AppState | undefined) ?? state;
+    }
+    return { url: snapshot.url, state, params, queryParams: snapshot.root.queryParams };
+  }
+}
+```
+
+#### `store/app-router/app-router.helper.ts`
+
+The one place that knows `routerNavigatedAction` carries an `AppRouterState`: router-store types its payload with its
+default serializer's shape.
+
+```ts
+import { type RouterNavigatedAction } from '@ngrx/router-store';
+import { type AppRouterState } from './app-router.model';
+
+/** The route a navigation landed on, as `AppRouterSerializer` wrote it. */
+export function navigatedRoute(action: RouterNavigatedAction): AppRouterState {
+  return action.payload.routerState as unknown as AppRouterState;
+}
+```
 
 #### `store/app-router/app-router.selectors.ts`
 
 ```ts
 import { createFeatureSelector } from '@ngrx/store';
-import { getRouterSelectors, type RouterReducerState } from '@ngrx/router-store';
+import { type RouterReducerState } from '@ngrx/router-store';
+import { type AppRouterState } from './app-router.model';
 
 export const ROUTER_FEATURE_KEY = 'appRouter';
 
-export const selectRouterState = createFeatureSelector<RouterReducerState>(ROUTER_FEATURE_KEY);
-
-export const { selectQueryParams, selectRouteParam, selectUrl } = getRouterSelectors(selectRouterState);
+// For devtools and debugging only: pages and page slices get the route from routerNavigatedAction.
+export const selectRouterState = createFeatureSelector<RouterReducerState<AppRouterState>>(ROUTER_FEATURE_KEY);
 ```
 
 #### `store/app-router/app-router.actions.ts`
@@ -466,8 +555,11 @@ import { createActionGroup, props } from '@ngrx/store';
 export const AppRouterActions = createActionGroup({
   source: 'App Router',
   events: {
-    /** `commands: []` keeps the current path and replaces only the query params; `null` removes a param. */
-    Navigate: props<{ commands: string[]; queryParams?: Record<string, string | null> }>()
+    /**
+     * `commands: []` keeps the current path and replaces only the query params; `null` removes a param.
+     * `replaceUrl` corrects the current history entry instead of adding one (a step the user did not ask for).
+     */
+    Navigate: props<{ commands: string[]; queryParams?: Record<string, string | null>; replaceUrl?: boolean }>()
   }
 });
 ```
@@ -485,7 +577,7 @@ export const navigate$ = createEffect(
   (actions$ = inject(Actions), router = inject(Router)) =>
     actions$.pipe(
       ofType(AppRouterActions.navigate),
-      tap(({ commands, queryParams }) => void router.navigate(commands, { queryParams }))
+      tap(({ commands, queryParams, replaceUrl }) => void router.navigate(commands, { queryParams, replaceUrl }))
     ),
   { functional: true, dispatch: false }
 );
@@ -635,13 +727,16 @@ export class EntityService {
 
 ### `helpers/entity-list-params.helper.ts`
 
-Converts between router `Params` and `ListEntityInput`. The page URL and the API request share this one format (`?filter=<json>&sortField=…&sortDirection=…&page=…&pageSize=…`), so it lives in `helpers/` for both the list slice and the service. Default values serialize to `null` so the router strips them, and malformed params fall back to defaults instead of throwing.
+Converts between router `Params` and `ListEntityInput`. The page URL and the API request share this one format (`?filter=<json>&sortField=…&sortDirection=…&page=…&pageSize=…`), so it lives in `helpers/` for the list reducer (URL → input), the list page and effects (input → URL) and the service. Default values serialize to `null` so the router strips them, and malformed params fall back to defaults instead of throwing. `sameListInput` is the page watch's equality: two inputs that make the same request are the same.
 
 ```ts
 import { type EntityFilterInput, type ListEntityInput, type SortDirection, type EntitySortField } from '../models/entity.model';
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 20;
+
+/** The input of a list URL without params; what the page shows before the router has written one. */
+export const DEFAULT_LIST_INPUT: ListEntityInput = { page: DEFAULT_PAGE, pageSize: DEFAULT_PAGE_SIZE };
 
 const SORT_FIELDS: readonly EntitySortField[] = ['name', 'createdAt', 'updatedAt'];
 
@@ -672,6 +767,11 @@ export function toParams(input: Partial<ListEntityInput>): Record<string, string
     page: nonDefault(input.page, DEFAULT_PAGE),
     pageSize: nonDefault(input.pageSize, DEFAULT_PAGE_SIZE)
   };
+}
+
+/** Two inputs are the same when they make the same request. */
+export function sameListInput(a: ListEntityInput, b: ListEntityInput): boolean {
+  return JSON.stringify(toParams(a)) === JSON.stringify(toParams(b));
 }
 
 function parseFilter(raw: string | undefined): EntityFilterInput | undefined {
@@ -800,22 +900,27 @@ export function httpErrorMessage(err: HttpErrorResponse): string {
 Every page slice has the same five files, named after the page: `<page>.model.ts` (its state), `<page>.actions.ts`
 (an action group whose source is the page name), `<page>.reducer.ts`, `<page>.selectors.ts` (the feature key and its
 selectors) and `<page>.effects.ts` (functional effects). The state has one `status` field typed as a union of the
-page's states, plus an `error` message set only when `status` is `'error'`. Pages dispatch `Load` on init and
-`Leave` on destroy, and the reducers reset to the initial state on both, so a revisit never shows stale data.
+page's sub-states, plus an `error` message set only when `status` is `'error'`, and the route state the page needs
+(the list input, the detail id, the form target), `null` until the router writes it. The reducer writes that route
+state on `routerNavigatedAction` when the route's `state` is the page's, and only then: navigating away never
+rewrites a slice. Pages dispatch `Leave` on destroy and the reducers reset to the initial state, so a revisit never
+shows stale data.
 
 ### `store/entity-list-page/`
 
-The list input lives in the URL; the slice holds the server data for the current page and the page's `status`
-(`'idle' | 'loading' | 'loaded' | 'deleting' | 'error'`).
+State `entity-list`. The slice holds the list input, copied from the URL by the reducer, the server data for the
+current page and the page's `status` (`'idle' | 'loading' | 'loaded' | 'deleting' | 'error'`).
 
 #### `store/entity-list-page/entity-list-page.model.ts`
 
 ```ts
-import { type Entity } from '../../models/entity.model';
+import { type Entity, type ListEntityInput } from '../../models/entity.model';
 
 export type EntityListPageStatus = 'idle' | 'loading' | 'loaded' | 'deleting' | 'error';
 
 export interface EntityListPageState {
+  /** The list input from the URL; `null` until the router has navigated to the list. */
+  input: ListEntityInput | null;
   status: EntityListPageStatus;
   items: Entity[];
   total: number;
@@ -833,11 +938,9 @@ import { type Entity, type ListEntityInput } from '../../models/entity.model';
 export const EntityListPageActions = createActionGroup({
   source: 'Entity List Page',
   events: {
-    /** The page asks for its data; the list then follows the list input in the URL. */
-    Load: emptyProps(),
     Leave: emptyProps(),
 
-    /** One request for one list input: the first one after `Load`, every URL change, and after a delete. */
+    /** One request for one list input: the page's watch sends one per new input, and a delete one more. */
     Fetch: props<{ input: ListEntityInput }>(),
     'Fetch Success': props<{ items: Entity[]; total: number }>(),
     'Fetch Failure': props<{ error: string }>(),
@@ -853,10 +956,14 @@ export const EntityListPageActions = createActionGroup({
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
+import { routerNavigatedAction } from '@ngrx/router-store';
+import { parseListInput } from '../../helpers/entity-list-params.helper';
+import { navigatedRoute } from '../app-router/app-router.helper';
 import { EntityListPageActions } from './entity-list-page.actions';
 import { type EntityListPageState } from './entity-list-page.model';
 
 export const initialEntityListPageState: EntityListPageState = {
+  input: null,
   status: 'idle',
   items: [],
   total: 0,
@@ -865,7 +972,12 @@ export const initialEntityListPageState: EntityListPageState = {
 
 export const entityListPageReducer = createReducer(
   initialEntityListPageState,
-  on(EntityListPageActions.load, EntityListPageActions.leave, () => initialEntityListPageState),
+  // The URL enters the slice here, and only for the list's own state.
+  on(routerNavigatedAction, (state, action) => {
+    const route = navigatedRoute(action);
+    return route.state === 'entity-list' ? { ...state, input: parseListInput(route.queryParams) } : state;
+  }),
+  on(EntityListPageActions.leave, () => initialEntityListPageState),
 
   on(EntityListPageActions.fetch, (state) => ({ ...state, status: 'loading' as const, error: null })),
   on(EntityListPageActions.fetchSuccess, (state, { items, total }) => ({ ...state, status: 'loaded' as const, items, total })),
@@ -880,72 +992,48 @@ export const entityListPageReducer = createReducer(
 
 ```ts
 import { createFeatureSelector, createSelector } from '@ngrx/store';
-import { parseListInput } from '../../helpers/entity-list-params.helper';
-import { selectQueryParams, selectUrl } from '../app-router/app-router.selectors';
 import { type EntityListPageState } from './entity-list-page.model';
 
 export const ENTITY_LIST_PAGE_FEATURE_KEY = 'entityListPage';
 
 export const selectEntityListPageState = createFeatureSelector<EntityListPageState>(ENTITY_LIST_PAGE_FEATURE_KEY);
 
+/** The list input the reducer copied from the URL; `null` until the router has navigated to the list. */
+export const selectListInput = createSelector(selectEntityListPageState, (s) => s.input);
 export const selectStatus = createSelector(selectEntityListPageState, (s) => s.status);
 export const selectItems = createSelector(selectEntityListPageState, (s) => s.items);
 export const selectTotal = createSelector(selectEntityListPageState, (s) => s.total);
 export const selectError = createSelector(selectEntityListPageState, (s) => s.error);
-
-// The URL is the source of truth for the list input.
-export const selectListInput = createSelector(selectQueryParams, (params) => parseListInput(params ?? {}));
-
-/** The list input while the URL is the list page's, otherwise `null` (e.g. mid-navigation to another page). */
-export const selectListInputOnListPage = createSelector(selectUrl, selectListInput, (url, input) => (isListUrl(url) ? input : null));
-
-function isListUrl(url: string | undefined): boolean {
-  const [path] = (url ?? '').split('?');
-  return path === '/entities' || path === '/entities/';
-}
 ```
 
 #### `store/entity-list-page/entity-list-page.effects.ts`
 
-`fetchOnListInputChange$` runs from `Load` until `Leave`: it follows the list input in the URL and dispatches `Fetch({ input })` for the first value and for every change, so the page never fetches itself. `selectListInputOnListPage` is `null` while the URL belongs to another page, which keeps a navigation away from triggering a stray fetch before `Leave` arrives. `fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the current page. `stepBackPastLastPage$` handles the page that ends up past the end — a delete emptied the last page, or a deep link names a page that no longer exists: an empty result with a non-zero total on a page above 1 navigates to the last page, and the URL change fetches it. Route-level effects stay registered after the page is left, which is why the stream ends on `Leave`.
+The page fetches each new list input itself (its watch, in [Pages](#pages)); the effects cover what is not a new
+input. `fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the
+current page. `stepBackPastLastPage$` handles the page that ends up past the end — a delete emptied the last page, or a
+deep link names a page that no longer exists: an empty result with a non-zero total on a page above 1 navigates to the
+last page with `replaceUrl`, since the user did not ask for that step, and the new input reaches the page's watch
+through the reducer like any other navigation.
 
 ```ts
 import { inject } from '@angular/core';
 import { type HttpErrorResponse } from '@angular/common/http';
 import { Store } from '@ngrx/store';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { catchError, concatMap, distinctUntilChanged, filter, map, of, switchMap, takeUntil, withLatestFrom } from 'rxjs';
+import { catchError, concatMap, filter, map, of, switchMap, withLatestFrom } from 'rxjs';
 import { toParams } from '../../helpers/entity-list-params.helper';
 import { httpErrorMessage } from '../../helpers/http-error.helper';
-import { type ListEntityInput } from '../../models/entity.model';
 import { EntityService } from '../../services/entity.service';
 import { AppRouterActions } from '../app-router/app-router.actions';
 import { EntityListPageActions } from './entity-list-page.actions';
-import { selectListInput, selectListInputOnListPage } from './entity-list-page.selectors';
-
-// From Load until Leave, every change of the list input in the URL (the first one included) fetches the list.
-export const fetchOnListInputChange$ = createEffect(
-  (actions$ = inject(Actions), store = inject(Store)) =>
-    actions$.pipe(
-      ofType(EntityListPageActions.load),
-      switchMap(() =>
-        store.select(selectListInputOnListPage).pipe(
-          filter((input): input is ListEntityInput => input !== null),
-          distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
-          map((input) => EntityListPageActions.fetch({ input })),
-          takeUntil(actions$.pipe(ofType(EntityListPageActions.leave)))
-        )
-      )
-    ),
-  { functional: true }
-);
+import { selectListInput } from './entity-list-page.selectors';
 
 // A delete changes the totals and shifts later rows onto the current page, so the list is fetched again.
 export const fetchAfterDelete$ = createEffect(
   (actions$ = inject(Actions), store = inject(Store)) =>
     actions$.pipe(
       ofType(EntityListPageActions.deleteSuccess),
-      withLatestFrom(store.select(selectListInput)),
+      withLatestFrom(store.select(selectListInput).pipe(filter((input) => input !== null))),
       map(([, input]) => EntityListPageActions.fetch({ input }))
     ),
   { functional: true }
@@ -956,10 +1044,14 @@ export const stepBackPastLastPage$ = createEffect(
   (actions$ = inject(Actions), store = inject(Store)) =>
     actions$.pipe(
       ofType(EntityListPageActions.fetchSuccess),
-      withLatestFrom(store.select(selectListInput)),
+      withLatestFrom(store.select(selectListInput).pipe(filter((input) => input !== null))),
       filter(([{ items, total }, input]) => items.length === 0 && total > 0 && input.page > 1),
       map(([{ total }, input]) =>
-        AppRouterActions.navigate({ commands: [], queryParams: toParams({ ...input, page: Math.ceil(total / input.pageSize) }) })
+        AppRouterActions.navigate({
+          commands: [],
+          queryParams: toParams({ ...input, page: Math.ceil(total / input.pageSize) }),
+          replaceUrl: true
+        })
       )
     ),
   { functional: true }
@@ -996,7 +1088,9 @@ export const delete$ = createEffect(
 
 ### `store/entity-detail-page/`
 
-Loads the entity on `Load`; clears it on `Leave`. Status: `'idle' | 'loading' | 'loaded' | 'error'`.
+State `entity-detail`. The reducer copies the `:id` from the URL; the page's watch loads each new id; `Leave` clears
+the slice. A new id on the reused page (detail 42 → 43) drops the previous entity at once, so the page never shows
+entity 42 under the URL for 43. Status: `'idle' | 'loading' | 'loaded' | 'error'`.
 
 #### `store/entity-detail-page/entity-detail-page.model.ts`
 
@@ -1006,6 +1100,8 @@ import { type Entity } from '../../models/entity.model';
 export type EntityDetailPageStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 export interface EntityDetailPageState {
+  /** The `:id` from the URL; `null` until the router has navigated to a detail page. */
+  id: string | null;
   status: EntityDetailPageStatus;
   entity: Entity | null;
   /** Set when `status` is `'error'`. */
@@ -1034,10 +1130,13 @@ export const EntityDetailPageActions = createActionGroup({
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
+import { routerNavigatedAction } from '@ngrx/router-store';
+import { navigatedRoute } from '../app-router/app-router.helper';
 import { EntityDetailPageActions } from './entity-detail-page.actions';
 import { type EntityDetailPageState } from './entity-detail-page.model';
 
 export const initialEntityDetailPageState: EntityDetailPageState = {
+  id: null,
   status: 'idle',
   entity: null,
   error: null
@@ -1045,7 +1144,13 @@ export const initialEntityDetailPageState: EntityDetailPageState = {
 
 export const entityDetailPageReducer = createReducer(
   initialEntityDetailPageState,
-  on(EntityDetailPageActions.load, () => ({ ...initialEntityDetailPageState, status: 'loading' as const })),
+  // A new id starts the slice over: nothing of the previous entity survives.
+  on(routerNavigatedAction, (state, action) => {
+    const route = navigatedRoute(action);
+    const id = route.state === 'entity-detail' ? (route.params['id'] as string) : null;
+    return id !== null && id !== state.id ? { ...initialEntityDetailPageState, id } : state;
+  }),
+  on(EntityDetailPageActions.load, (state) => ({ ...state, status: 'loading' as const, entity: null, error: null })),
   on(EntityDetailPageActions.loadSuccess, (state, { entity }) => ({ ...state, status: 'loaded' as const, entity })),
   on(EntityDetailPageActions.loadFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
   on(EntityDetailPageActions.leave, () => initialEntityDetailPageState)
@@ -1062,6 +1167,8 @@ export const ENTITY_DETAIL_PAGE_FEATURE_KEY = 'entityDetailPage';
 
 export const selectEntityDetailPageState = createFeatureSelector<EntityDetailPageState>(ENTITY_DETAIL_PAGE_FEATURE_KEY);
 
+/** The `:id` the reducer copied from the URL; `null` until the router has navigated to a detail page. */
+export const selectId = createSelector(selectEntityDetailPageState, (s) => s.id);
 export const selectStatus = createSelector(selectEntityDetailPageState, (s) => s.status);
 export const selectEntity = createSelector(selectEntityDetailPageState, (s) => s.entity);
 export const selectError = createSelector(selectEntityDetailPageState, (s) => s.error);
@@ -1095,7 +1202,9 @@ export const load$ = createEffect(
 
 ### `store/entity-form-page/`
 
-Serves both create and edit: `Load` carries the id, or `null` on `/entities/new`, and only an id triggers a load. Status: `'idle' | 'loading' | 'ready' | 'saving' | 'error'`, where `ready` is a new form or an edit form whose entity has loaded. After a successful save, `navigateAfterSave$` dispatches `AppRouterActions.navigate` to the detail page. Writes use `concatMap`, so a second save never cancels the first.
+States `entity-new` and `entity-edit`, one slice. The reducer copies the target from the URL: `{ id: null }` on
+`/entities/new`, `{ id }` on `/entities/:id/edit`. The page's watch dispatches `Load` with the target's id, or `null`,
+and only an id triggers a request. Status: `'idle' | 'loading' | 'ready' | 'saving' | 'error'`, where `ready` is a new form or an edit form whose entity has loaded. After a successful save, `navigateAfterSave$` dispatches `AppRouterActions.navigate` to the detail page. Writes use `concatMap`, so a second save never cancels the first.
 
 #### `store/entity-form-page/entity-form-page.model.ts`
 
@@ -1105,7 +1214,14 @@ import { type Entity } from '../../models/entity.model';
 /** `ready`: a new form, or an edit form whose entity has loaded. */
 export type EntityFormPageStatus = 'idle' | 'loading' | 'ready' | 'saving' | 'error';
 
+/** Which entity the form is for: `id` is `null` on `/entities/new`. */
+export interface EntityFormTarget {
+  id: string | null;
+}
+
 export interface EntityFormPageState {
+  /** Copied from the URL; `null` until the router has navigated to the form. */
+  target: EntityFormTarget | null;
   status: EntityFormPageStatus;
   /** The entity being edited; `null` when creating. */
   entity: Entity | null;
@@ -1142,10 +1258,14 @@ export const EntityFormPageActions = createActionGroup({
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
+import { routerNavigatedAction } from '@ngrx/router-store';
+import { type AppRouterState } from '../app-router/app-router.model';
+import { navigatedRoute } from '../app-router/app-router.helper';
 import { EntityFormPageActions } from './entity-form-page.actions';
-import { type EntityFormPageState } from './entity-form-page.model';
+import { type EntityFormPageState, type EntityFormTarget } from './entity-form-page.model';
 
 export const initialEntityFormPageState: EntityFormPageState = {
+  target: null,
   status: 'idle',
   entity: null,
   error: null
@@ -1153,9 +1273,16 @@ export const initialEntityFormPageState: EntityFormPageState = {
 
 export const entityFormPageReducer = createReducer(
   initialEntityFormPageState,
-  on(EntityFormPageActions.load, (_state, { id }) => ({
-    ...initialEntityFormPageState,
-    status: id === null ? ('ready' as const) : ('loading' as const)
+  // A new target starts the slice over: nothing of the previous form survives.
+  on(routerNavigatedAction, (state, action) => {
+    const target = formTarget(navigatedRoute(action));
+    return target !== null && target.id !== state.target?.id ? { ...initialEntityFormPageState, target } : state;
+  }),
+  on(EntityFormPageActions.load, (state, { id }) => ({
+    ...state,
+    status: id === null ? ('ready' as const) : ('loading' as const),
+    entity: null,
+    error: null
   })),
   on(EntityFormPageActions.loadSuccess, (state, { entity }) => ({ ...state, status: 'ready' as const, entity })),
   on(EntityFormPageActions.loadFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
@@ -1166,7 +1293,17 @@ export const entityFormPageReducer = createReducer(
 
   on(EntityFormPageActions.leave, () => initialEntityFormPageState)
 );
+
+function formTarget(route: AppRouterState): EntityFormTarget | null {
+  if (route.state === 'entity-new') {
+    return { id: null };
+  }
+  return route.state === 'entity-edit' ? { id: route.params['id'] as string } : null;
+}
 ```
+
+`target.id !== state.target?.id` is `true` for the first `{ id: null }` too, because the initial `target` is `null` and
+`state.target?.id` is then `undefined`.
 
 #### `store/entity-form-page/entity-form-page.selectors.ts`
 
@@ -1178,6 +1315,8 @@ export const ENTITY_FORM_PAGE_FEATURE_KEY = 'entityFormPage';
 
 export const selectEntityFormPageState = createFeatureSelector<EntityFormPageState>(ENTITY_FORM_PAGE_FEATURE_KEY);
 
+/** The target the reducer copied from the URL; `null` until the router has navigated to the form. */
+export const selectTarget = createSelector(selectEntityFormPageState, (s) => s.target);
 export const selectStatus = createSelector(selectEntityFormPageState, (s) => s.status);
 export const selectEntity = createSelector(selectEntityFormPageState, (s) => s.entity);
 export const selectError = createSelector(selectEntityFormPageState, (s) => s.error);
@@ -1331,20 +1470,56 @@ default.
 
 ### Pages
 
-Three pages: list, detail, and form (reused for create and edit). Each reads only its own slice.
+Three pages: list, detail, and form (reused for create and edit). Each reads only its own slice, never the router.
+
+**The page watch.** Each page loads from its own lifecycle: `ngOnInit` starts a watch on the slice's route state and
+dispatches the page's load action for each new value, until the component is destroyed; `ngOnDestroy` dispatches
+`Leave`. The list page's watch:
+
+```ts
+private readonly store = inject(Store);
+private readonly destroyRef = inject(DestroyRef);
+
+ngOnInit(): void {
+  // From init to destroy, each new list input (the first one included) fetches the list.
+  this.store
+    .select(selectListInput)
+    .pipe(
+      filter((input) => input !== null),
+      distinctUntilChanged(sameListInput),
+      takeUntilDestroyed(this.destroyRef)
+    )
+    .subscribe((input) => this.store.dispatch(EntityListPageActions.fetch({ input })));
+}
+
+ngOnDestroy(): void {
+  this.store.dispatch(EntityListPageActions.leave());
+}
+```
+
+- **`ngOnInit`, never the constructor.** Angular constructs the new page before `routerNavigatedAction`, and runs
+  `ngOnInit` after it, so by `ngOnInit` the reducer has copied the URL into the slice.
+- **`null` is skipped:** it means the router has not written the slice yet.
+- **`distinctUntilChanged` is the only dedupe.** A navigation that lands on the same input writes an equal object and
+  fetches nothing.
+- The detail page watches `selectId` (`distinctUntilChanged()`) and dispatches `EntityDetailPageActions.load({ id })`;
+  the form page watches `selectTarget` (`distinctUntilChanged((a, b) => a.id === b.id)`) and dispatches
+  `EntityFormPageActions.load({ id: target.id })`.
 
 ### `pages/entity-list-page.component.ts`
 
-- Dispatches `EntityListPageActions.load()` on init and `leave()` on destroy; the slice's effect fetches from there.
-- Reads `selectListInput` (from the URL) and its slice: `selectStatus`, `selectItems`, `selectTotal`, `selectError`.
-- The control strip (filter / sort / page size) dispatches no load action: it dispatches
-  `AppRouterActions.navigate({ commands: [], queryParams: toParams(next) })`, and the slice's navigation effect
-  fetches when the URL changes.
+- Runs the watch above and dispatches `leave()` on destroy.
+- Reads its slice: `selectListInput`, `selectStatus`, `selectItems`, `selectTotal`, `selectError`. The template reads
+  the input through `listInput = computed(() => this.input() ?? DEFAULT_LIST_INPUT)`, so it never handles `null`.
+- The control strip (filter / sort / page size) and pagination dispatch no load action: they build the next input
+  from the slice's input and dispatch `AppRouterActions.navigate({ commands: [], queryParams: toParams(next) })`. The
+  router changes the URL, the reducer copies the new input, and the watch fetches it. A user's change adds a history
+  entry, so back undoes it.
 - The filter strip has fixed inputs: _name contains_, _description contains_, _created on or after_, _created
   before_. Its pure functions live in `helpers/entity-filter-form.helper.ts` (`FilterForm`, `EMPTY_FILTER_FORM`,
   `formatRange`, `toFilterInput`, `toFilterForm`), kept out of the component so `ng test` covers them directly
   (`entity-filter-form.helper.spec.ts`). The strip's edits live in
-  `draft = linkedSignal<FilterForm>(() => toFilterForm(listInput().filter))`, so it resyncs from the URL on every
+  `draft = linkedSignal<FilterForm>(() => toFilterForm(listInput().filter))`, so it resyncs from the slice on every
   change of the list input — back / forward, a deep link, _Clear_ — and holds local edits in between; `applyFilters()` maps it
   with `toFilterInput` to an `EntityFilterInput` (`name.contains`, `description.contains`, `createdAt.ge` /
   `createdAt.lt`) and navigates with `page: 1`; _Clear_ resets the draft and navigates without a filter on page 1,
@@ -1359,7 +1534,7 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 - Each select has its own `<label for>` and an `id` (`entity-list-sort` / `Sort`, `entity-list-page-size` /
   `Per page`), not a wrapping `<label>`: a wrapping label folds the option text into the accessible name, and the
   specs' `getByLabelText('Sort')` stops matching. Each `<option>` shows the URL's value with
-  `[selected]="option.value === sortValue()"` (and `size === listInput().pageSize`); a `[value]` on the `<select>` is
+  `[selected]="option.value === sortValue()"` (and `size === listInput().pageSize`), the slice's value; a `[value]` on the `<select>` is
   applied before the `@for` renders the options, so it does not take.
 - Pagination: _Previous_ / _Next_ navigate with `page ± 1`; the label shows `first–last of total · page X of Y` via the
   helper's `formatRange`, with `totalPages` computed from `total` and `pageSize`. Stepping back from a page past the
@@ -1382,8 +1557,8 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 
 ### `pages/entity-detail-page.component.ts`
 
-- Reads the `id` with `selectRouteParam('id')` (typed `string | undefined`), dispatches
-  `EntityDetailPageActions.load({ id })` on init when the id is present, and `leave()` on destroy.
+- Watches `selectId` from `ngOnInit` and dispatches `EntityDetailPageActions.load({ id })` for each new id, and
+  `leave()` on destroy. A link to another entity reuses the component; the watch loads the new id.
 - Shows the description (`—` when it is `null`) and `createdAt` / `updatedAt` with `date: 'medium'`.
 - The error banner is an `@if (status() === 'error')`; under it, `@switch (status())` renders _Loading…_ or (on
   `'loaded'`) the entity with a link to the edit page.
@@ -1391,8 +1566,9 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 
 ### `pages/entity-form-page.component.ts`
 
-- Shared for `new` and `edit`: reads the `id` with `selectRouteParam('id')` (absent on `new`) and dispatches
-  `EntityFormPageActions.load({ id })` on init and `leave()` on destroy.
+- Shared for `new` and `edit`: watches `selectTarget` from `ngOnInit` and dispatches
+  `EntityFormPageActions.load({ id: target.id })` for each new target (`id` is `null` on `new`), and `leave()` on
+  destroy.
 - The form is `new FormGroup({ name: new FormControl(…), description: new FormControl(…) })`, with no injected
   `FormBuilder`; an `effect(() => …)` fills it when `selectEntity` delivers the edited entity.
 - After a save, the slice's `navigateAfterSave$` effect dispatches `AppRouterActions.navigate` to the detail page; the
@@ -1423,7 +1599,7 @@ The URL (de)serializer the list page depends on is the clearest standalone examp
 ```ts
 import { describe, expect, it } from 'vitest';
 import { type ListEntityInput } from '../models/entity.model';
-import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, parseListInput, toParams } from './entity-list-params.helper';
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, parseListInput, sameListInput, toParams } from './entity-list-params.helper';
 
 describe('entity-list-params.helper', () => {
   it('falls back to the defaults for an empty URL', () => {
@@ -1467,6 +1643,15 @@ describe('entity-list-params.helper', () => {
     expect(input.filter).toBeUndefined();
     expect(input.sort).toBeUndefined();
     expect(input.page).toBe(DEFAULT_PAGE);
+  });
+
+  it('treats two inputs that make the same request as the same', () => {
+    // Arrange
+    const input: ListEntityInput = { filter: { name: { contains: 'a' } }, page: 2, pageSize: DEFAULT_PAGE_SIZE };
+
+    // Act + Assert
+    expect(sameListInput(input, { ...input, filter: { name: { contains: 'a' } } })).toBe(true);
+    expect(sameListInput(input, { ...input, page: 3 })).toBe(false);
   });
 });
 ```

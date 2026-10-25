@@ -23,7 +23,7 @@ change this file in the same commit.
 
 ## 1. How to use this file
 
-Read the architecture section of the project you are changing ([API](#31-architecture), [Web](#41-architecture))
+Read the architecture section of the project you are changing ([API](#31-architecture), [Web](#41-architecture-the-app-is-a-statechart))
 once, then look things up. The quickest way in is the question you have:
 
 | I want to…                                    | where it goes                                                              | section                                   |
@@ -32,9 +32,9 @@ once, then look things up. The quickest way in is the question you have:
 | add an API route                              | a handler in `controllers/<resource>.controller.ts`, mounted in `app.ts`   | [API building blocks](#32-building-blocks) |
 | make a column filterable or sortable          | one line in the resource's schema file                                     | [List queries](#34-list-queries)          |
 | change what an error response looks like     | `middlewares/error.middleware.ts`                                          | [HTTP contract](#33-http-contract)        |
-| add a reusable UI piece                       | `web/src/app/components/` + its story + its browser spec                   | [Web building blocks](#43-building-blocks) |
-| keep some state on the web                    | depends on the kind of state                                               | [Where state lives](#42-where-state-lives) |
-| call the API from the web                     | a method on `services/<resource>.service.ts`, called from an effect        | [Web building blocks](#43-building-blocks) |
+| add a reusable UI piece                       | `web/src/app/components/` + its story + its browser spec                   | [Web building blocks](#44-building-blocks) |
+| keep some state on the web                    | depends on the kind of state                                               | [Where state lives](#43-where-state-lives) |
+| call the API from the web                     | a method on `services/<resource>.service.ts`, called from an effect        | [Web building blocks](#44-building-blocks) |
 | know which test to write                      | —                                                                          | [Which test do I write?](#73-which-test-do-i-write) |
 
 ## 2. Repository
@@ -272,52 +272,134 @@ allowlist; a new operator is one line in its scalar schema plus one branch in `d
 
 ## 4. Web
 
-### 4.1 Architecture
+### 4.1 Architecture: the app is a statechart
+
+The web app is a statechart. Each page route is a **state**, named in its `data: { state }` and typed by `AppState`;
+each page's `status` union holds its **sub-states**; **actions** are the only transitions. The route table in
+`app.routes.ts` is the list of states.
 
 ```
-URL ──► @ngrx/router-store ──► appRouter slice  (route params + query params, in the store)
-                                     │
-route ─► page component              │ selectors
-           │  Load on init, Leave on destroy        ▲ state
-           ▼                                        │
-        page slice  ◄── reducer ◄── actions ──► effects ──► EntityService ──► HttpClient ──► API
-                                                   │
-                                                   └──► AppRouterActions.navigate ──► navigate$ ──► Router ──► URL
+                       open row                          Edit
+  ┌───────────────┐ ───────────────► ┌───────────────┐ ───────────────► ┌───────────────┐
+  │ entity-list   │                  │ entity-detail │                  │ entity-edit   │
+  │ query change ↺│ ◄─────────────── │ another id   ↺│ ◄─────────────── │               │
+  └───────────────┘   Back           └───────────────┘   Save Success   └───────────────┘
+      │      ▲                               ▲                                   │
+  New │      │ Cancel                        │ Save Success                      │ Cancel → entity-list
+      ▼      │                               │
+  ┌───────────────┐ ─────────────────────────┘
+  │ entity-new    │
+  └───────────────┘
 ```
 
-- **The URL is the source of truth for list queries.** The list page never holds filter / sort / page in the store:
-  it dispatches `AppRouterActions.navigate({ commands: [], queryParams })`, and its effect, running from `Load` to
-  `Leave`, dispatches `Fetch({ input })` for the first list input in the URL and for every change. Refresh, back,
-  forward and deep links all work for free.
-- **Pages talk to the store, effects talk to the world.** A page reads selectors and dispatches actions; effects call
-  the service and map results to actions; `navigate$` is the only code that calls the Angular `Router`.
+| state           | route                                            | slice              | sub-states (`status`)                                  |
+| --------------- | ------------------------------------------------ | ------------------ | ------------------------------------------------------ |
+| `entity-list`   | `/entities?filter&sortField&sortDirection&page&pageSize` | `entityListPage`   | `idle` → `loading` → `loaded` ⇄ `deleting`, `error`     |
+| `entity-detail` | `/entities/:id`                                  | `entityDetailPage` | `idle` → `loading` → `loaded`, `error`                  |
+| `entity-new`    | `/entities/new`                                  | `entityFormPage`   | `idle` → `ready` → `saving`, `error`                    |
+| `entity-edit`   | `/entities/:id/edit`                             | `entityFormPage`   | `idle` → `loading` → `ready` → `saving`, `error`        |
+
+Data moves one way, in two loops that share the page reducer and the page:
+
+```
+navigation   user intent ──► AppRouterActions.navigate ──► navigate$ ──► Router ──► URL
+                                                                           │  ▲ back · forward · deep link
+                                                                           ▼
+                                                     routerNavigatedAction (@ngrx/router-store)
+                                                                           │ only the reducer whose state matches
+                                                                           ▼
+data         page ◄── selectors ◄── page slice ◄── page reducer ◄── <Action> Success / Failure
+               │                                                                 ▲
+               └── watch from ngOnInit ──► Fetch / Load ──► effect ──► service ──► API
+```
+
+- **The router only writes state; the page decides when to load.** No effect reacts to a navigation, and no
+  navigation starts a request.
+- **Pages talk to the store, effects talk to the world.** A page reads selectors of its own slice and dispatches
+  actions; effects call the service and map results to actions; `navigate$` is the only code that calls the Angular
+  `Router`.
 - **Each page owns one slice, registered on its route** (`provideState` + `provideEffects` in `app.routes.ts`). Only
-  `appContext` and `appRouter` are global, in `app.config.ts`. Route-level effects stay registered after the page is
-  left, so an effect that reacts to the URL stops on `Leave` or checks it is still on its page.
+  `appContext` and `appRouter` are global, in `app.config.ts`. Route-level slices and effects stay registered after the
+  page is left, which is why every page resets its slice on `Leave`.
 
-### 4.2 Where state lives
+### 4.2 Store and router
 
-| state                                         | lives in                                              | example                                         |
-| --------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------- |
-| what the user is looking at, shareable        | the URL (router-store)                                | list filter, sort, page; the `:id` of a page    |
-| server data and the request's status          | the page's slice                                      | `items`, `total`, `entity`, `status`, `error`   |
-| UI-only, short-lived                          | a signal in the page (`signal` / `linkedSignal`)      | the filter strip's draft, the row pending delete |
-| build-time config                             | `environment*.ts`, read only by `appContext`          | `apiBaseUrl`, `appName`                         |
+The URL enters the store in one direction only, and components read only their page slice: to them, the store is the
+single source of truth.
 
-Derive UI state from the store with `linkedSignal` when it must follow it — the filter draft resyncs from the URL on
-every change, the pending delete closes when a new page of items arrives — instead of syncing it by hand in an
-`effect()`.
+| state                                 | written by                                                   | read by                                 |
+| ------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| the URL                               | the Angular `Router`, called only by `navigate$`             | `@ngrx/router-store`                    |
+| `appRouter` (`{ url, state, params, queryParams }`) | `routerReducer`, through `AppRouterSerializer`  | devtools; no page, no page slice        |
+| a page's route state (list input, detail id, form target) | its page reducer, on `routerNavigatedAction` for its own state | that page, through its selectors |
+| server data and `status`              | its page reducer, on `Fetch` / `Load` results                | that page                               |
 
-### 4.3 Building blocks
+**Loading data: the page watch.** In `ngOnInit` a page starts a watch on its route state — `filter` out `null`,
+`distinctUntilChanged`, `takeUntilDestroyed` — and dispatches `Fetch` / `Load` for each value; `ngOnDestroy` dispatches
+`Leave`. A reused component (list page 2 → 3, detail 42 → 43) reloads because its watch is still running. Loads that
+are not navigations stay effects: `fetchAfterDelete$` fetches again with the slice's input.
+
+**When the URL changes outside the app,** it arrives through the same door as a change the app made, and needs no code
+of its own:
+
+| trigger                              | what Angular does                                         | what the store and page do                                               |
+| ------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| deep link or refresh                 | registers the route's slice and effects, creates the page, `NavigationEnd` | the reducer stores the URL's state; `ngOnInit`'s watch loads it once     |
+| back / forward to another page       | destroys the old page, creates the new one                | the old page dispatches `Leave`; the new one loads as on a deep link     |
+| back / forward within the list       | reuses the page; no lifecycle hooks                       | the reducer stores the input; the running watch fetches it               |
+| an edited URL or a link to another id | reuses the detail page                                   | the reducer stores the id and drops the old entity; the watch loads it   |
+| a guard cancels                      | `NavigationCancel`, no `NavigationEnd`                    | no `routerNavigatedAction`: no slice changes                             |
+
+**When the app changes what the URL holds,** it dispatches `AppRouterActions.navigate` and waits: the new value
+reaches the slice only through `routerNavigatedAction`. Nothing writes URL-backed state into a slice directly, so
+nothing has to sync back.
+
+| situation                                         | who dispatches `navigate`                | with                                                          |
+| ------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| the user changes filter, sort, page or page size  | the list page                            | `{ commands: [], queryParams: toParams(next) }`               |
+| the user opens a row, edits, cancels              | the page                                 | `{ commands: ['/entities', id] }` and the like                |
+| a save succeeds                                   | `navigateAfterSave$`                     | `{ commands: ['/entities', entity.id] }`                      |
+| a page past the end (a delete, a stale deep link) | `stepBackPastLastPage$`                  | `{ commands: [], queryParams, replaceUrl: true }`             |
+
+A user's change adds a history entry, so back undoes it; a correction the user did not ask for replaces the entry.
+State that does not belong in the URL — a filter draft, a row pending delete, server data — never goes through
+`navigate`.
+
+**Pitfalls.**
+
+- **Start the watch in `ngOnInit`, never the constructor.** Angular constructs the new page before
+  `routerNavigatedAction` and runs `ngOnInit` after it.
+- **A new id or target starts the slice over.** The reducer drops the previous entity with the new id, or the page
+  shows entity 42 under the URL for 43 until the request returns.
+- **Read the route with `navigatedRoute(action)`**, the one cast from router-store's payload type to `AppRouterState`.
+- **`navigationActionTiming: PostActivation`** keeps `appRouter` from holding a URL the router never commits (a guard
+  can cancel before activation).
+- **The watch's `distinctUntilChanged` is the only dedupe.** A navigation that lands on an equal input fetches nothing;
+  reducers never compare to avoid an update.
+
+### 4.3 Where state lives
+
+| state                                         | lives in                                                       | example                                          |
+| --------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| what the user is looking at, shareable        | the URL, copied into the page slice by its reducer             | list filter, sort, page; the `:id` of a page     |
+| server data and the request's status          | the page's slice                                               | `items`, `total`, `entity`, `status`, `error`    |
+| UI-only, short-lived                          | a signal in the page (`signal` / `linkedSignal`)               | the filter strip's draft, the row pending delete |
+| build-time config                             | `environment*.ts`, read only by `appContext`                   | `apiBaseUrl`, `appName`                          |
+
+Derive UI state from the store with `linkedSignal` when it must follow it — the filter draft resyncs from the slice's
+input on every change, the pending delete closes when a new page of items arrives — instead of syncing it by hand in
+an `effect()`.
+
+### 4.4 Building blocks
 
 | block            | lives in                                   | is                                                              | may use                                                    | must not                                                       |
 | ---------------- | ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
 | component        | `components/<name>.component.ts`           | a store-free UI piece: signal `input()` / `output()`            | other components                                           | inject the `Store`, a service or the `Router`                  |
 | layout           | `layouts/<name>-layout.component.ts`       | the shell around the pages                                      | the `Store` (read)                                         | inject services                                                |
-| page             | `pages/<name>-page.component.ts`           | one route's screen                                              | the `Store` (selectors, dispatch), components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`    |
-| slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's state and its transitions       | resource models, helpers                                   | hold another page's data, hold the list query                  |
-| effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly                     |
-| app-router slice | `store/app-router/`                        | router-store selectors, the `Navigate` action, `navigate$`      | the Angular `Router` (`navigate$` only)                    | —                                                              |
+| page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`; select from `appRouter` |
+| slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's route state, data and transitions | resource models, helpers, `navigatedRoute`         | hold another page's data, read another state's route           |
+| effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly; react to `routerNavigatedAction` |
+| app-router slice | `store/app-router/`                        | `AppState`, the serializer, `navigatedRoute`, `Navigate` + `navigate$` | the Angular `Router` (`navigate$` only)             | —                                                              |
 | app-context slice| `store/app-context/`                       | `apiBaseUrl` + `appName`, seeded from `environment`             | `environment`                                              | change after start                                             |
 | service          | `services/<resource>.service.ts`           | every HTTP call for one resource (`providedIn: 'root'`)          | `HttpClient`, `selectApiBaseUrl`, helpers                  | be injected outside effects, keep state                        |
 | helper           | `helpers/<name>.helper.ts`                 | pure functions (URL params, filter form mapping, error message) | models                                                     | inject anything                                                |
@@ -331,11 +413,13 @@ every change, the pending delete closes when a new page of items arrives — ins
 - **Forms** are `new FormGroup` / `new FormControl`, validated like the API's schemas (`name` required, max 200;
   `description` max 2000). Save trims the values and sends an empty description as `null`.
 
-### 4.4 The page contract
+### 4.5 The page contract
 
-- **Load and Leave.** Every page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`, and its reducer resets to
-  the initial state on both, so a revisit never shows stale data. Detail and form load the entity themselves; there are
-  no cross-page reducer updates.
+- **Watch and Leave.** Every page starts its watch in `ngOnInit` ([Store and router](#42-store-and-router)) and
+  dispatches `Leave` in `ngOnDestroy`; the reducer resets to the initial state on `Leave`, so a revisit never shows
+  stale data. Detail and form load the entity themselves; there are no cross-page reducer updates.
+- **Each slice holds the route state its page needs** (the list input, the detail id, the form target), `null` until
+  the router writes it, and writes it only on `routerNavigatedAction` for its own state.
 - **One `status` union per slice, never boolean flags:** list `'idle' | 'loading' | 'loaded' | 'deleting' | 'error'`,
   detail `'idle' | 'loading' | 'loaded' | 'error'`, form `'idle' | 'loading' | 'ready' | 'saving' | 'error'`, plus
   `error: string | null`, set only in `'error'`.
@@ -345,11 +429,12 @@ every change, the pending delete closes when a new page of items arrives — ins
 - **Writes use `concatMap`, reads `switchMap`.** A second save never cancels the first; a newer fetch cancels an older
   one.
 - **Navigation after a write is an effect**, never page code: `navigateAfterSave$` goes to the detail page; on the
-  list, `fetchAfterDelete$` refetches and `stepBackPastLastPage$` moves off a page past the end.
+  list, `fetchAfterDelete$` refetches and `stepBackPastLastPage$` moves off a page past the end, replacing the history
+  entry.
 - **A page used by several routes registers its slice once,** on a shared componentless parent route (the form on
   `new` and `:id/edit`), so its effects do not run twice.
 
-### 4.5 UI rules
+### 4.6 UI rules
 
 - **One file per component:** inline `template`, no `.html` / `.scss` siblings. Angular ESLint lints inline templates.
 - **Styling:** Tailwind utilities in the template, plus a `host` class for the host element. The only global
@@ -405,7 +490,7 @@ singular suffix. Angular files sit flat in their folder — `pages/entity-list-p
 | DAO class               | `<Resource>Dao`                               | `EntityDao`                                                    |
 | NgRx action group       | `<Page>Actions`, `source` = page name         | `EntityListPageActions`, `'Entity List Page'`                  |
 | feature key / selectors | `<PAGE>_FEATURE_KEY`, `select<Thing>`          | `ENTITY_LIST_PAGE_FEATURE_KEY`, `selectListInput`              |
-| effect                  | `<what it does>$`                             | `fetchOnListInputChange$`, `navigateAfterSave$`                |
+| effect                  | `<what it does>$`                             | `stepBackPastLastPage$`, `navigateAfterSave$`                  |
 | page / component class  | the name without a suffix                     | `EntityListPage`, `ConfirmDialog`, `MainLayout`                |
 
 "Dao", not "Repository": a class per table returning rows is DAO-shaped. `PaginatedResult`, not `Connection`, which
@@ -490,10 +575,11 @@ Storybook is not a test: it is where components are built and their states revie
   `HttpTestingController`; effects get `provideMockActions` and fake services; anything reading the store gets
   `provideMockStore` with selector overrides.
 - *Assert:* services — method, URL, params and body of each call; reducers — every action's resulting state, as plain
-  function calls; selectors — `.projector(…)` for anything with logic; effects — the action each input maps to, plus
-  the RxJS operators that matter (`distinctUntilChanged`, `takeUntil(leave)`, `switchMap` cancellation, `concatMap`
-  ordering), driven by a `Subject` of actions and a mutable `MockStore`; routes — every path renders its page through
-  `RouterTestingHarness`; helpers — a happy case and an edge case each.
+  function calls, with each navigation a `navigated({ state, params, queryParams })` fixture (into the page's own state
+  and into another); selectors — `.projector(…)` for anything with logic; effects — the action each input maps to,
+  plus the RxJS operators that matter (`switchMap` cancellation, `concatMap` ordering), driven by a `Subject` of
+  actions; routes — every path renders its page and lands its `data.state` through `RouterTestingHarness`; the
+  serializer — the deepest state and the merged params; helpers — a happy case and an edge case each.
 - *Not here:* rendering details and styling — the browser spec owns those.
 - *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect,
   a route or a helper. Every slice has its reducer, selectors and effects specs.
@@ -504,8 +590,9 @@ Storybook is not a test: it is where components are built and their states revie
   for every required input, append to `document.body`, `autoDetectChanges()` — because `render()` (in
   `src/testing/render.ts`) starts change detection before inputs are set.
 - *Assert:* through the `page` locators, by role and accessible name: each UI state of the status union, what a click
-  or input dispatches (spy on `MockStore.dispatch` before `createComponent`), `Load` on init and `Leave` on destroy, and
-  for a component the outputs it emits.
+  or input dispatches (spy on `MockStore.dispatch` before `createComponent`), the page watch (the first route state
+  loads, an equal one does not, a new one on the same component does, `Leave` on destroy — moved with
+  `overrideSelector` + `refreshState()`), and for a component the outputs it emits.
 - *Not here:* HTTP or effects — there is no backend; the e2e owns the full path.
 - *Add one when:* you add a page, a component, a UI state or a control.
 
@@ -514,8 +601,8 @@ Storybook is not a test: it is where components are built and their states revie
   database, created, migrated and emptied by the global setup. The dev database and any running dev or Compose stack
   are never touched; teardown stops Postgres only if setup started it.
 - *Assert:* a user's flow end to end, seeding data through the API (`e2e/utils/api.ts`) and driving the UI: list,
-  filter (and the filter in the URL), delete and cancel, stepping back off an emptied page; create and edit; a detail
-  page and a missing one.
+  filter (and the filter in the URL), a deep link to a later page, back after _Next_, delete and cancel, stepping back
+  off an emptied page; create and edit; a detail page and a missing one.
 - *Not here:* edge cases a unit or browser spec can cover faster.
 - *Add one when:* you add a page or a user-visible flow.
 
@@ -573,10 +660,13 @@ For a resource `user`:
 **Web**
 1. `models/user.model.ts`: mirror `User`, its inputs, `UserFilterInput`, `UserSortInput`, `ListUserInput`.
 2. `services/user.service.ts` and `helpers/user-list-params.helper.ts` (+ a filter-form helper if the list has one).
-3. One slice per page under `store/user-<page>-page/`, registered on its route in `app.routes.ts`.
-4. The pages under `pages/`, following [the page contract](#44-the-page-contract).
-5. Tests: the service, helper and slice specs, a browser spec per page, e2e specs per page, the new routes in
-   `app.routes.spec.ts`.
+3. The new states (`user-list`, `user-detail`, `user-new`, `user-edit`) in `AppState`
+   (`store/app-router/app-router.model.ts`), and one route per state in `app.routes.ts` with its `data: { state }`.
+4. One slice per page under `store/user-<page>-page/`, registered on its route, its reducer writing its route state on
+   `routerNavigatedAction` for its own state.
+5. The pages under `pages/`, following [the page contract](#45-the-page-contract), each with its watch.
+6. Tests: the service, helper and slice specs, a browser spec per page, e2e specs per page, the new routes and states
+   in `app.routes.spec.ts`.
 
 ## 9. Formatting, lint and Docker
 
@@ -613,9 +703,12 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - **No `eslint-plugin-prettier`** — formatting is `format:check`'s job.
 - **No per-project Docker build context** — `catalog:` needs the root lockfile.
 - **No `types/` folder** — `models/` holds shapes and errors; `express.d.ts` stays at `src/`.
-- **No list query in a reducer, no global per-resource slice** — the URL is the query; each page owns its slice.
-- **No `ActivatedRoute`, `Router` or `FormBuilder` in pages** — every route read and navigation is visible as state
-  and actions.
+- **No global per-resource slice** — each page owns its slice, with the route state it needs.
+- **No `ActivatedRoute`, `Router`, router selectors or `FormBuilder` in pages** — every route read reaches a page through
+  its slice, and every navigation is an action.
+- **No loading from the router** — no effect reacts to `routerNavigatedAction`; the page's watch decides when to load.
+- **No query written to a slice by the app** — a filter, sort or page change navigates, and the reducer copies the new
+  URL; there is no store → URL sync to keep in step.
 - **No boolean `loading` / `saving` flags** — one status union cannot contradict itself.
 - **No SCSS or per-component CSS files** — Tailwind utilities in inline templates.
 - **No `@Input()` decorators** — components keep signal `input()` / `output()`, and their browser specs set them with
@@ -632,6 +725,7 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - [ ] `pnpm test:integration` passes if you touched the API's DAOs, schemas, controllers or `app.ts`.
 - [ ] `pnpm test:browser` passes if you touched a component or page; `pnpm test:e2e` if you changed a user flow or the
       web↔API contract.
+- [ ] A new page route declares its `data: { state }`, and the page reads only its slice and loads from its watch.
 - [ ] A schema change comes with its migration (`db:generate`), committed.
 - [ ] An API type change is mirrored in the web's `models/`.
 - [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists; a new component has a story.

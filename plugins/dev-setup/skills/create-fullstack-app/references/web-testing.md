@@ -32,18 +32,20 @@ patterns; the cases come from here. Names follow the `describe` rule above.
 | file | cases |
 | --- | --- |
 | `app.component.spec.ts` | renders the main layout with its router outlet |
-| `app.routes.spec.ts` | `''` redirects to `/entities`; `/entities`, `/entities/:id`, `/entities/new` and `/entities/:id/edit` render their pages |
+| `app.routes.spec.ts` | `''` redirects to `/entities`; `/entities`, `/entities/:id`, `/entities/new` and `/entities/:id/edit` render their pages; each of the four lands its state (`entity-list`, `entity-detail`, `entity-new`, `entity-edit`) and its params in the app-router slice |
 | `layouts/main-layout.component.spec.ts` | shows the app name from the store and a router outlet |
 | `services/entity.service.spec.ts` | `list` drops default `page` / `pageSize`; `list` sends the list input as the shared URL params; `get`, `create`, `update`, `delete` each send the right method, URL and body |
-| `helpers/entity-list-params.helper.spec.ts` | the four cases in `web.md` §11 |
+| `helpers/entity-list-params.helper.spec.ts` | the five cases in `web.md` §11 |
 | `helpers/entity-filter-form.helper.spec.ts` | `toFilterInput`: empty form → `undefined`, trimmed `contains` filters, the date range as local midnight; `toFilterForm`: no filter → empty form, round trip, unsupported operators and invalid dates ignored; `formatRange`: `0 of 0`, the row range with total and page |
 | `helpers/http-error.helper.spec.ts` | uses the API's message; falls back to the response's |
 | `store/app-context/app-context.reducer.spec.ts` | seeds the initial state from `environment`; an unknown action returns it unchanged |
 | `store/app-context/app-context.selectors.spec.ts` | picks `apiBaseUrl` and `appName` |
-| `store/app-router/app-router.effects.spec.ts` | `navigate$` calls the `Router` with the commands and query params |
-| `store/<page>/<page>.reducer.spec.ts` (×3) | every action → its state: `Load` / `Leave` reset, each request → its loading status, each success and failure |
-| `store/<page>/<page>.selectors.spec.ts` (×3) | the slice fields; the list's `selectListInput` (parse, defaults, `ASC` default direction) and `selectListInputOnListPage` (`null` off the list URL) |
-| `store/entity-list-page/entity-list-page.effects.spec.ts` | `fetchOnListInputChange$`, `fetchAfterDelete$`, `fetch$` and `delete$` success / failure, `stepBackPastLastPage$` (steps back; stays on a page with rows; stays on an empty first page), and the operator details below |
+| `store/app-router/app-router.serializer.spec.ts` | the deepest route's `data.state`; params merged along the branch; the query params and URL; `state` is `null` when no route declares one |
+| `store/app-router/app-router.helper.spec.ts` | `navigatedRoute` returns the payload's router state as written by the serializer |
+| `store/app-router/app-router.effects.spec.ts` | `navigate$` calls the `Router` with the commands, query params and `replaceUrl` |
+| `store/<page>/<page>.reducer.spec.ts` (×3) | `routerNavigatedAction` into the page's own state writes its route state (list: the parsed input; detail: the id, and a new id drops the previous entity; form: `{ id: null }` on `entity-new`, `{ id }` on `entity-edit`), into another state leaves the slice unchanged; `Leave` resets; each request → its loading status; each success and failure |
+| `store/<page>/<page>.selectors.spec.ts` (×3) | the slice fields, including the route state (`selectListInput`, `selectId`, `selectTarget`) |
+| `store/entity-list-page/entity-list-page.effects.spec.ts` | `fetchAfterDelete$` (fetches the slice's input), `fetch$` and `delete$` success / failure, `stepBackPastLastPage$` (steps back with `replaceUrl`; stays on a page with rows; stays on an empty first page), and the operator details below |
 | `store/entity-detail-page/entity-detail-page.effects.spec.ts` | `load$` success and failure |
 | `store/entity-form-page/entity-form-page.effects.spec.ts` | `load$` (loads an id, skips a new form, failure), `create$` and `update$` success / failure, saves run one after the other (`concatMap`), `navigateAfterSave$` |
 
@@ -52,15 +54,15 @@ patterns; the cases come from here. Names follow the `describe` rule above.
 | file | cases |
 | --- | --- |
 | `components/confirm-dialog.component.browser.spec.ts` | the full spec below |
-| `pages/entity-list-page.component.browser.spec.ts` | lifecycle; the UI states (rows + range label, loading, no-entities-yet, filtered-empty, error banner, Previous / Next disabled at the ends and enabled in the middle); the delete flow (confirm dispatches `delete`, cancel dispatches nothing); the URL-building actions (sort, page size, Next, Apply, Clear) |
-| `pages/entity-detail-page.component.browser.spec.ts` | loaded entity with an _Edit_ link, error banner, _Loading…_, lifecycle (`load({ id })` / `leave()`) |
-| `pages/entity-form-page.component.browser.spec.ts` | lifecycle on `new` (`load({ id: null })`) and edit (`load({ id })`); fills the form on load; dispatches `create` / `update` with the form values; does not save an empty name; Save disabled with its label while loading or saving; error banner |
+| `pages/entity-list-page.component.browser.spec.ts` | the watch (fetches the slice's input on init, again for a new input, not for an equal one, nothing while the input is `null`, `leave()` on destroy); the UI states (rows + range label, loading, no-entities-yet, filtered-empty, error banner, Previous / Next disabled at the ends and enabled in the middle); the delete flow (confirm dispatches `delete`, cancel dispatches nothing); the navigation actions built from the slice's input (sort, page size, Next, Apply, Clear) |
+| `pages/entity-detail-page.component.browser.spec.ts` | loaded entity with an _Edit_ link, error banner, _Loading…_, the watch (`load({ id })` on init, again for a new id on the same component, `leave()` on destroy) |
+| `pages/entity-form-page.component.browser.spec.ts` | the watch on `new` (`load({ id: null })`) and edit (`load({ id })`), `leave()` on destroy; fills the form on load; dispatches `create` / `update` with the form values; does not save an empty name; Save disabled with its label while loading or saving; error banner |
 
 **e2e (`pnpm test:e2e`, `e2e/pages/*.spec.ts`)**
 
 | file | cases |
 | --- | --- |
-| `entity-list-page.spec.ts` | lists entities seeded through the API; filters by name through the strip, and the filter lands in the URL; deletes through the dialog; cancel keeps the row; steps back a page when a delete empties the last one |
+| `entity-list-page.spec.ts` | lists entities seeded through the API; filters by name through the strip, and the filter lands in the URL; a deep link to page 2 shows page 2; _Next_ then the browser's back shows the first page again; deletes through the dialog; cancel keeps the row; steps back a page when a delete empties the last one |
 | `entity-detail-page.spec.ts` | the spec below |
 | `entity-form-page.spec.ts` | creates an entity and lands on its detail page; edits a seeded entity and sees the change |
 
@@ -298,57 +300,57 @@ describe('entity-detail-page.effects', () => {
 });
 ```
 
-- **Reducer specs** are plain function calls: `reducer(state, action)` → expected state, no `TestBed`.
+- **Reducer specs** are plain function calls: `reducer(state, action)` → expected state, no `TestBed`. A navigation
+  is a `routerNavigatedAction` built by `navigated()` from `src/testing/navigated.ts`, so each transition of the
+  statechart reads as one line: `reducer(initialState, navigated({ state: 'entity-detail', params: { id: 'e1' } }))`.
 - **Selector specs** call `selector.projector(input)` directly. Each page slice and the `app-context` slice ships a
-  `*.selectors.spec.ts` for parallelism across slices, even where the selectors are trivial field pickers; the list
-  page's `selectListInput` / `selectListInputOnListPage` additionally carry URL-parsing logic worth asserting in depth.
-- **Store effects** that read the store (the list page's `fetchOnListInputChange$` / `fetchAfterDelete$` /
-  `stepBackPastLastPage$`) add a `provideMockStore` with the relevant selectors overridden.
+  `*.selectors.spec.ts` for parallelism across slices, even where the selectors are trivial field pickers. URL parsing
+  is the params helper's spec and the list reducer's, not the selectors'.
+- **Store effects** that read the store (the list page's `fetchAfterDelete$` / `stepBackPastLastPage$`) add a
+  `provideMockStore` with `selectListInput` overridden.
+
+### `web/src/testing/navigated.ts`
+
+Builds the `routerNavigatedAction` the router would dispatch after landing on a state, with the payload
+`AppRouterSerializer` writes. Unit specs only; the browser specs mock the store and never see router actions.
+
+```ts
+import { routerNavigatedAction } from '@ngrx/router-store';
+import { type NavigationEnd } from '@angular/router';
+import { type AppRouterState } from '../app/store/app-router/app-router.model';
+
+export function navigated(route: Partial<AppRouterState> & Pick<AppRouterState, 'state'>): ReturnType<typeof routerNavigatedAction> {
+  const routerState: AppRouterState = { url: '/', params: {}, queryParams: {}, ...route };
+  return routerNavigatedAction({
+    payload: { routerState: routerState as never, event: { id: 1, url: routerState.url } as NavigationEnd }
+  });
+}
+```
+
+`routerState as never` is the one cast: router-store types the payload with its default serializer's snapshot shape,
+the same reason `navigatedRoute` exists.
 
 ### Effects — operator details (list page)
 
 An excerpt: `entity`, `result` / `resultB`, `entityService` and the imports come from the rest of the file. The
-single-action-in → single-action-out style above proves the mapping but **not** the RxJS operators that make the
-URL-driven list correct. The list effects spec adds an `operator details` block that drives them with a
-**`Subject`-backed `actions$`** and a **mutable `MockStore`**, collecting every emission synchronously — no scheduler:
+single-action-in → single-action-out style above proves the mapping but **not** the RxJS operators that keep the
+list correct. The list effects spec adds an `operator details` block that drives them with a
+**`Subject`-backed `actions$`**, collecting every emission synchronously — no scheduler:
 
 - Reassign the existing `let actions$` to a `new Subject<Action>()` and `.subscribe((a) => emitted.push(a))` the effect.
-- For store-driven effects (`fetchOnListInputChange$`), push input changes with `store.overrideSelector(selector, value)`
-  then `store.refreshState()`. Identical values exercise `distinctUntilChanged` (dropped); emitting `leave()` then a
-  change exercises `takeUntil`; overriding to `null` exercises the null-input `filter`.
-- For service-driven effects (`fetch$`, `delete$`), give the fake service `Subject` returns via
-  `mockReturnValueOnce(first).mockReturnValueOnce(second)` and complete them in a controlled order: `switchMap` drops the
-  first (its emission is ignored), `concatMap` only subscribes the second after the first completes
-  (`toHaveBeenCalledTimes`).
+- Give the fake service `Subject` returns via `mockReturnValueOnce(first).mockReturnValueOnce(second)` and complete
+  them in a controlled order: `switchMap` drops the first (its emission is ignored), `concatMap` only subscribes the
+  second after the first completes (`toHaveBeenCalledTimes`).
+
+The list's other operator, `distinctUntilChanged` on the list input, lives in the page's watch and is covered by the
+page's browser spec ([The page watch](#the-page-watch-ui-states-and-navigation-actions)).
 
 ```ts
-import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { Subject } from 'rxjs';
-// ...the beforeEach adds provideMockStore with selectListInput / selectListInputOnListPage overridden.
 
 describe('operator details', () => {
   const inputA: ListEntityInput = { filter: undefined, sort: undefined, page: 1, pageSize: 20 };
   const inputB: ListEntityInput = { filter: undefined, sort: undefined, page: 2, pageSize: 20 };
-
-  it('fetchOnListInputChange$ fetches once for a repeated identical input (distinctUntilChanged)', () => {
-    const actions = new Subject<Action>();
-    actions$ = actions;
-    const store = TestBed.inject(MockStore);
-    store.overrideSelector(selectListInputOnListPage, inputA);
-    const emitted: Action[] = [];
-    const sub = TestBed.runInInjectionContext(() => fetchOnListInputChange$()).subscribe((a) => emitted.push(a));
-
-    actions.next(EntityListPageActions.load()); // inner subscribes, emits inputA -> fetch
-    // Equal but a new object: the same reference would be dropped by NgRx's own select before
-    // the effect's distinctUntilChanged ever saw it, and the case would pass without the operator.
-    store.overrideSelector(selectListInputOnListPage, { ...inputA });
-    store.refreshState(); // equal -> dropped by distinctUntilChanged
-    store.overrideSelector(selectListInputOnListPage, inputB);
-    store.refreshState(); // changed -> fetch
-    sub.unsubscribe();
-
-    expect(emitted).toEqual([EntityListPageActions.fetch({ input: inputA }), EntityListPageActions.fetch({ input: inputB })]);
-  });
 
   it('fetch$ lets a newer fetch cancel the in-flight one (switchMap)', () => {
     const first = new Subject<PaginatedResult<Entity>>();
@@ -370,19 +372,21 @@ describe('operator details', () => {
 });
 ```
 
-The companion cases (`takeUntil(leave)`, the null-input `filter`, and `delete$`'s `concatMap` serialization) follow the
-same two techniques. `stepBackPastLastPage$` takes the plain style: override `selectListInput`, emit one
-`fetchSuccess`, and collect with `toArray()` — an empty page past the end (`{ page: 3, pageSize: 1 }`, `total: 2`)
-navigates to page 2; a page with rows, or an empty first page, emits nothing.
+The companion case, `delete$`'s `concatMap` serialization, follows the same technique. `stepBackPastLastPage$` takes
+the plain style: override `selectListInput`, emit one `fetchSuccess`, and collect with `toArray()` — an empty page past
+the end (`{ page: 3, pageSize: 1 }`, `total: 2`) navigates to page 2 with `replaceUrl: true`; a page with rows, or an
+empty first page, emits nothing.
 
 ### Routing — `app.routes.spec.ts`
 
 `RouterTestingHarness` works in the zoneless jsdom environment with no extra change-detection provider. Provide the
-real `routes`, a root store (`appContext` + `appRouter` reducers) with `provideRouterStore`, the app-router effects,
-and a **fake `EntityService`** (every method returns `of(...)`) so the per-route effects that fire on page load never
-touch HTTP. `navigateByUrl(url, Component)` asserts the activated component's type; read `Router.url` to assert the
-redirect. The block is an excerpt: its imports and the `entity` fixture are the same as in the other specs, and the
-full spec covers every route listed in the [spec inventory](#spec-inventory).
+real `routes`, a root store (`appContext` + `appRouter` reducers) with `provideRouterStore` configured as in
+`app.config.ts` (the serializer and post-activation timing), the app-router effects, and a **fake `EntityService`**
+(every method returns `of(...)`) so the page loads never touch HTTP. `navigateByUrl(url, Component)` asserts the
+activated component's type; read `Router.url` to assert the redirect, and `selectRouterState` to assert the state the
+route declares — the route table is the statechart, so this spec is where a missing or wrong `data.state` fails. The
+block is an excerpt: its imports and the `entity` fixture are the same as in the other specs, and the full spec covers
+every route listed in the [spec inventory](#spec-inventory).
 
 ```ts
 import { provideRouter, Router } from '@angular/router';
@@ -399,7 +403,11 @@ describe('app.routes', () => {
       providers: [
         provideRouter(routes),
         provideStore({ [APP_CONTEXT_FEATURE_KEY]: appContextReducer, [ROUTER_FEATURE_KEY]: routerReducer }),
-        provideRouterStore({ stateKey: ROUTER_FEATURE_KEY }),
+        provideRouterStore({
+          stateKey: ROUTER_FEATURE_KEY,
+          serializer: AppRouterSerializer,
+          navigationActionTiming: NavigationActionTiming.PostActivation
+        }),
         provideEffects(appRouterEffects),
         { provide: EntityService, useValue: fakeEntityService }
       ]
@@ -415,6 +423,18 @@ describe('app.routes', () => {
   it('renders the form page at /entities/:id/edit (the edit and new routes share one form slice)', async () => {
     const harness = await RouterTestingHarness.create();
     expect(await harness.navigateByUrl('/entities/e1/edit', EntityFormPage)).toBeInstanceOf(EntityFormPage);
+  });
+
+  it('lands the entity-edit state with its id', async () => {
+    // Arrange
+    const harness = await RouterTestingHarness.create();
+
+    // Act
+    await harness.navigateByUrl('/entities/e1/edit', EntityFormPage);
+
+    // Assert
+    const router = await firstValueFrom(TestBed.inject(Store).select(selectRouterState));
+    expect(router.state).toMatchObject({ state: 'entity-edit', params: { id: 'e1' } });
   });
 });
 ```
@@ -456,7 +476,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '../../testing/render';
 import { type Entity } from '../models/entity.model';
 import { type EntityDetailPageStatus } from '../store/entity-detail-page/entity-detail-page.model';
-import { selectEntity, selectError, selectStatus } from '../store/entity-detail-page/entity-detail-page.selectors';
+import { selectEntity, selectError, selectId, selectStatus } from '../store/entity-detail-page/entity-detail-page.selectors';
 import { EntityDetailPage } from './entity-detail-page.component';
 
 const entity: Entity = { id: 'e1', name: 'Acme', description: 'An entity', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' };
@@ -466,6 +486,7 @@ function setup(status: EntityDetailPageStatus, value: Entity | null, error: stri
     provideRouter([]),
     provideMockStore({
       selectors: [
+        { selector: selectId, value: 'e1' },
         { selector: selectStatus, value: status },
         { selector: selectEntity, value },
         { selector: selectError, value: error }
@@ -567,49 +588,67 @@ describe('confirm-dialog.component', () => {
 });
 ```
 
-### Lifecycle dispatch, UI states and URL actions
+### The page watch, UI states and navigation actions
 
-Beyond rendering, the page specs cover:
+Pages read only their own slice, so a page spec seeds everything through `provideMockStore` selector overrides,
+including the route state the router would have written (`selectListInput`, `selectId`, `selectTarget`). Beyond
+rendering, the page specs cover:
 
+- **The watch** (all pages): the first route state dispatches the load action (`fetch({ input })`, `load({ id })`),
+  an equal value dispatches nothing, a new value on the same component dispatches it again, `null` dispatches nothing,
+  and `ngOnDestroy` dispatches `leave()` and ends the watch.
 - **UI states** (list page): loading, filtered-empty vs. no-entities-yet, the error banner, and the `Previous`/`Next`
   disabled logic — one `renderList(state)` helper over `provideMockStore` selector overrides, asserted with
   `toBeDisabled()` / `toBeEnabled()`.
 - **The delete flow** (list page): _Delete_ on a row opens the `ConfirmDialog`; confirming dispatches
   `EntityListPageActions.delete({ id })`, cancelling closes the dialog and dispatches nothing.
-- **URL-building actions** (list page): changing the Sort / Per-page selects and clicking Next / Clear each dispatch the
-  exact `AppRouterActions.navigate({ commands: [], queryParams: toParams(...) })` — the "URL as source of truth" contract.
-- **Lifecycle** (all pages): `ngOnInit` dispatches `load(...)` and `ngOnDestroy` dispatches `leave()`.
+- **Navigation actions** (list page): changing the Sort / Per-page selects and clicking Next / Clear each dispatch the
+  exact `AppRouterActions.navigate({ commands: [], queryParams: toParams(...) })`, built from the slice's input. The
+  page never fetches for them: the new input comes back through the reducer.
 - **Form fill-on-load**: a mock store returning a loaded entity populates the Name/Description controls (the component's
   `effect` → `form.setValue`).
 
 Two setup rules make these work:
 
 1. **Spy on `dispatch` _before_ `createComponent`** — the shared `render` helper injects the store only after creating
-   the component, too late to observe `ngOnInit`. For lifecycle/action specs, inline the setup instead: configure →
+   the component, too late to observe `ngOnInit`. For watch and action specs, inline the setup instead: configure →
    `TestBed.inject(MockStore)` → `vi.spyOn(store, 'dispatch')` → `createComponent` → append → `autoDetectChanges()`.
-2. **Seed the router param** — `selectRouteParam('id')` returns a fresh selector each call, so it can't be overridden by
-   reference. Seed it through `provideMockStore`'s `initialState`:
+2. **Move the route state with `overrideSelector` + `refreshState()`**, as the reducer would after a navigation. An
+   equal value must be a new object: the same reference is dropped by NgRx's own `select` before the page's
+   `distinctUntilChanged` sees it, and the case would pass without the operator.
 
 ```ts
-provideMockStore({
-  selectors: [/* status/entity/error */],
-  initialState: { appRouter: { state: { root: { params: { id: 'e1' }, firstChild: null } }, navigationId: 1 } }
+const input: ListEntityInput = { filter: undefined, sort: undefined, page: 2, pageSize: 20 };
+TestBed.configureTestingModule({
+  providers: [
+    provideRouter([]),
+    provideMockStore({ selectors: [{ selector: selectListInput, value: input } /* status, items, total, error */] })
+  ]
 });
 // ...spy before createComponent:
 const store = TestBed.inject(MockStore);
 const dispatch = vi.spyOn(store, 'dispatch');
-const fixture = TestBed.createComponent(EntityDetailPage);
+const fixture = TestBed.createComponent(EntityListPage);
 document.body.appendChild(fixture.nativeElement);
 fixture.autoDetectChanges();
+expect(dispatch).toHaveBeenCalledWith(EntityListPageActions.fetch({ input }));
 
-expect(dispatch).toHaveBeenCalledWith(EntityDetailPageActions.load({ id: 'e1' }));
+dispatch.mockClear();
+store.overrideSelector(selectListInput, { ...input }); // equal -> dropped by distinctUntilChanged
+store.refreshState();
+expect(dispatch).not.toHaveBeenCalled();
+store.overrideSelector(selectListInput, { ...input, page: 3 }); // the reused page gets a new input
+store.refreshState();
+expect(dispatch).toHaveBeenCalledWith(EntityListPageActions.fetch({ input: { ...input, page: 3 } }));
+
 fixture.destroy();
-expect(dispatch).toHaveBeenCalledWith(EntityDetailPageActions.leave());
+expect(dispatch).toHaveBeenCalledWith(EntityListPageActions.leave());
 ```
 
-For a URL-building action, `dispatch.mockClear()` after init (to drop the `load()`), drive the control, then assert the
+For a navigation action, `dispatch.mockClear()` after init (to drop the `fetch()`), drive the control, then assert the
 `navigate` payload — e.g. `await page.getByLabelText('Sort').selectOptions('name:ASC')` →
-`navigate({ commands: [], queryParams: { filter: null, sortField: 'name', sortDirection: 'ASC', page: null, pageSize: null } })`.
+`navigate({ commands: [], queryParams: { filter: null, sortField: 'name', sortDirection: 'ASC', page: null, pageSize: null } })`
+(a sort change goes back to page 1, the default, so `page` is `null`).
 
 ## 4. Full-stack e2e
 
@@ -807,9 +846,15 @@ test.describe('entity detail page', () => {
 });
 ```
 
-The list page e2e covers the delete flows against the real API: delete-via-dialog, cancel-keeps-the-row, and
-**step-back-on-empty-page** — seed two rows under one filter, land on `?pageSize=1&page=2` (URL as source of truth),
-delete the only row, and assert the URL drops `page=2` as the page steps back to page 1.
+The list page e2e covers the router → store path and the delete flows against the real API:
+
+- **deep link** — seed three rows under one filter, `goto` `?pageSize=1&page=2` with that filter, and see the second
+  row and _page 2 of 3_;
+- **back after Next** — on page 1, click _Next_, see page 2, then `page.goBack()` and see page 1 again, with no _Next_
+  click repeated: the browser's own navigation reaches the slice through the router;
+- delete-via-dialog, cancel-keeps-the-row, and **step-back-on-empty-page** — seed two rows under one filter, land on
+  `?pageSize=1&page=2` by deep link, delete the only row, and assert the URL drops `page=2` as the page steps back to
+  page 1.
 
 Add to `web/.gitignore`: `/test-results`, `/playwright-report`, `/blob-report`, `/playwright/.cache` (Playwright
 output), and `/.vitest` (Vitest 5's attachments and browser-mode failure screenshots, under `.vitest/attachments/`).
