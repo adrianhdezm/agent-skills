@@ -24,14 +24,22 @@ packages:
 
 allowBuilds:
   '@parcel/watcher': false
+  cpu-features: false
   esbuild: true
   lmdb: false
   msgpackr-extract: false
+  protobufjs: false
+  ssh2: false
 ```
+
+`cpu-features`, `protobufjs` and `ssh2` are optional native deps pulled in transitively by `@testcontainers/postgresql`
+(through dockerode/ssh2). The DB tests talk to the local Docker socket and never need them built, so they are set to
+`false` to keep `pnpm install` clean (no `ERR_PNPM_IGNORED_BUILDS`).
 
 **Catalog rule**: only packages used in two or more manifests with the same version range belong in the catalog.
 Everything else is a direct dependency of the one manifest that uses it. TypeScript is in the catalog because both
-projects pin the same exact 6.0.x version.
+projects pin the same exact 6.0.x version; `@types/node` is in the catalog too, because api and web both depend on it at
+the same `^24.x` range. `vitest` stays out — api is on `^5` and web is pinned to `4.1.12`, different ranges.
 
 ## Root `package.json`
 
@@ -48,6 +56,7 @@ projects pin the same exact 6.0.x version.
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:db": "pnpm --filter api test:db",
     "format": "pnpm -r format",
     "format:check": "pnpm -r format:check",
     "up": "docker compose up --build",
@@ -78,12 +87,13 @@ Pick the newest TypeScript that satisfies both, which is the latest 6.0.x while 
 
 ```sh
 pnpm --filter api --filter web add -D --save-catalog \
-  eslint @eslint/js typescript-eslint eslint-config-prettier globals prettier
+  eslint @eslint/js typescript-eslint eslint-config-prettier globals prettier @types/node
 pnpm --filter api --filter web add -D -E --save-catalog "typescript@$(pnpm view 'typescript@~6.0.0' version)"
 ```
 
 This writes the `catalog:` block and replaces the Angular CLI's own `typescript` entry in `web/package.json` with
-`catalog:`. Check the result: `typescript` in the catalog is an exact version with no `^` or `~`.
+`catalog:`. `@types/node` is cataloged the same way, because both projects use it. Check the result: `typescript` in the
+catalog is an exact version with no `^` or `~`.
 
 ## `.gitignore`
 
@@ -124,10 +134,14 @@ DB_PASSWORD=s3cr3t
 # Inside Docker Compose the API uses host "db" (set in docker-compose.yml).
 DATABASE_URL=postgres://postgres:s3cr3t@localhost:5432/app
 PORT=3000
+
+# Optional: pino log level (defaults to debug in dev, info in production).
+# LOG_LEVEL=info
 ```
 
 Copy it to `.env` for local work: `cp .env.example .env`. The API fails fast if `.env` is missing (strict
-`--env-file`).
+`--env-file`), and `db/client.ts` throws if `DATABASE_URL` is unset — there is no hardcoded connection-string fallback.
+`.env.example` is committed; `.env` is not.
 
 ## `docker-compose.yml`
 

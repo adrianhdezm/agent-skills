@@ -146,6 +146,8 @@ export default defineConfig([
 ### `web/eslint.config.mjs`
 
 ```js
+// eslint-plugin-storybook: https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from 'eslint-plugin-storybook';
 import eslint from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -154,7 +156,7 @@ import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist/**', '.angular/**', 'eslint.config.mjs']),
+  globalIgnores(['dist/**', '.angular/**', 'storybook-static/**', 'eslint.config.mjs', 'playwright.config.ts']),
   {
     files: ['**/*.ts'],
     extends: [eslint.configs.recommended, tseslint.configs.recommendedTypeChecked, angular.configs.tsRecommended],
@@ -215,9 +217,12 @@ export default defineConfig([
   {
     files: ['**/*.spec.ts'],
     rules: {
-      'max-lines-per-function': 'off'
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off'
     }
   },
+  // Storybook's recommended rules, then prettier last so it wins the final say on formatting.
+  ...storybook.configs['flat/recommended'],
   eslintConfigPrettier
 ]);
 ```
@@ -237,4 +242,10 @@ export default defineConfig([
 - **Complexity guards as `warn`, not `error`**: they signal when a module grows too dense without blocking prototype
   code.
 - **Per-file overrides carry a comment**: `*.controller.ts` → `require-await` off (uniform controller signature);
-  `*.reducer.ts` → `complexity` off (grows with actions by design); tests → `max-lines-per-function` off.
+  `*.reducer.ts` → `complexity` off (grows with actions by design); tests → `max-lines-per-function` off (and, in web,
+  `max-nested-callbacks` off, since `describe`/`it`/callback nesting is idiomatic).
+- **Web only: `eslint-plugin-storybook` + extra ignores** (`storybook-static/**` is build output; `playwright.config.ts`
+  is a root config that isn't in a TS project). `...storybook.configs['flat/recommended']` lints `*.stories.ts`. The
+  browser-mode and e2e specs live outside `tsconfig.app`/`tsconfig.spec`, so `tsconfig.browser.json` (referenced from
+  `tsconfig.json`) and `e2e/tsconfig.json` give ESLint's project service a home for `*.browser.spec.ts`, `src/testing/`
+  and `e2e/`. The browser config (`vitest.browser.config.mts`) is an `.mts` file, so `**/*.ts` rules don't apply to it.

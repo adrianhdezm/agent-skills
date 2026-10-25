@@ -12,8 +12,15 @@ real resource, and the template for every later one. The resource-agnostic piece
 - [`api/src/controllers/home.controller.ts`](#apisrccontrollershomecontrollerts)
 - [`api/src/controllers/health.controller.ts`](#apisrccontrollershealthcontrollerts)
 - [`api/src/controllers/entity.controller.ts`](#apisrccontrollersentitycontrollerts)
-- [`api/tests/controllers/entity.controller.test.ts`](#apitestscontrollersentitycontrollertestts)
-- [`api/tests/db/schemas/entity.schema.test.ts`](#apitestsdbschemasentityschematestts)
+- [Test layout](#test-layout)
+- [`api/tests/utils/`](#apitestsutils)
+- [`api/tests/api/entity.controller.test.ts`](#apitestsapientitycontrollertestts)
+- [`api/tests/api/home.controller.test.ts`](#apitestsapihomecontrollertestts)
+- [`api/tests/api/health.controller.test.ts`](#apitestsapihealthcontrollertestts)
+- [`api/tests/api/error.middleware.test.ts`](#apitestsapierrormiddlewaretestts)
+- [`api/tests/db/entity.dao.test.ts`](#apitestsdbentitydaotestts)
+- [`api/tests/db/entity.full-stack.test.ts`](#apitestsdbentityfull-stacktestts)
+- [`api/tests/unit/entity.schema.test.ts`](#apitestsunitentityschematestts)
 - [Adding another resource](#adding-another-resource)
 
 ## `api/src/db/schemas/entity.schema.ts`
@@ -27,6 +34,10 @@ Everything resource-specific lives here, so the DAO holds no configuration of it
 - the list pieces: `entityFilterInputSchema` and `entitySortInputSchema` from the builders, `ListEntityInput`,
   `listEntityInputSchema` (the structured `ListEntityInput`, with no URL decoding), and `entityDefaultSort`.
 
+The builders (`createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema`) come from
+`helpers/list-input.helper.ts`; the scalar filter inputs (`idFilterInputSchema`, …) come from `models/list-input.model.ts`
+(see [api-dao.md](api-dao.md)).
+
 Filter and sort fields carry the column names, which is what lets the DAO pass `entity` as the column source. The file
 has no comments: every resource schema is declarations only, so keep it that way when copying it.
 
@@ -34,14 +45,8 @@ has no comments: every resource schema is declarations only, so keep it that way
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-zod';
 import { z } from 'zod';
-import {
-  createFilterInputSchema,
-  createListInputSchema,
-  createSortInputSchema,
-  dateFilterInputSchema,
-  idFilterInputSchema,
-  stringFilterInputSchema
-} from '../../models/list-input.model.js';
+import { createFilterInputSchema, createListInputSchema, createSortInputSchema } from '../../helpers/list-input.helper.js';
+import { dateFilterInputSchema, idFilterInputSchema, stringFilterInputSchema } from '../../models/list-input.model.js';
 
 export const entity = pgTable('entity', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -185,15 +190,17 @@ export class EntityDao implements Dao<Entity, ListEntityInput, CreateEntityInput
 }
 ```
 
-The DAO is the only code that touches Drizzle, and it needs a live database, so it has no unit test. Its SQL building is
-covered by the `dao.helper` tests, and its wiring by the smoke test in the SKILL.md Review Checklist.
+The DAO is the only code that touches Drizzle. It is covered directly by a Testcontainers-backed suite
+([`tests/db/entity.dao.test.ts`](#apitestsdbentitydaotestts)) that runs it against a real Postgres, and its
+SQL-building pieces are additionally unit-tested through the SQL they render in the `dao.helper` tests
+([api-dao.md](api-dao.md)).
 
 ## `api/src/controllers/home.controller.ts`
 
 ```ts
 import type { NextFunction, Request, Response } from 'express';
 
-export async function homeController(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getHome(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     res.json({ service: 'api', status: 'running' });
   } catch (err) {
@@ -204,14 +211,15 @@ export async function homeController(_req: Request, res: Response, next: NextFun
 
 ## `api/src/controllers/health.controller.ts`
 
-Non-persisted ops probe: runs `SELECT 1` inline, no DAO.
+Non-persisted ops probe: runs `SELECT 1` inline, no DAO. It is the one deliberate exception to the uniform
+`catch (err) { next(err) }` skeleton — its catch maps any failure to a 503.
 
 ```ts
 import type { NextFunction, Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
 import createError from 'http-errors';
 
-export async function healthController(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const startedAt = Date.now();
   try {
     await req.app.locals.context.db.execute(sql`select 1`);
@@ -350,23 +358,40 @@ export async function deleteEntity(req: Request, res: Response, next: NextFuncti
 }
 ```
 
-## `api/tests/controllers/entity.controller.test.ts`
+## Test layout
 
-Runs the real app from `createApp` on a random port, with a fake DAO on the context. This is what the context
-singleton buys: no database, no module mocking.
+Tests are grouped by kind, not mirrored against `src/` (full rules in `coding-conventions.md`):
+
+- `tests/unit/` — fast, database-free (the `dao.helper`, `list-input.helper` and `entity.schema` tests);
+- `tests/api/` — one file per controller, driving `createApp` over `fetch` with a fake DAO, plus `error.middleware.test.ts`
+  for the terminal handler;
+- `tests/db/` — the DAO against a real Postgres via Testcontainers, plus `entity.full-stack.test.ts` which drives the real
+  app over HTTP against a real DAO + DB (no fake);
+- `tests/utils/` — shared helpers (not tests).
+
+Each test file wraps its suites in one top-level `describe` named for the module (`describe('entity.controller')`,
+`describe('entity.dao')`, …). `vitest.config.ts` defines three projects (`unit`, `api`, `db`); `pnpm --filter api test`
+runs `unit` + `api` (no Docker), and `pnpm --filter api test:db` runs `db`.
+
+## `api/tests/utils/`
+
+Shared test helpers, not tests themselves. The `api` suites use `test-server.ts` + `fake-dao.ts`; the `db` suite uses
+`pg-container.ts` + `entity-seed.ts`.
+
+### `api/tests/utils/fake-dao.ts`
+
+A vitest mock standing in for `EntityDao`, a minimal `db` stub for the health probe, and `createTestApp`, which builds an
+app whose context carries both and returns them so tests can program and assert on them.
 
 ```ts
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import type { EntityDao } from '../../src/daos/entity.dao.js';
 import type { DbClient } from '../../src/db/client.js';
-import { NotFoundError } from '../../src/models/error.model.js';
+import type { AppContext } from '../../src/models/app-context.model.js';
 
-const ID = '00000000-0000-4000-8000-000000000001';
-
-function fakeDao() {
+/** A vitest mock standing in for an EntityDao — one vi.fn() per Dao method. */
+export function createFakeDao() {
   return {
     get: vi.fn(),
     list: vi.fn(),
@@ -376,166 +401,995 @@ function fakeDao() {
   };
 }
 
-let server: Server;
-let baseUrl: string;
-let dao: ReturnType<typeof fakeDao>;
+/** A minimal stub of the drizzle client: only `execute`, used by the health probe. */
+export function createFakeDb() {
+  return { execute: vi.fn().mockResolvedValue(undefined) };
+}
+
+export type FakeDao = ReturnType<typeof createFakeDao>;
+export type FakeDb = ReturnType<typeof createFakeDb>;
+
+/** Build an app whose context carries a fake DAO and db, returning both so tests can program and assert on them. */
+export function createTestApp(): { app: ReturnType<typeof createApp>; dao: FakeDao; db: FakeDb } {
+  const dao = createFakeDao();
+  const db = createFakeDb();
+  const context: AppContext = { db: db as unknown as DbClient, entityDao: dao as unknown as EntityDao };
+  return { app: createApp(context), dao, db };
+}
+```
+
+### `api/tests/utils/test-server.ts`
+
+Starts the app on an ephemeral port and hands back the base URL plus the fake DAO and db, so each controller test is a
+few lines of `fetch`.
+
+```ts
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createTestApp, type FakeDao, type FakeDb } from './fake-dao.js';
+
+export interface TestServer {
+  readonly baseUrl: string;
+  readonly dao: FakeDao;
+  readonly db: FakeDb;
+  readonly close: () => Promise<void>;
+}
+
+/** Start the app (with a fake DAO + db) on an ephemeral port and hand back its base URL and mocks. */
+export async function startTestServer(): Promise<TestServer> {
+  const { app, dao, db } = createTestApp();
+  const server: Server = createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    dao,
+    db,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve()))
+  };
+}
+```
+
+### `api/tests/utils/pg-container.ts`
+
+Spins up a throwaway `postgres:17-alpine` with Testcontainers, connects drizzle, and applies `db/migrations/` with the
+drizzle migrator (same `__migrations__` table as `drizzle.config.ts`). DAO suites call `startTestDb()` once in
+`beforeAll` and `stop()` in `afterAll`. Needs a running Docker daemon.
+
+```ts
+import { fileURLToPath } from 'node:url';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
+import type { DbClient } from '../../src/db/client.js';
+import { schema } from '../../src/db/schema.js';
+
+const migrationsFolder = fileURLToPath(new URL('../../db/migrations', import.meta.url));
+
+export interface TestDb {
+  readonly db: DbClient;
+  readonly stop: () => Promise<void>;
+}
+
+/**
+ * Spin up a throwaway Postgres container, connect drizzle to it, and apply the
+ * project's migrations with the drizzle migrator (same folder and __migrations__
+ * table as drizzle.config.ts). DAO suites call this once in beforeAll and tear
+ * it down in afterAll.
+ */
+export async function startTestDb(): Promise<TestDb> {
+  const container: StartedPostgreSqlContainer = await new PostgreSqlContainer('postgres:17-alpine').start();
+  const pool = new Pool({ connectionString: container.getConnectionUri() });
+  const db = drizzle(pool, { schema });
+  await migrate(db, { migrationsFolder, migrationsTable: '__migrations__', migrationsSchema: 'public' });
+  return {
+    db,
+    stop: async () => {
+      await pool.end();
+      await container.stop();
+    }
+  };
+}
+```
+
+### `api/tests/utils/entity-seed.ts`
+
+Seed generators for the DAO suite: `day(n)` for stable timestamps, `seedEntities(db, rows)` inserting directly (bypassing
+the DAO so tests control ids and timestamps), and `seedCanonical(db)` for the five-row list fixture. A new resource adds
+its own `<resource>-seed.ts`.
+
+```ts
+import type { DbClient } from '../../src/db/client.js';
+import { type Entity, entity } from '../../src/db/schemas/entity.schema.js';
+
+export interface EntitySeed {
+  name: string;
+  description?: string | null;
+  createdAt?: Date;
+}
+
+/** A fixed day in 2026, so date-filter tests have stable, ordered timestamps. */
+export function day(n: number): Date {
+  return new Date(Date.UTC(2026, 0, n));
+}
+
+/** Insert rows directly (bypassing the DAO) so tests control ids, descriptions and timestamps. */
+export function seedEntities(db: DbClient, rows: EntitySeed[]): Promise<Entity[]> {
+  return db.insert(entity).values(rows).returning();
+}
+
+/** Five rows (alpha…echo) on consecutive days, with one null description — the canonical list fixture. */
+export function seedCanonical(db: DbClient): Promise<Entity[]> {
+  return seedEntities(db, [
+    { name: 'alpha', description: 'first', createdAt: day(1) },
+    { name: 'bravo', description: 'second', createdAt: day(2) },
+    { name: 'charlie', description: null, createdAt: day(3) },
+    { name: 'delta', description: 'fourth', createdAt: day(4) },
+    { name: 'echo', description: 'fifth', createdAt: day(5) }
+  ]);
+}
+```
+
+## `api/tests/api/entity.controller.test.ts`
+
+Runs the real app from `createApp` on a random port, with a fake DAO on the context (via `startTestServer`). This is what
+the context singleton buys: no database, no module mocking. Uses `fetch`, not `supertest`, and asserts status **and**
+response body for each route, plus the 400/404 cases — including the body-parser edges (malformed JSON → 400, an
+over-the-limit body → 413), the `PATCH` validation refine (no updatable fields → 400) and an invalid field → 400, the
+DAO's `NotFoundError` → 404 on **both** update and delete, and repeated query params collapsing to the first value.
+
+```ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { NotFoundError } from '../../src/models/error.model.js';
+import { startTestServer, type TestServer } from '../utils/test-server.js';
+
+const ID = '00000000-0000-4000-8000-000000000001';
+
+let srv: TestServer;
 
 beforeEach(async () => {
-  dao = fakeDao();
-  const app = createApp({ db: {} as DbClient, entityDao: dao as unknown as EntityDao });
-  server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  srv = await startTestServer();
 });
 
 afterEach(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await srv.close();
 });
 
-describe('GET /entities', () => {
-  it('passes the parsed list input to the DAO', async () => {
-    // Arrange
-    dao.list.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 5, totalPages: 0 });
-    const filter = encodeURIComponent(JSON.stringify({ name: { contains: 'a' } }));
+describe('entity.controller', () => {
+  describe('GET /entities', () => {
+    it('passes the parsed list input to the DAO and returns its paginated result', async () => {
+      // Arrange
+      const result = { items: [{ id: ID, name: 'a' }], total: 1, page: 2, pageSize: 5, totalPages: 1 };
+      srv.dao.list.mockResolvedValue(result);
+      const filter = encodeURIComponent(JSON.stringify({ name: { contains: 'a' } }));
 
-    // Act
-    const res = await fetch(`${baseUrl}/entities?filter=${filter}&sortField=name&sortDirection=DESC&page=2&pageSize=5`);
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities?filter=${filter}&sortField=name&sortDirection=DESC&page=2&pageSize=5`);
 
-    // Assert
-    expect(res.status).toBe(200);
-    expect(dao.list).toHaveBeenCalledWith({
-      filter: { name: { contains: 'a' } },
-      sort: { field: 'name', direction: 'DESC' },
-      page: 2,
-      pageSize: 5
+      // Assert
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(result);
+      expect(srv.dao.list).toHaveBeenCalledWith({
+        filter: { name: { contains: 'a' } },
+        sort: { field: 'name', direction: 'DESC' },
+        page: 2,
+        pageSize: 5
+      });
+    });
+
+    it('decodes the URL params: numbers, and ASC when only a sort field is given', async () => {
+      // Arrange
+      srv.dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 10, totalPages: 0 });
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities?sortField=createdAt&page=3&pageSize=10`);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(srv.dao.list).toHaveBeenCalledWith({ sort: { field: 'createdAt', direction: 'ASC' }, page: 3, pageSize: 10 });
+    });
+
+    it('keeps the first value of a repeated param', async () => {
+      // Arrange
+      srv.dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 20, totalPages: 0 });
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities?page=3&page=9`);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(srv.dao.list).toHaveBeenCalledWith({ page: 3, pageSize: 20 });
+    });
+
+    it.each([
+      ['a filter that is not JSON', 'filter=%7B'],
+      ['an unknown param', 'nme=a'],
+      ['a page that is not a number', 'page=abc'],
+      ['a sort field outside the allowlist', 'sortField=description'],
+      ['a pageSize over the max', 'pageSize=101']
+    ])('rejects %s with 400 without reaching the DAO', async (_label, query) => {
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities?${query}`);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.list).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed filter with 400 without reaching the DAO', async () => {
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities?filter=${encodeURIComponent('{"name":{"gt":1}}')}`);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.list).not.toHaveBeenCalled();
     });
   });
 
-  it('decodes the URL params: numbers, and ASC when only a sort field is given', async () => {
-    // Arrange
-    dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 10, totalPages: 0 });
+  describe('POST /entities', () => {
+    it('creates from a valid body and returns 201 with the created row', async () => {
+      // Arrange
+      const created = { id: ID, name: 'first', description: null };
+      srv.dao.create.mockResolvedValue(created);
 
-    // Act
-    const res = await fetch(`${baseUrl}/entities?sortField=createdAt&page=3&pageSize=10`);
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'first' })
+      });
 
-    // Assert
-    expect(res.status).toBe(200);
-    expect(dao.list).toHaveBeenCalledWith({ sort: { field: 'createdAt', direction: 'ASC' }, page: 3, pageSize: 10 });
-  });
-
-  it.each([
-    ['a filter that is not JSON', 'filter=%7B'],
-    ['an unknown param', 'nme=a'],
-    ['a page that is not a number', 'page=abc'],
-    ['a sort field outside the allowlist', 'sortField=description']
-  ])('rejects %s with 400 without reaching the DAO', async (_label, query) => {
-    // Act
-    const res = await fetch(`${baseUrl}/entities?${query}`);
-
-    // Assert
-    expect(res.status).toBe(400);
-    expect(dao.list).not.toHaveBeenCalled();
-  });
-
-  it('rejects a malformed filter with 400 without reaching the DAO', async () => {
-    // Act
-    const res = await fetch(`${baseUrl}/entities?filter=${encodeURIComponent('{"name":{"gt":1}}')}`);
-
-    // Assert
-    expect(res.status).toBe(400);
-    expect(dao.list).not.toHaveBeenCalled();
-  });
-});
-
-describe('POST /entities', () => {
-  it('creates from a valid body and returns 201', async () => {
-    // Arrange
-    dao.create.mockResolvedValue({ id: ID, name: 'first' });
-
-    // Act
-    const res = await fetch(`${baseUrl}/entities`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'first' })
+      // Assert
+      expect(res.status).toBe(201);
+      expect(await res.json()).toEqual(created);
+      expect(srv.dao.create).toHaveBeenCalledWith({ name: 'first' });
     });
 
-    // Assert
-    expect(res.status).toBe(201);
-    expect(dao.create).toHaveBeenCalledWith({ name: 'first' });
-  });
+    it('rejects an empty name with 400', async () => {
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: '' })
+      });
 
-  it('rejects an empty name with 400', async () => {
-    // Act
-    const res = await fetch(`${baseUrl}/entities`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: '' })
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.create).not.toHaveBeenCalled();
     });
 
-    // Assert
-    expect(res.status).toBe(400);
-    expect(dao.create).not.toHaveBeenCalled();
-  });
-});
+    it('rejects a malformed JSON body with 400 without reaching the DAO', async () => {
+      // Act: the JSON body parser fails before the controller runs.
+      const res = await fetch(`${srv.baseUrl}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{'
+      });
 
-describe('/entities/:id', () => {
-  it('rejects an id that is not a uuid with 400', async () => {
-    // Act
-    const res = await fetch(`${baseUrl}/entities/not-a-uuid`);
-
-    // Assert
-    expect(res.status).toBe(400);
-  });
-
-  it('maps NotFoundError from the DAO to 404', async () => {
-    // Arrange
-    dao.update.mockRejectedValue(new NotFoundError('Entity', ID));
-
-    // Act
-    const res = await fetch(`${baseUrl}/entities/${ID}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'renamed' })
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.create).not.toHaveBeenCalled();
     });
 
-    // Assert
-    expect(res.status).toBe(404);
-    expect(dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
+    it('rejects a body over the size limit with 413 without reaching the DAO', async () => {
+      // Act: express.json()'s default 100kb limit rejects the request before the controller runs.
+      const res = await fetch(`${srv.baseUrl}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'x'.repeat(200 * 1024) })
+      });
+
+      // Assert
+      expect(res.status).toBe(413);
+      expect(srv.dao.create).not.toHaveBeenCalled();
+    });
   });
 
-  it('returns 204 on delete', async () => {
-    // Arrange
-    dao.delete.mockResolvedValue(undefined);
+  describe('/entities/:id', () => {
+    it('returns 200 with the row on GET', async () => {
+      // Arrange
+      const row = { id: ID, name: 'found', description: null };
+      srv.dao.get.mockResolvedValue(row);
 
-    // Act
-    const res = await fetch(`${baseUrl}/entities/${ID}`, { method: 'DELETE' });
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
 
-    // Assert
-    expect(res.status).toBe(204);
-    expect(dao.delete).toHaveBeenCalledWith({ id: ID });
+      // Assert
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(row);
+      expect(srv.dao.get).toHaveBeenCalledWith({ id: ID });
+    });
+
+    it('returns 404 when GET finds no row', async () => {
+      // Arrange
+      srv.dao.get.mockResolvedValue(null);
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+
+      // Assert
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 200 with the updated row on PATCH', async () => {
+      // Arrange
+      const updated = { id: ID, name: 'renamed', description: null };
+      srv.dao.update.mockResolvedValue(updated);
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'renamed' })
+      });
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(updated);
+      expect(srv.dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
+    });
+
+    it('rejects a PATCH with no updatable fields with 400 without reaching the DAO', async () => {
+      // Act: the update schema's refine requires at least one field besides id.
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a PATCH with an invalid field with 400 without reaching the DAO', async () => {
+      // Act: name exceeds its 200-character limit.
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'x'.repeat(201) })
+      });
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(srv.dao.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an id that is not a uuid with 400', async () => {
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/not-a-uuid`);
+
+      // Assert
+      expect(res.status).toBe(400);
+    });
+
+    it('maps NotFoundError from the DAO to 404', async () => {
+      // Arrange
+      srv.dao.update.mockRejectedValue(new NotFoundError('Entity', ID));
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'renamed' })
+      });
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(srv.dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
+    });
+
+    it('maps NotFoundError from the DAO to 404 on delete', async () => {
+      // Arrange
+      srv.dao.delete.mockRejectedValue(new NotFoundError('Entity', ID));
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, { method: 'DELETE' });
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(srv.dao.delete).toHaveBeenCalledWith({ id: ID });
+    });
+
+    it('returns 204 with an empty body on delete', async () => {
+      // Arrange
+      srv.dao.delete.mockResolvedValue(undefined);
+
+      // Act
+      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, { method: 'DELETE' });
+
+      // Assert
+      expect(res.status).toBe(204);
+      expect(await res.text()).toBe('');
+      expect(srv.dao.delete).toHaveBeenCalledWith({ id: ID });
+    });
   });
 });
 ```
 
-## `api/tests/db/schemas/entity.schema.test.ts`
+## `api/tests/api/home.controller.test.ts`
 
-Tests the list input schema on the structured input the DAO receives: the page defaults, a nested filter, and every
-rejection the strict schemas promise. No URL strings appear here; the controller test covers decoding.
+One file per controller: the home descriptor, and the unmatched-path 404 (the not-found middleware's job, exercised at
+the app edge).
+
+```ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { startTestServer, type TestServer } from '../utils/test-server.js';
+
+let srv: TestServer;
+
+beforeEach(async () => {
+  srv = await startTestServer();
+});
+
+afterEach(async () => {
+  await srv.close();
+});
+
+describe('home.controller', () => {
+  it('returns the service descriptor on GET /', async () => {
+    // Act
+    const res = await fetch(`${srv.baseUrl}/`);
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ service: 'api', status: 'running' });
+  });
+
+  it('returns 404 for an unmatched path', async () => {
+    // Act
+    const res = await fetch(`${srv.baseUrl}/nope`);
+
+    // Assert
+    expect(res.status).toBe(404);
+  });
+});
+```
+
+## `api/tests/api/health.controller.test.ts`
+
+The health probe both ways: `ok` when the db stub resolves, `503` when it rejects.
+
+```ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { startTestServer, type TestServer } from '../utils/test-server.js';
+
+let srv: TestServer;
+
+beforeEach(async () => {
+  srv = await startTestServer();
+});
+
+afterEach(async () => {
+  await srv.close();
+});
+
+describe('health.controller', () => {
+  it('reports ok when the database responds', async () => {
+    // Act
+    const res = await fetch(`${srv.baseUrl}/health`);
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: 'ok', db: 'up' });
+    expect(srv.db.execute).toHaveBeenCalledOnce();
+  });
+
+  it('reports 503 when the database query fails', async () => {
+    // Arrange
+    srv.db.execute.mockRejectedValue(new Error('down'));
+
+    // Act
+    const res = await fetch(`${srv.baseUrl}/health`);
+
+    // Assert
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ status: 'error' });
+  });
+});
+```
+
+## `api/tests/api/error.middleware.test.ts`
+
+Exercises the terminal error handler through the real app (fake DAO). The key guarantee is that an **unexpected** error
+(a non-`http-error`) becomes a `500` whose body does **not** leak the original message — only `4xx` errors created with
+`createError(..., { expose: true })` surface their message. Also pins the uniform body shape `{ status, message }`
+returned at every status.
+
+```ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { startTestServer, type TestServer } from '../utils/test-server.js';
+
+const ID = '00000000-0000-4000-8000-000000000001';
+
+let srv: TestServer;
+
+beforeEach(async () => {
+  srv = await startTestServer();
+});
+
+afterEach(async () => {
+  await srv.close();
+});
+
+describe('error.middleware', () => {
+  it('maps an unexpected error to 500 without leaking the internal message', async () => {
+    // Arrange: a non-HTTP error from deep in the stack.
+    srv.dao.get.mockRejectedValue(new Error('secret db detail'));
+
+    // Act
+    const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+
+    // Assert: the status is 500 and the body hides the original message.
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ status: 'error', message: 'Internal Server Error' });
+  });
+
+  it('exposes the message of a client (4xx) error in the standard body shape', async () => {
+    // Act: an invalid uuid produces a 400 from the controller.
+    const res = await fetch(`${srv.baseUrl}/entities/not-a-uuid`);
+
+    // Assert
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ status: 'error', message: 'Invalid id' });
+  });
+
+  it('returns the standard body shape on a 404', async () => {
+    // Arrange
+    srv.dao.get.mockResolvedValue(null);
+
+    // Act
+    const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+
+    // Assert
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ status: 'error', message: `Entity not found: ${ID}` });
+  });
+});
+```
+
+## `api/tests/db/entity.dao.test.ts`
+
+Exercises the real DAO against a throwaway `postgres:17-alpine` (via `startTestDb` from `utils/pg-container.ts`), with
+`db/migrations/` applied by the drizzle migrator. One container per suite (`beforeAll` / `afterAll`), and `beforeEach`
+clears rows (a delete) so each test is isolated. `create` / `get` / `update` / `delete` cover the happy path and the edge
+cases (`NotFoundError` on a missing id, null description, a partial patch leaving omitted fields untouched vs. clearing a
+field with `null`); `list` is exhaustive — pagination, sort (with the `id`
+tie-breaker and the default sort), filter (every operator kind possible on the entity's columns, a second string and a
+second date column, `and` / `or` / `not`, empty `in`), the three combined, and a dedicated
+`list: filter escaping and injection safety` block proving `escapeLike` treats `%` / `_` as literals and that a hostile
+value is parameterized, not executed.
+
+Needs a running Docker daemon **and** an existing `db/migrations/` (run `pnpm --filter api db:generate` first). It runs
+under `pnpm --filter api test:db`, not the default `test`.
+
+```ts
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { EntityDao } from '../../src/daos/entity.dao.js';
+import { type Entity, type EntityFilterInput, type EntitySortInput, entity } from '../../src/db/schemas/entity.schema.js';
+import { NotFoundError } from '../../src/models/error.model.js';
+import { day, seedCanonical, seedEntities } from '../utils/entity-seed.js';
+import { startTestDb, type TestDb } from '../utils/pg-container.js';
+
+const MISSING_ID = '00000000-0000-4000-8000-000000000000';
+
+let testDb: TestDb;
+let dao: EntityDao;
+
+function runList(input: { filter?: EntityFilterInput; sort?: EntitySortInput; page?: number; pageSize?: number } = {}) {
+  return dao.list({ page: 1, pageSize: 50, ...input });
+}
+
+const names = (result: { items: readonly Entity[] }): string[] => result.items.map((row) => row.name);
+
+const idsOf = (rows: readonly Entity[]): string[] => rows.map((row) => row.id);
+
+function idOf(rows: Entity[], name: string): string {
+  const row = rows.find((candidate) => candidate.name === name);
+  if (!row) {
+    throw new Error(`no seeded row named ${name}`);
+  }
+  return row.id;
+}
+
+describe('entity.dao', () => {
+  beforeAll(async () => {
+    testDb = await startTestDb();
+    dao = new EntityDao(testDb.db);
+  });
+
+  afterAll(async () => {
+    await testDb.stop();
+  });
+
+  beforeEach(async () => {
+    await testDb.db.delete(entity);
+  });
+
+  describe('create', () => {
+    it('inserts a row and returns it with a generated id and timestamps', async () => {
+      // Act
+      const row = await dao.create({ name: 'first', description: 'hello' });
+
+      // Assert
+      expect(row.name).toBe('first');
+      expect(row.description).toBe('hello');
+      expect(row.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(row.createdAt).toBeInstanceOf(Date);
+      expect(row.updatedAt).toBeInstanceOf(Date);
+    });
+
+    it('stores a null description when none is given', async () => {
+      // Act
+      const row = await dao.create({ name: 'no-desc' });
+
+      // Assert
+      expect(row.description).toBeNull();
+    });
+  });
+
+  describe('get', () => {
+    it('returns the row for an existing id', async () => {
+      // Arrange
+      const created = await dao.create({ name: 'findme' });
+
+      // Act
+      const row = await dao.get({ id: created.id });
+
+      // Assert
+      expect(row).toEqual(created);
+    });
+
+    it('returns null for a missing id', async () => {
+      // Act + Assert
+      expect(await dao.get({ id: MISSING_ID })).toBeNull();
+    });
+  });
+
+  describe('update', () => {
+    it('updates the given fields and bumps updatedAt', async () => {
+      // Arrange
+      const created = await dao.create({ name: 'old', description: 'old' });
+
+      // Act
+      const row = await dao.update({ id: created.id, name: 'new', description: null });
+
+      // Assert
+      expect(row.name).toBe('new');
+      expect(row.description).toBeNull();
+      expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(created.updatedAt.getTime());
+    });
+
+    it('throws NotFoundError for a missing id', async () => {
+      // Act + Assert
+      await expect(dao.update({ id: MISSING_ID, name: 'x' })).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it('leaves fields that are omitted from the patch untouched', async () => {
+      // Arrange
+      const created = await dao.create({ name: 'old', description: 'keep me' });
+
+      // Act: patch only the name.
+      const row = await dao.update({ id: created.id, name: 'new' });
+
+      // Assert
+      expect(row.name).toBe('new');
+      expect(row.description).toBe('keep me');
+    });
+
+    it('clears a field when the patch sets it to null', async () => {
+      // Arrange
+      const created = await dao.create({ name: 'old', description: 'remove me' });
+
+      // Act
+      const row = await dao.update({ id: created.id, description: null });
+
+      // Assert
+      expect(row.name).toBe('old');
+      expect(row.description).toBeNull();
+    });
+  });
+
+  describe('delete', () => {
+    it('removes the row', async () => {
+      // Arrange
+      const created = await dao.create({ name: 'gone' });
+
+      // Act
+      await dao.delete({ id: created.id });
+
+      // Assert
+      expect(await dao.get({ id: created.id })).toBeNull();
+    });
+
+    it('throws NotFoundError for a missing id', async () => {
+      // Act + Assert
+      await expect(dao.delete({ id: MISSING_ID })).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('list: pagination', () => {
+    beforeEach(async () => {
+      await seedCanonical(testDb.db);
+    });
+
+    it('returns the requested page with total and totalPages', async () => {
+      // Act
+      const result = await runList({ sort: { field: 'name', direction: 'ASC' }, page: 1, pageSize: 2 });
+
+      // Assert
+      expect(names(result)).toEqual(['alpha', 'bravo']);
+      expect(result).toMatchObject({ total: 5, page: 1, pageSize: 2, totalPages: 3 });
+    });
+
+    it('returns the last partial page', async () => {
+      // Act
+      const result = await runList({ sort: { field: 'name', direction: 'ASC' }, page: 3, pageSize: 2 });
+
+      // Assert
+      expect(names(result)).toEqual(['echo']);
+    });
+
+    it('returns no items for a page past the end but keeps the real total', async () => {
+      // Act
+      const result = await runList({ page: 4, pageSize: 2 });
+
+      // Assert
+      expect(result.items).toEqual([]);
+      expect(result).toMatchObject({ total: 5, totalPages: 3 });
+    });
+  });
+
+  describe('list: sort', () => {
+    beforeEach(async () => {
+      await seedCanonical(testDb.db);
+    });
+
+    it('sorts by name ascending', async () => {
+      expect(names(await runList({ sort: { field: 'name', direction: 'ASC' } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta', 'echo']);
+    });
+
+    it('sorts by name descending', async () => {
+      expect(names(await runList({ sort: { field: 'name', direction: 'DESC' } }))).toEqual(['echo', 'delta', 'charlie', 'bravo', 'alpha']);
+    });
+
+    it('falls back to the default sort (createdAt DESC) when none is given', async () => {
+      expect(names(await runList())).toEqual(['echo', 'delta', 'charlie', 'bravo', 'alpha']);
+    });
+  });
+
+  describe('list: sort tie-breaker', () => {
+    it('breaks ties on the sort field with an ascending id', async () => {
+      // Arrange: identical name and timestamp, so only the id can order them.
+      const created = await seedEntities(testDb.db, [
+        { name: 'same', createdAt: day(1) },
+        { name: 'same', createdAt: day(1) }
+      ]);
+      const expected = idsOf(created).sort();
+
+      // Act
+      const result = await runList({ sort: { field: 'name', direction: 'ASC' } });
+
+      // Assert
+      expect(idsOf(result.items)).toEqual(expected);
+    });
+  });
+
+  describe('list: filter', () => {
+    let rows: Entity[] = [];
+
+    beforeEach(async () => {
+      rows = await seedCanonical(testDb.db);
+    });
+
+    const sortedByName = (filter: EntityFilterInput) => runList({ filter, sort: { field: 'name', direction: 'ASC' } });
+
+    it('filters by id eq and id in', async () => {
+      expect(names(await sortedByName({ id: { eq: idOf(rows, 'alpha') } }))).toEqual(['alpha']);
+      expect(names(await sortedByName({ id: { in: [idOf(rows, 'alpha'), idOf(rows, 'echo')] } }))).toEqual(['alpha', 'echo']);
+    });
+
+    it('treats an empty in list as matching nothing', async () => {
+      const result = await sortedByName({ id: { in: [] } });
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('filters strings by eq and ne', async () => {
+      expect(names(await sortedByName({ name: { eq: 'bravo' } }))).toEqual(['bravo']);
+      expect(names(await sortedByName({ name: { ne: 'alpha' } }))).toEqual(['bravo', 'charlie', 'delta', 'echo']);
+    });
+
+    it('matches contains / notContains / beginsWith case-insensitively', async () => {
+      expect(names(await sortedByName({ name: { contains: 'ALPHA' } }))).toEqual(['alpha']);
+      expect(names(await sortedByName({ name: { contains: 'a' } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+      expect(names(await sortedByName({ name: { notContains: 'a' } }))).toEqual(['echo']);
+      expect(names(await sortedByName({ name: { beginsWith: 'A' } }))).toEqual(['alpha']);
+    });
+
+    it('filters strings by comparison, between and in', async () => {
+      expect(names(await sortedByName({ name: { lt: 'charlie' } }))).toEqual(['alpha', 'bravo']);
+      expect(names(await sortedByName({ name: { between: ['bravo', 'delta'] } }))).toEqual(['bravo', 'charlie', 'delta']);
+      expect(names(await sortedByName({ name: { in: ['alpha', 'echo'] } }))).toEqual(['alpha', 'echo']);
+    });
+
+    it('filters dates by ge, le, between and eq', async () => {
+      expect(names(await sortedByName({ createdAt: { ge: day(3) } }))).toEqual(['charlie', 'delta', 'echo']);
+      expect(names(await sortedByName({ createdAt: { le: day(2) } }))).toEqual(['alpha', 'bravo']);
+      expect(names(await sortedByName({ createdAt: { between: [day(2), day(4)] } }))).toEqual(['bravo', 'charlie', 'delta']);
+      expect(names(await sortedByName({ createdAt: { eq: day(1) } }))).toEqual(['alpha']);
+    });
+
+    it('filters by description (a second string column)', async () => {
+      // 'fourth' and 'fifth' both contain 'th'; charlie's description is null.
+      expect(names(await sortedByName({ description: { contains: 'th' } }))).toEqual(['delta', 'echo']);
+      expect(names(await sortedByName({ description: { eq: 'first' } }))).toEqual(['alpha']);
+    });
+
+    it('filters by updatedAt (a second date column)', async () => {
+      // Seeded rows take the default updatedAt (insertion time), which is after every day() fixture.
+      expect(names(await sortedByName({ updatedAt: { ge: day(1) } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta', 'echo']);
+      expect(await sortedByName({ updatedAt: { lt: day(1) } })).toMatchObject({ total: 0 });
+    });
+
+    it('combines fields with and / or / not', async () => {
+      expect(names(await sortedByName({ and: [{ name: { contains: 'a' } }, { createdAt: { le: day(2) } }] }))).toEqual(['alpha', 'bravo']);
+      expect(names(await sortedByName({ or: [{ name: { eq: 'alpha' } }, { name: { eq: 'echo' } }] }))).toEqual(['alpha', 'echo']);
+      expect(names(await sortedByName({ not: { name: { eq: 'alpha' } } }))).toEqual(['bravo', 'charlie', 'delta', 'echo']);
+    });
+
+    it('returns an empty result when nothing matches', async () => {
+      const result = await sortedByName({ name: { eq: 'zzz' } });
+      expect(result.items).toEqual([]);
+      expect(result).toMatchObject({ total: 0, totalPages: 0 });
+    });
+  });
+
+  describe('list: filter escaping and injection safety', () => {
+    it('treats LIKE metacharacters in contains as literals', async () => {
+      // Arrange: rows whose names differ only by a literal % or _.
+      await seedEntities(testDb.db, [{ name: '100% off' }, { name: '1000 off' }, { name: 'a_b' }, { name: 'axb' }]);
+      const sortedByName = (filter: EntityFilterInput) => runList({ filter, sort: { field: 'name', direction: 'ASC' } });
+
+      // Act + Assert: the % and _ match only themselves, not as wildcards.
+      expect(names(await sortedByName({ name: { contains: '100%' } }))).toEqual(['100% off']);
+      expect(names(await sortedByName({ name: { contains: 'a_b' } }))).toEqual(['a_b']);
+    });
+
+    it('treats a SQL-injection string as ordinary filter data', async () => {
+      // Arrange
+      await seedCanonical(testDb.db);
+
+      // Act: a hostile value that would drop the table if it were not parameterized.
+      const hostile = await runList({ filter: { name: { eq: "'; DROP TABLE entity; --" } } });
+
+      // Assert: it matched nothing, and the table is still queryable afterwards.
+      expect(hostile).toMatchObject({ total: 0 });
+      expect((await runList()).total).toBe(5);
+    });
+  });
+
+  describe('list: filter + sort + pagination combined', () => {
+    beforeEach(async () => {
+      await seedCanonical(testDb.db);
+    });
+
+    it('applies the filter, then the sort, then the page window', async () => {
+      // Act: names containing 'a' (alpha, bravo, charlie, delta), sorted DESC, second page of 2.
+      const result = await runList({
+        filter: { name: { contains: 'a' } },
+        sort: { field: 'name', direction: 'DESC' },
+        page: 2,
+        pageSize: 2
+      });
+
+      // Assert
+      expect(names(result)).toEqual(['bravo', 'alpha']);
+      expect(result).toMatchObject({ total: 4, page: 2, pageSize: 2, totalPages: 2 });
+    });
+  });
+});
+```
+
+## `api/tests/db/entity.full-stack.test.ts`
+
+The one test that wires the **whole** API stack together: a real HTTP request → controller → real `EntityDao` → real
+Postgres (Testcontainers), with no fake DAO. The `tests/api/*` controller tests mock the DAO and the `tests/db/*` DAO
+tests bypass HTTP; this closes the seam between them, catching any controller↔DAO contract drift (e.g. the `sort` object
+the controller builds vs. what the DAO expects). Lives in `tests/db/` so it runs under `pnpm --filter api test:db`.
+
+```ts
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../src/app.js';
+import { EntityDao } from '../../src/daos/entity.dao.js';
+import { entity } from '../../src/db/schemas/entity.schema.js';
+import type { AppContext } from '../../src/models/app-context.model.js';
+import { startTestDb, type TestDb } from '../utils/pg-container.js';
+
+// Unlike tests/api/* (which mock the DAO), this exercises the whole stack:
+// real HTTP request -> controller -> real EntityDao -> real Postgres.
+let testDb: TestDb;
+let server: Server;
+let baseUrl: string;
+
+beforeAll(async () => {
+  testDb = await startTestDb();
+  const context: AppContext = { db: testDb.db, entityDao: new EntityDao(testDb.db) };
+  server = createServer(createApp(context));
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const { port } = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await testDb.stop();
+});
+
+beforeEach(async () => {
+  await testDb.db.delete(entity);
+});
+
+describe('entity full-stack', () => {
+  it('round-trips create -> list -> get -> update -> delete through the real DAO and DB', async () => {
+    // Create
+    const createRes = await fetch(`${baseUrl}/entities`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'roundtrip', description: 'hello' })
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as { id: string; name: string; description: string | null };
+    expect(created).toMatchObject({ name: 'roundtrip', description: 'hello' });
+    expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
+
+    // List sees it
+    const listRes = await fetch(`${baseUrl}/entities`);
+    expect(listRes.status).toBe(200);
+    expect(await listRes.json()).toMatchObject({ items: [{ id: created.id, name: 'roundtrip' }], total: 1, totalPages: 1 });
+
+    // Get by id
+    const getRes = await fetch(`${baseUrl}/entities/${created.id}`);
+    expect(getRes.status).toBe(200);
+    expect(await getRes.json()).toMatchObject({ id: created.id, name: 'roundtrip' });
+
+    // Update
+    const patchRes = await fetch(`${baseUrl}/entities/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'renamed' })
+    });
+    expect(patchRes.status).toBe(200);
+    expect(await patchRes.json()).toMatchObject({ id: created.id, name: 'renamed', description: 'hello' });
+
+    // Delete
+    const deleteRes = await fetch(`${baseUrl}/entities/${created.id}`, { method: 'DELETE' });
+    expect(deleteRes.status).toBe(204);
+
+    // Gone
+    const goneRes = await fetch(`${baseUrl}/entities/${created.id}`);
+    expect(goneRes.status).toBe(404);
+  });
+});
+```
+
+## `api/tests/unit/entity.schema.test.ts`
+
+Covers only the entity's own column/sort wiring on `listEntityInputSchema` — a nested filter over the real columns with
+date coercion, and the rejections specific to this resource (a column the entity lacks, a bad uuid, a sort field outside
+its allowlist). The generic builder behaviour (defaults, strictness, the logical-branch cap) is covered once in
+`tests/unit/list-input.helper.test.ts` ([api-dao.md](api-dao.md)), so it is not repeated here. No URL strings appear;
+the controller test covers decoding.
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { listEntityInputSchema } from '../../../src/db/schemas/entity.schema.js';
+import { listEntityInputSchema } from '../../src/db/schemas/entity.schema.js';
 
-describe('listEntityInputSchema', () => {
-  it('applies the page defaults', () => {
-    // Act
-    const input = listEntityInputSchema.parse({});
-
-    // Assert
-    expect(input).toEqual({ page: 1, pageSize: 20 });
-  });
-
-  it('accepts a nested filter with sort and pagination', () => {
+describe('entity.schema', () => {
+  it('accepts a nested filter over the entity columns and coerces date strings', () => {
     // Arrange
     const raw = {
       filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }] },
@@ -565,21 +1419,9 @@ describe('listEntityInputSchema', () => {
   });
 
   it.each([
-    ['an unknown filter field', { filter: { title: { eq: 'a' } } }],
-    ['an unknown operator', { filter: { name: { startsWith: 'a' } } }],
-    ['a wrongly typed operand', { filter: { name: { eq: 1 } } }],
-    ['an invalid id', { filter: { id: { eq: 'nope' } } }],
-    ['a between that is not a pair', { filter: { name: { between: ['a'] } } }],
-    ['an in list of the wrong type', { filter: { name: { in: [1] } } }],
-    ['an in list over 100 values', { filter: { name: { in: Array.from({ length: 101 }, String) } } }],
-    ['an invalid nested filter', { filter: { and: [{ not: { name: { gt: true } } }] } }],
-    ['an unknown key', { nope: 'a' }],
-    ['a sort field outside the allowlist', { sort: { field: 'description', direction: 'ASC' } }],
-    ['a lowercase sort direction', { sort: { field: 'name', direction: 'desc' } }],
-    ['an out-of-range pageSize', { pageSize: 500 }],
-    ['a zero page', { page: 0 }],
-    ['a fractional pageSize', { pageSize: 1.5 }],
-    ['a page that is not a number', { page: Number('abc') }]
+    ['a filter field the entity does not have', { filter: { title: { eq: 'a' } } }],
+    ['an invalid uuid for the id column', { filter: { id: { eq: 'nope' } } }],
+    ['a sort field outside the entity allowlist', { sort: { field: 'description', direction: 'ASC' } }]
   ])('rejects %s', (_label, raw) => {
     // Act + Assert
     expect(listEntityInputSchema.safeParse(raw).success).toBe(false);
@@ -594,7 +1436,8 @@ The entity example is the template. For a second resource (say `user`):
 1. `db/schemas/user.schema.ts`: copy `entity.schema.ts` (no comments, as in the original). Define the `user` table, `createUserInputSchema` /
    `updateUserInputSchema` / `userIdInputSchema`, `userFilterInputSchema = createFilterInputSchema({ … })` with one
    scalar filter input per filterable column (keyed by the column name), `userSortInputSchema =
-   createSortInputSchema([...])`, `ListUserInput`, `listUserInputSchema` and `userDefaultSort`.
+createSortInputSchema([...])`, `ListUserInput`, `listUserInputSchema` and `userDefaultSort`. The builders come from
+   `helpers/list-input.helper.js`, the scalar inputs from `models/list-input.model.js`.
 2. `db/schema.ts`: register the table, `export const schema = { entity, user }`.
 3. `daos/user.dao.ts`: copy `entity.dao.ts`, swap the table and types:
    `implements Dao<User, ListUserInput, CreateUserInput, UpdateUserInput>`.
@@ -602,8 +1445,10 @@ The entity example is the template. For a second resource (say `user`):
 5. `server.ts`: instantiate `new UserDao(db)` in the context literal.
 6. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the schemas and the DAO.
 7. `app.ts`: wire the routes.
-8. `tests/controllers/user.controller.test.ts` and `tests/db/schemas/user.schema.test.ts`: copy the entity tests,
-   swap the fake DAO and the schema.
+8. Tests: copy `tests/api/user.controller.test.ts` (routes, fake DAO), `tests/db/user.dao.test.ts` (Testcontainers) and
+   `tests/unit/user.schema.test.ts` (schema wiring) from the entity ones, swapping the schema and DAO. Add a
+   `tests/utils/user-seed.ts` seed generator for the DAO suite; `fake-dao.ts`, `test-server.ts` and `pg-container.ts` are
+   reused as-is.
 9. Web: mirror `User`, `UserFilterInput`, `UserSortInput` and `ListUserInput` in `models/user.model.ts`, then add the
    page slices `store/user-list-page/`, `store/user-detail-page/` and `store/user-form-page/` and register each on its
    route (see [web.md](web.md#9-shared-model-and-page-slices)).

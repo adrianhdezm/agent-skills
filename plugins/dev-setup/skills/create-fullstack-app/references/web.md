@@ -73,6 +73,12 @@ pnpm --filter web add -D @ngrx/store-devtools@22 angular-eslint@22 tailwindcss @
 The CLI's own Angular, `vitest` and `jsdom` entries stay as generated. ESLint, Prettier and TypeScript are added by the
 root shared-tooling step in `monorepo-root.md`.
 
+**Storybook and the extra test layers** are added after the app is in place: Storybook for the components
+([references/web-storybook.md](web-storybook.md)), and the browser-mode + full-stack e2e test layers
+([references/web-testing.md](web-testing.md)). They add the `storybook`, `build-storybook`, `test:browser` and
+`test:e2e` scripts and their dev dependencies, and **pin `web` to Vitest 4** (the Angular `test` builder accepts
+`^4 || ^5`; Vitest 5's browser mode does not work in this workspace). `ng test` stays the required `test` check.
+
 ## 4. Tailwind v4
 
 ### `web/.postcssrc.json`
@@ -151,38 +157,55 @@ store.
 ## 6. Folder structure
 
 ```
-web/src/app/
-├── app.component.ts         # root
-├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
-├── app.routes.ts            # routes; each page route registers its page slice
-├── components/
-│   └── <name>.component.ts   # presentational, store-free, inputs/outputs only
-├── layouts/
-│   └── main-layout.component.ts
-├── pages/
-│   ├── entity-list-page.component.ts
-│   ├── entity-detail-page.component.ts
-│   └── entity-form-page.component.ts  # reused for /entities/new + /entities/:id/edit
-├── models/
-│   └── entity.model.ts       # resource types, mirroring the API's names and shapes
-├── services/
-│   └── entity.service.ts     # EntityService: the only HttpClient user; called from effects
-├── helpers/
-│   ├── entity-list-params.helper.ts       # URL ↔ ListEntityInput (de)serializer, shared by the URL and the API call
-│   ├── entity-list-params.helper.spec.ts
-│   └── http-error.helper.ts  # httpErrorMessage, shared by the page effects
-└── store/
-    ├── app-context/          # global slice: apiBaseUrl + appName
-    ├── app-router/           # global slice: appRouter state, route selectors, Navigate action + effect
-    ├── entity-list-page/     # page slice, registered on the list route
-    │   ├── entity-list-page.model.ts
-    │   ├── entity-list-page.actions.ts
-    │   ├── entity-list-page.reducer.ts
-    │   ├── entity-list-page.selectors.ts
-    │   └── entity-list-page.effects.ts
-    ├── entity-detail-page/   # page slice, registered on the detail route
-    └── entity-form-page/     # page slice, registered on the new + edit routes
+web/
+├── .storybook/              # Storybook (Vite/Analog) config — see references/web-storybook.md
+│   ├── main.ts / preview.ts / tsconfig.json / typings.d.ts
+├── e2e/                     # Playwright full-stack e2e — see references/web-testing.md
+│   ├── global-setup.ts / global-teardown.ts / tsconfig.json
+│   ├── pages/               #   one *.spec.ts per page
+│   └── utils/api.ts         #   seed via the real API
+├── playwright.config.ts     # e2e runner config (CommonJS: uses __dirname)
+├── vitest.browser.config.mts # browser-mode page tests (Vitest 4 + Playwright)
+├── tsconfig.browser.json    # scopes *.browser.spec.ts + src/testing for tooling
+└── src/
+    ├── testing/             # render() + browser-setup.ts for the browser-mode tests
+    └── app/
+        ├── app.component.ts         # root
+        ├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
+        ├── app.routes.ts            # routes; each page route registers its page slice
+        ├── components/
+        │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
+        │   └── confirm-dialog.stories.ts      # its Storybook story
+        ├── layouts/
+        │   └── main-layout.component.ts
+        ├── pages/
+        │   ├── entity-list-page.component.ts
+        │   ├── entity-list-page.component.browser.spec.ts   # browser-mode render test
+        │   ├── entity-detail-page.component.ts  (+ .browser.spec.ts)
+        │   └── entity-form-page.component.ts  (+ .browser.spec.ts)  # reused for /entities/new + /entities/:id/edit
+        ├── models/
+        │   └── entity.model.ts       # resource types, mirroring the API's names and shapes
+        ├── services/
+        │   ├── entity.service.ts     # EntityService: the only HttpClient user; called from effects
+        │   └── entity.service.spec.ts
+        ├── helpers/
+        │   ├── entity-list-params.helper.ts  (+ .spec.ts)  # URL ↔ ListEntityInput (de)serializer
+        │   ├── entity-filter-form.helper.ts  (+ .spec.ts)  # list page's filter strip ↔ EntityFilterInput + range label
+        │   └── http-error.helper.ts  (+ .spec.ts)          # httpErrorMessage, shared by the page effects
+        └── store/
+            ├── app-context/          # global slice: apiBaseUrl + appName (+ reducer/selectors specs)
+            ├── app-router/           # global slice: appRouter state, route selectors, Navigate action + effect (+ .effects.spec.ts)
+            ├── entity-list-page/     # page slice, registered on the list route
+            │   ├── entity-list-page.{model,actions,reducer,selectors,effects}.ts
+            │   └── entity-list-page.{reducer,selectors,effects}.spec.ts
+            ├── entity-detail-page/   # page slice (+ reducer/selectors/effects specs), registered on the detail route
+            └── entity-form-page/     # page slice (+ reducer/selectors/effects specs), registered on the new + edit routes
 ```
+
+Every page slice gets `*.reducer.spec.ts` / `*.selectors.spec.ts` / `*.effects.spec.ts` beside it; the global
+`app-context` slice gets reducer + selectors specs and `app-router` an effects spec. The service and helpers
+get a `*.spec.ts`, and each page gets a `*.component.browser.spec.ts`. The test layers are specified in
+[references/web-testing.md](web-testing.md); Storybook in [references/web-storybook.md](web-storybook.md).
 
 **One slice per page.** Each page owns a slice at `store/<page-name>/`, named after the page component, and registers
 it on its own route with `provideState` + `provideEffects`. Only `appContext` and the router state
@@ -197,7 +220,8 @@ actions; pages never call it.
 
 **Actions are named for intent, not lifecycle.** The page asks for its data with `Load` (dispatched from `ngOnInit`,
 but named for what it does, not for the moment), the list's request for one input is `Fetch`, and results are
-`<Action> Success` / `<Action> Failure`.
+`<Action> Success` / `<Action> Failure` — so the list page's fetch results are `Fetch Success` / `Fetch Failure`,
+while the detail and form pages fetch on `Load` and so report `Load Success` / `Load Failure`.
 
 **Every page loads the same way.** The page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`. `Load`
 sets the slice's `status` to `'loading'` and an effect calls the service; success sets `'loaded'` (or `'ready'` for
@@ -547,7 +571,7 @@ export interface PaginatedResult<T> {
 
 ### `services/entity.service.ts`
 
-All HTTP for the resource, called only from effects. Each method writes its full URL explicitly and builds its params inline, so it reads as the request it sends; there is no private `url()` or params helper. `list` sends the list input as the same query params the page URL uses.
+All HTTP for the resource, called only from effects. Each method writes its full URL explicitly, so it reads as the request it sends; there is no private `url()` helper. `list` reuses the shared `toParams` (from `entity-list-params.helper.ts`) — the same mapping the page URL uses — so the query it sends and the URL stay identical; there is no params helper _private to the service_.
 
 ```ts
 import { inject, Injectable } from '@angular/core';
@@ -663,6 +687,89 @@ function nonDefault(value: number | undefined, fallback: number): string | null 
 }
 ```
 
+### `helpers/entity-filter-form.helper.ts`
+
+The list page's filter strip ↔ `EntityFilterInput` mapping and its range label, kept out of the component so `ng test` covers them directly (`entity-filter-form.helper.spec.ts`), paralleling `entity-list-params.helper.ts`. Exports `FilterForm`, `EMPTY_FILTER_FORM`, `formatRange`, `toFilterInput` and `toFilterForm`; the date conversions stay private. Dates are days in the viewer's time zone, sent as local midnight in ISO-8601.
+
+```ts
+import { type DateFilterInput, type EntityFilterInput, type ListEntityInput } from '../models/entity.model';
+
+export interface FilterForm {
+  name: string;
+  description: string;
+  createdFrom: string;
+  createdBefore: string;
+}
+
+export const EMPTY_FILTER_FORM: FilterForm = { name: '', description: '', createdFrom: '', createdBefore: '' };
+
+export function formatRange(input: ListEntityInput, total: number, totalPages: number): string {
+  if (total === 0) {
+    return '0 of 0';
+  }
+  const first = (input.page - 1) * input.pageSize + 1;
+  const last = Math.min(input.page * input.pageSize, total);
+  return `${first}–${last} of ${total} · page ${input.page} of ${totalPages}`;
+}
+
+export function toFilterInput(form: FilterForm): EntityFilterInput | undefined {
+  const filter: EntityFilterInput = {};
+  if (form.name.trim()) {
+    filter.name = { contains: form.name.trim() };
+  }
+  if (form.description.trim()) {
+    filter.description = { contains: form.description.trim() };
+  }
+  const createdAt: DateFilterInput = {};
+  const from = toIsoDate(form.createdFrom);
+  const before = toIsoDate(form.createdBefore);
+  if (from) {
+    createdAt.ge = from;
+  }
+  if (before) {
+    createdAt.lt = before;
+  }
+  if (Object.keys(createdAt).length > 0) {
+    filter.createdAt = createdAt;
+  }
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
+export function toFilterForm(filter: EntityFilterInput | undefined): FilterForm {
+  const base: EntityFilterInput = filter ?? {};
+  return {
+    name: base.name?.contains ?? '',
+    description: base.description?.contains ?? '',
+    createdFrom: toLocalDate(base.createdAt?.ge),
+    createdBefore: toLocalDate(base.createdAt?.lt)
+  };
+}
+
+// A date input is a day in the viewer's time zone; send local midnight as ISO-8601.
+function toIsoDate(day: string): string | undefined {
+  if (!day) {
+    return undefined;
+  }
+  const [year, month, date] = day.split('-').map(Number);
+  return new Date(year, month - 1, date).toISOString();
+}
+
+// Turn an ISO-8601 instant back into the local day a date input shows.
+function toLocalDate(iso: string | undefined): string {
+  if (!iso) {
+    return '';
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+```
+
 ### `helpers/http-error.helper.ts`
 
 The message shown when a request fails: the API's `message` when it sent one.
@@ -720,8 +827,8 @@ export const EntityListPageActions = createActionGroup({
 
     /** One request for one list input: the first one after `Load`, every URL change, and after a delete. */
     Fetch: props<{ input: ListEntityInput }>(),
-    'Load Success': props<{ items: Entity[]; total: number }>(),
-    'Load Failure': props<{ error: string }>(),
+    'Fetch Success': props<{ items: Entity[]; total: number }>(),
+    'Fetch Failure': props<{ error: string }>(),
 
     Delete: props<{ id: string }>(),
     'Delete Success': props<{ id: string }>(),
@@ -749,8 +856,8 @@ export const entityListPageReducer = createReducer(
   on(EntityListPageActions.load, EntityListPageActions.leave, () => initialEntityListPageState),
 
   on(EntityListPageActions.fetch, (state) => ({ ...state, status: 'loading' as const, error: null })),
-  on(EntityListPageActions.loadSuccess, (state, { items, total }) => ({ ...state, status: 'loaded' as const, items, total })),
-  on(EntityListPageActions.loadFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
+  on(EntityListPageActions.fetchSuccess, (state, { items, total }) => ({ ...state, status: 'loaded' as const, items, total })),
+  on(EntityListPageActions.fetchFailure, (state, { error }) => ({ ...state, status: 'error' as const, error })),
 
   on(EntityListPageActions.delete, (state) => ({ ...state, status: 'deleting' as const, error: null })),
   on(EntityListPageActions.deleteFailure, (state, { error }) => ({ ...state, status: 'error' as const, error }))
@@ -836,8 +943,8 @@ export const fetch$ = createEffect(
       ofType(EntityListPageActions.fetch),
       switchMap(({ input }) =>
         entityService.list(input).pipe(
-          map((res) => EntityListPageActions.loadSuccess({ items: res.items, total: res.total })),
-          catchError((err: HttpErrorResponse) => of(EntityListPageActions.loadFailure({ error: httpErrorMessage(err) })))
+          map((res) => EntityListPageActions.fetchSuccess({ items: res.items, total: res.total })),
+          catchError((err: HttpErrorResponse) => of(EntityListPageActions.fetchFailure({ error: httpErrorMessage(err) })))
         )
       )
     ),
@@ -1116,6 +1223,86 @@ export const navigateAfterSave$ = createEffect(
 
 ## 10. Pages
 
+### Components: `components/confirm-dialog.component.ts`
+
+Components are presentational and **store-free**: they take `input()` / `output()` and leave the action to the host.
+The scaffold ships one, `ConfirmDialog` — a modal used by the list page's delete flow and developed in Storybook
+([references/web-storybook.md](web-storybook.md)). It is the template for every later component.
+
+```ts
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+
+export type ConfirmDialogTone = 'danger' | 'primary';
+
+let nextId = 0;
+
+// A modal confirm dialog driven entirely by inputs/outputs (no store). The host
+// decides when it is shown; it emits `confirmed` / `cancelled` and leaves the action
+// to the caller. `busy` disables both buttons and swaps the confirm label while
+// the confirmed action is in flight.
+@Component({
+  selector: 'app-confirm-dialog',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents', '(document:keydown.escape)': 'onEscape()' },
+  template: `
+    <div class="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
+      <div role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId" class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+        <h2 [id]="titleId" class="text-lg font-semibold text-slate-900">{{ title() }}</h2>
+        <p class="mt-2 text-sm text-slate-600">{{ message() }}</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            (click)="cancelled.emit()"
+            [disabled]="busy()"
+            class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            {{ cancelLabel() }}
+          </button>
+          <button type="button" (click)="confirmed.emit()" [disabled]="busy()" [class]="confirmClasses()">
+            {{ busy() ? busyLabel() : confirmLabel() }}
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+})
+export class ConfirmDialog {
+  readonly title = input.required<string>();
+  readonly message = input.required<string>();
+  readonly confirmLabel = input('Delete');
+  readonly cancelLabel = input('Cancel');
+  readonly busyLabel = input('Deleting…');
+  readonly busy = input(false);
+  readonly tone = input<ConfirmDialogTone>('danger');
+
+  readonly confirmed = output<void>();
+  readonly cancelled = output<void>();
+
+  protected readonly titleId = `confirm-dialog-title-${nextId++}`;
+
+  private static readonly TONE_CLASSES: Record<ConfirmDialogTone, string> = {
+    danger: 'bg-red-600 hover:bg-red-500',
+    primary: 'bg-slate-900 hover:bg-slate-700'
+  };
+
+  protected readonly confirmClasses = computed(
+    () => `rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${ConfirmDialog.TONE_CLASSES[this.tone()]}`
+  );
+
+  // Escape cancels, but not while the action is in flight.
+  protected onEscape(): void {
+    if (!this.busy()) {
+      this.cancelled.emit();
+    }
+  }
+}
+```
+
+A host binds its inputs with property syntax — `[title]="'Delete entity'"`, not a static `title="…"` — so the signal
+input is wired as an input rather than a plain attribute.
+
+### Pages
+
 Three pages: list, detail, and form (reused for create and edit). Each reads only its own slice.
 
 ### `pages/entity-list-page.component.ts`
@@ -1125,21 +1312,25 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 - The control strip (filter / sort / page size) dispatches no load action: it dispatches
   `AppRouterActions.navigate({ commands: [], queryParams: toParams(next) })`, and the slice's navigation effect
   fetches when the URL changes.
-- The filter strip has fixed inputs: *name contains*, *description contains*, *created on or after*, *created
-  before*. A local `draft: FilterForm` signal holds the edits; `applyFilters()` maps it with `toFilterInput` to an
-  `EntityFilterInput` (`name.contains`, `description.contains`, `createdAt.ge` / `createdAt.lt`) and navigates with
-  `page: 1`. Dates are days in the viewer's time zone: `toIsoDate` sends local midnight as ISO-8601, and
-  `toLocalDate` turns it back into the day when reading the URL. `toFilterForm` reads back only what the strip can
-  express; other operators in a deep link are kept in the URL but not shown.
-- Sort is a select of `field:direction` pairs (default *Newest first*, `createdAt:DESC`); page size is a select of 10 /
+- The filter strip has fixed inputs: _name contains_, _description contains_, _created on or after_, _created
+  before_. Its pure functions live in `helpers/entity-filter-form.helper.ts` (`FilterForm`, `EMPTY_FILTER_FORM`,
+  `formatRange`, `toFilterInput`, `toFilterForm`), kept out of the component so `ng test` covers them directly
+  (`entity-filter-form.helper.spec.ts`). A local `draft: FilterForm` signal holds the edits; `applyFilters()` maps it
+  with `toFilterInput` to an `EntityFilterInput` (`name.contains`, `description.contains`, `createdAt.ge` /
+  `createdAt.lt`) and navigates with `page: 1`. Dates are days in the viewer's time zone: the helper's private
+  `toIsoDate` sends local midnight as ISO-8601, and `toLocalDate` turns it back into the day when reading the URL.
+  `toFilterForm` reads back only what the strip can express; other operators in a deep link are kept in the URL but
+  not shown.
+- Sort is a select of `field:direction` pairs (default _Newest first_, `createdAt:DESC`); page size is a select of 10 /
   20 / 50 / 100. Changing either resets to page 1.
-- Pagination: *Previous* / *Next* navigate with `page ± 1`; the label shows `first–last of total · page X of Y`, with
-  `totalPages` computed from `total` and `pageSize`. An `effect()` steps back to the last page when a delete empties
-  the current one.
-- Delete: an inline confirm modal controlled by a signal dispatches `EntityListPageActions.delete`; the dialog is busy
-  while `status() === 'deleting'`.
-- `status() === 'error'` shows `error()` in a banner. The empty row switches on the status: *Loading…* while
-  `'loading'`, otherwise *No entities match the filter.* when a filter is active, or *No entities yet.*
+- Pagination: _Previous_ / _Next_ navigate with `page ± 1`; the label shows `first–last of total · page X of Y` via the
+  helper's `formatRange`, with `totalPages` computed from `total` and `pageSize`. An `effect()` steps back to the last
+  page when a delete empties the current one.
+- Delete: an `<app-confirm-dialog>` (the `ConfirmDialog` component above), shown while a `pendingDelete` signal holds
+  the row, dispatches `EntityListPageActions.delete` on `(confirmed)` and clears the signal on `(cancelled)`; it is
+  `[busy]` while `status() === 'deleting'`.
+- `status() === 'error'` shows `error()` in a banner. The empty row switches on the status: _Loading…_ while
+  `'loading'`, otherwise _No entities match the filter._ when a filter is active, or _No entities yet._
 - Every input and select has a `name`; the free-text inputs also set `autocomplete="off"`, since they are not
   personal data.
 
@@ -1147,7 +1338,7 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 
 - Reads the `id` with `selectRouteParam('id')`, dispatches `EntityDetailPageActions.load({ id })` on init and
   `leave()` on destroy.
-- Renders with `@switch (status())`: *Loading…*, the error banner, or (on `'loaded'`) the entity with a link to the
+- Renders with `@switch (status())`: _Loading…_, the error banner, or (on `'loaded'`) the entity with a link to the
   edit page.
 
 ### `pages/entity-form-page.component.ts`
@@ -1159,7 +1350,7 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 - After a save, the slice's `navigateAfterSave$` effect dispatches `AppRouterActions.navigate` to the detail page; the
   page itself never navigates.
 - `status() === 'error'` shows `error()` in a banner. The Save button is disabled while `'loading'` or `'saving'`
-  and its label switches on the status (*Loading…*, *Saving…*, *Save*).
+  and its label switches on the status (_Loading…_, _Saving…_, _Save_).
 - Uses `Validators.required` + `Validators.maxLength` with an inline
   `// eslint-disable-next-line @typescript-eslint/unbound-method` on the first validator (Angular's static validator
   reference is a known false positive of the unbound-method rule).
@@ -1167,8 +1358,12 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 
 ## 11. Tests
 
-Angular's convention puts specs next to the file they test, as `*.spec.ts`; `ng test` runs them with Vitest. The
-scaffold ships one spec for the URL (de)serializer, the piece the list page depends on.
+The web app has three test layers, specified in [references/web-testing.md](web-testing.md): **unit** (`ng test`,
+Vitest + jsdom, `*.spec.ts` beside the file — services, every slice, helpers), **browser-mode page tests** (Vitest 4
+browser mode + Playwright, `*.component.browser.spec.ts`), and **full-stack e2e** (Playwright Test against the real
+stack, `e2e/`). `ng test` is the required `test` check.
+
+The URL (de)serializer the list page depends on is the clearest standalone example of the unit layer:
 
 ### `helpers/entity-list-params.helper.spec.ts`
 
