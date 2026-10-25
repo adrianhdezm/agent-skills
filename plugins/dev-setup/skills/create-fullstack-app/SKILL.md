@@ -1,6 +1,7 @@
 ---
 name: create-fullstack-app
 description: Scaffolds a pnpm-workspace monorepo with an Express 5 + Drizzle + Postgres + zod API, an Angular 22 + NgRx + Tailwind web app whose list state lives in the URL, Docker Compose, and an entity CRUDL example wired end to end, with build, typecheck, test, lint and format checks passing. Use when creating a new full-stack TypeScript app, an Angular + Express or Angular + Postgres project, a monorepo with an API and a web frontend, or when the user asks to bootstrap, scaffold, init or start a full-stack project.
+disable-model-invocation: true
 ---
 
 # Create Full-Stack App
@@ -52,20 +53,34 @@ my-app/
 │   │   │   ├── client.ts / schema.ts   # schema.ts: the table registry
 │   │   │   └── schemas/      # one <resource>.schema.ts: table + every input of the resource
 │   │   ├── models/           # dao.model.ts (contract), list-input.model.ts (filter/sort vocabulary), errors
-│   │   ├── helpers/          # dao.helper.ts (input → SQL), query-parser.helper.ts (normalizeQuery)
+│   │   ├── helpers/          # dao.helper.ts (input → SQL), list-input.helper.ts (schema builders), query-parser.helper.ts (normalizeQuery)
 │   │   ├── daos/             # one *.dao.ts per table, nothing else
 │   │   ├── controllers/      # *.controller.ts, wired directly on the app
 │   │   └── middleware/       # error + not-found
-│   └── tests/                # mirrors src/, one *.test.ts per module, no database
+│   └── tests/                # grouped by kind, not mirroring src/:
+│       ├── unit/             #   helpers + schema, no database
+│       ├── api/              #   one *.controller.test.ts per controller (fetch + fake DAO)
+│       ├── db/               #   <resource>.dao.test.ts (Testcontainers)
+│       └── utils/            #   shared test helpers (pg-container, fake-dao, test-server, seeds)
 └── web/
     ├── Dockerfile            # multi-stage → Nginx, SPA fallback
     ├── nginx.conf
     ├── eslint.config.mjs
-    └── src/app/
-        ├── pages/ layouts/ components/   # flat *.component.ts
-        ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers
-        └── store/            # app-context/ + app-router/ globally, one slice per page on its route; *.spec.ts beside the code
+    ├── .storybook/           # Storybook (Vite/Analog) config
+    ├── vitest.browser.config.mts  # browser-mode page tests (Vitest 4 + Playwright)
+    ├── playwright.config.ts  # full-stack e2e runner
+    ├── e2e/                  # Playwright specs (pages/) + API-seeding helper (utils/) + global setup/teardown
+    └── src/
+        ├── testing/         # render() + setup for the browser-mode tests
+        └── app/
+            ├── pages/ layouts/ components/   # flat *.component.ts; components/ has ConfirmDialog + its .stories.ts
+            ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers; *.spec.ts beside
+            └── store/        # app-context/ + app-router/ globally, one slice per page on its route; reducer/selectors/effects specs beside
 ```
+
+The web app has three test layers (`ng test` unit, `pnpm test:browser` Vitest browser mode, `pnpm test:e2e` Playwright
+full-stack) and Storybook for the components — see [references/web-testing.md](references/web-testing.md) and
+[references/web-storybook.md](references/web-storybook.md).
 
 ## Process
 
@@ -103,10 +118,12 @@ Copy this checklist and tick it off:
    ```
 
 3. **Write the API** from [references/api-setup.md](references/api-setup.md) (manifest, configs, app shell,
-   Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary, SQL translator,
-   query parser, their tests) and [references/api-entity.md](references/api-entity.md) (resource schema, DAO,
-   controllers, their test). Read the "How the layers fit" section of `api-dao.md` first. Add `api/.prettierrc`, `api/.prettierignore` and `api/eslint.config.mjs` from
-   [references/eslint-prettier.md](references/eslint-prettier.md). Do not create `db/migrations/`.
+   Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary and builder helper,
+   SQL translator, query parser, their `unit/` tests) and [references/api-entity.md](references/api-entity.md) (resource
+   schema, DAO and its Testcontainers `db/` test, the three controllers with one `api/` test file each, and the shared
+   `tests/utils/` helpers). Read the "How the layers fit" section of `api-dao.md` first. Add `api/.prettierrc`,
+   `api/.prettierignore` and `api/eslint.config.mjs` from [references/eslint-prettier.md](references/eslint-prettier.md).
+   Do not create `db/migrations/`.
 
 4. **Scaffold the web app**, then immediately apply [references/web.md](references/web.md) in order: clean up the CLI
    output, set the scripts, add Tailwind, the environment files, the core files, the global slices, the shared model,
@@ -119,6 +136,11 @@ Copy this checklist and tick it off:
    ```
 
    For the Fundamental NGX opt-in, layer [references/fundamental-ngx.md](references/fundamental-ngx.md) on top.
+
+   Then add **Storybook** ([references/web-storybook.md](references/web-storybook.md)) and the **browser-mode + e2e test
+   layers** ([references/web-testing.md](references/web-testing.md)): their dev dependencies, `.storybook/` + the browser
+   / Playwright configs, the `storybook` / `build-storybook` / `test:browser` / `test:e2e` scripts, and the **Vitest 4
+   pin** on `web`. The `ConfirmDialog` component in `components/` (from `web.md`) is the example these build on.
 
 5. **Add the dependencies**: the API's (in `api-setup.md`), the web's (in `web.md`), then the shared tooling (in
    `monorepo-root.md`). Before the shared step, check that the TypeScript peer ranges of typescript-eslint and
@@ -142,24 +164,31 @@ Copy this checklist and tick it off:
    ```sh
    docker compose up --build -d
    pnpm --filter api db:generate --name init && pnpm --filter api db:migrate
+   pnpm --filter api test:db                     # DAO suite vs a Testcontainers Postgres (needs Docker + migrations)
    curl -s http://localhost:3000/health
    ```
 
-   Then walk through the [Review Checklist](#review-checklist).
+   `test:db` runs only now, because the `db` project applies `db/migrations/` and those exist only after the first
+   `db:generate`. Then walk through the [Review Checklist](#review-checklist).
 
 ## Version constraints
 
 `pnpm add` resolves current versions at scaffold time; these are the constraints it works within, and why.
 
-| what                                   | constraint              | why                                                                   |
-| -------------------------------------- | ----------------------- | --------------------------------------------------------------------- |
-| Node                                   | 24+                     | the Dockerfiles run `node:24-alpine`; `@types/node@24` follows it     |
-| pnpm                                   | 11+                     | `allowBuilds` in `pnpm-workspace.yaml`                                |
-| TypeScript                             | exact 6.0.x, in catalog | Angular 22 needs `>=6.0 <6.1`; typescript-eslint supports `<6.1`      |
-| `@angular/*`, `@ngrx/*`, angular-eslint | major 22                | NgRx and angular-eslint release in step with Angular's major          |
-| `@fundamental-ngx/*`                   | exact 0.65.x            | the release whose peer range covers Angular 22                        |
-| Tailwind                               | major 4                 | the CSS-first `@import` layers and `@tailwindcss/postcss` plugin      |
-| Postgres / Nginx images                | `17-alpine` / `1.27-alpine` | pinned in `docker-compose.yml` and `web/Dockerfile`               |
+| what                                    | constraint                  | why                                                               |
+| --------------------------------------- | --------------------------- | ----------------------------------------------------------------- |
+| Node                                    | 24+                         | the Dockerfiles run `node:24-alpine`; `@types/node@24` follows it |
+| pnpm                                    | 11+                         | `allowBuilds` in `pnpm-workspace.yaml`                            |
+| TypeScript                              | exact 6.0.x, in catalog     | Angular 22 needs `>=6.0 <6.1`; typescript-eslint supports `<6.1`  |
+| `@angular/*`, `@ngrx/*`, angular-eslint | major 22                    | NgRx and angular-eslint release in step with Angular's major      |
+| `@fundamental-ngx/*`                    | exact 0.65.x                | the release whose peer range covers Angular 22                    |
+| Tailwind                                | major 4                     | the CSS-first `@import` layers and `@tailwindcss/postcss` plugin  |
+| Vitest (API)                            | major 5                     | the API's `vitest run` projects                                   |
+| Vitest (web)                            | exact 4.x (`@vitest/browser`, `@vitest/browser-playwright` to match) | Vitest 5's browser mode doesn't work in this workspace; `@angular/build` accepts `^4 \|\| ^5` so `ng test` is fine |
+| Storybook / `@storybook/angular-vite`   | major 10                    | the Vite/Analog builder that fits the esbuild toolchain           |
+| `@analogjs/vite-plugin-angular`         | major 2                     | compiles Angular under Vite for Storybook + the browser tests     |
+| Playwright / `@playwright/test`         | major 1                     | full-stack e2e in a real browser                                  |
+| Postgres / Nginx images                 | `17-alpine` / `1.27-alpine` | pinned in `docker-compose.yml` and `web/Dockerfile`               |
 
 **Catalog rule:** a package goes in `catalog:` only when two or more manifests use it with the same range. Everything
 else is a direct dependency of the one manifest that uses it.
@@ -176,7 +205,7 @@ These bite first when writing code in the project. The full set is in
 - API and web types and errors: `*.model.ts`
 - Web: `*.component.ts`, flat under `components/` / `layouts/` / `pages/` with no wrapping folder
 - NgRx slices: `*.model.ts`, `*.actions.ts`, `*.reducer.ts`, `*.selectors.ts`, `*.effects.ts`
-- Tests: API `tests/**/*.test.ts` mirroring `src/`; web `*.spec.ts` beside the file
+- Tests: API `tests/**/*.test.ts` grouped by kind (`unit/`, `api/`, `db/`, `utils/`), one top-level `describe` per file named for the module; web `*.spec.ts` beside the file
 
 ### API
 
@@ -194,10 +223,19 @@ These bite first when writing code in the project. The full set is in
   (`createError(status, msg, { expose, cause })`).
 - **The DAO layer** is the core of the API; its rules are in [The DAO layer](#the-dao-layer) below.
 - **zod + drizzle-zod.** Row inputs come from `createInsertSchema` / `createUpdateSchema` / `createSelectSchema`; list
-  inputs from the `createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema` builders. Controllers
-  validate every input inline with `safeParse` and throw `createError(400, …)` on failure.
-- **Tests need no database.** The filter / sort translator is tested through the SQL it renders; controllers through
-  `createApp` with a fake DAO on the context. A new resource gets a controller test copied from the entity one.
+  inputs from the `createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema` builders in
+  `helpers/list-input.helper.ts`. Controllers validate every input inline with `safeParse` and throw
+  `createError(400, …)` on failure.
+- **Tests are grouped by kind under `tests/{unit,api,db,utils}/`**, not mirrored against `src/`, and each file wraps its
+  suites in one top-level `describe` named for the module. A single `vitest.config.ts` defines three `projects`:
+  - `pnpm test` runs **`unit` + `api`** with no database — the filter / sort translator through the SQL it renders, the
+    list-input builders directly, and every route through `createApp` with a fake DAO on the context, driven over
+    `fetch` (not `supertest`), asserting status and body. One route-test file per controller.
+  - `pnpm test:db` runs the **`db`** project: the real DAO against a throwaway `postgres:17-alpine` via Testcontainers
+    (`@testcontainers/postgresql`), migrated with the drizzle migrator. `list` is covered exhaustively (filter, sort,
+    pagination, alone and combined). It needs Docker and an existing `db/migrations/`, so it runs after the first
+    `db:generate`. A new resource gets a controller test in `tests/api/`, a DAO test in `tests/db/`, and a schema test
+    in `tests/unit/`.
 - **`types: ["node"]` is explicit** in `tsconfig.app.json`: TypeScript 6 defaults `types` to `[]`. Every new config file
   goes into the `include` of `tsconfig.node.json`, or ESLint reports it as belonging to no project.
 - **Pino logs plain JSON.** `pino-pretty` is only a pipe in the `dev` script.
@@ -207,14 +245,15 @@ These bite first when writing code in the project. The full set is in
 
 Each layer has one job; the full walk-through is in [references/api-dao.md](references/api-dao.md#how-the-layers-fit).
 
-| layer | file | holds |
-| --- | --- | --- |
-| contract | `models/dao.model.ts` | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`; no zod, no drizzle |
-| vocabulary | `models/list-input.model.ts` | scalar filter inputs (id, string, number, date, boolean), `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema` |
-| translation | `helpers/dao.helper.ts` | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult` |
-| HTTP parsing | `helpers/query-parser.helper.ts` | `normalizeQuery` |
-| resource | `db/schemas/<resource>.schema.ts` | table, create / update / filter / sort / list input schemas, default sort, and the types inferred from them |
-| DAO | `daos/<resource>.dao.ts` | `implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput>`; queries only |
+| layer        | file                              | holds                                                                                                                                 |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| contract     | `models/dao.model.ts`             | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`; no zod, no drizzle                                       |
+| vocabulary   | `models/list-input.model.ts`      | scalar filter inputs (id, string, number, date, boolean), `sortDirectionSchema`, and the derived filter types                        |
+| builders     | `helpers/list-input.helper.ts`    | `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`, and the page-size limits                                 |
+| translation  | `helpers/dao.helper.ts`           | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult`                                                          |
+| HTTP parsing | `helpers/query-parser.helper.ts`  | `normalizeQuery`                                                                                                                      |
+| resource     | `db/schemas/<resource>.schema.ts` | table, create / update / filter / sort / list input schemas, default sort, and the types inferred from them                           |
+| DAO          | `daos/<resource>.dao.ts`          | `implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput>`; queries only                                         |
 
 - **One contract, single-input methods:** `get({ id })` → `T | null`, `list(input)` → `PaginatedResult<T>`,
   `create(input)`, `update(input)` with the `id` inside the input, `delete({ id })` → `void`. DAOs throw
@@ -267,6 +306,12 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   input, and `<Action> Success` / `<Action> Failure` for results. This is
   what makes back, forward, refresh and deep links work.
 - **Inline templates and Tailwind utilities.** There are no `.html` or `.scss` files.
+- **Components are developed in Storybook and tested in three layers.** `components/` holds store-free
+  `input()`/`output()` components (example: `ConfirmDialog`) with a `*.stories.ts` beside each. Tests: `ng test`
+  (unit, `*.spec.ts` beside the file — services, slices, helpers), `pnpm test:browser` (pages in real Chromium via
+  Vitest browser mode, `web` pinned to Vitest 4), and `pnpm test:e2e` (Playwright against the real app + API + Postgres).
+  A signal-input component can't be bound in browser mode (Analog drops the metadata), so it is covered by Storybook +
+  e2e. Details in [references/web-testing.md](references/web-testing.md) and [references/web-storybook.md](references/web-storybook.md).
 
 ### Infra
 
@@ -294,11 +339,14 @@ pnpm workspace, then:
 - **Root files** (workspace, manifest, shared tooling, ignore files, env, Compose):
   [references/monorepo-root.md](references/monorepo-root.md)
 - **API setup** (manifest, dependencies, tsconfigs, app shell, Dockerfile): [references/api-setup.md](references/api-setup.md)
-- **API DAO layer** (how the layers fit, DAO contract, list-input vocabulary, errors, SQL translator, query normalizer,
-  tests, extending the vocabulary): [references/api-dao.md](references/api-dao.md)
-- **API entity example** (resource schema, table registry, DAO, controllers, controller test, adding a resource):
+- **API DAO layer** (how the layers fit, DAO contract, list-input vocabulary, the builder helper, errors, SQL
+  translator, query normalizer, their `unit/` tests, extending the vocabulary): [references/api-dao.md](references/api-dao.md)
+- **API entity example** (resource schema, table registry, DAO and its Testcontainers `db/` test, the three
+  controllers with one `api/` test file each, the shared `tests/utils/` helpers, the schema test, adding a resource):
   [references/api-entity.md](references/api-entity.md)
-- **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, pages, spec, Nginx): [references/web.md](references/web.md)
+- **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, components, pages, spec, Nginx): [references/web.md](references/web.md)
+- **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the `ConfirmDialog` story): [references/web-storybook.md](references/web-storybook.md)
+- **Web tests** (unit via `ng test`, browser-mode page tests on Vitest 4, full-stack Playwright e2e): [references/web-testing.md](references/web-testing.md)
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
 - **Coding conventions** (copied to the repo root): [references/coding-conventions.md](references/coding-conventions.md)
@@ -312,6 +360,7 @@ pnpm workspace, then:
 - [ ] `pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format:check` passes
 - [ ] `docker compose up --build` starts all three services and the `db` healthcheck passes
 - [ ] `pnpm --filter api db:generate --name init` produces exactly one migration, and `db:migrate` applies it
+- [ ] `pnpm --filter api test:db` passes (DAO suite against a Testcontainers Postgres; needs Docker and the migration above)
 - [ ] `curl http://localhost:3000/health` returns `{status:'ok', db:'up', …}`
 - [ ] `curl http://localhost:4200/entities` returns 200
 - [ ] `POST /entities` creates; `GET /entities?filter=<json>&sortField=…&sortDirection=…&page=&pageSize=` returns
@@ -319,3 +368,6 @@ pnpm workspace, then:
       updates; `DELETE /entities/:id` returns 204, and 404 for a missing id
 - [ ] `.env` is not committed and `.env.example` is
 - [ ] `coding-conventions.md` is at the repo root
+- [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook` serves the `ConfirmDialog` stories
+- [ ] `pnpm --filter web test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
+- [ ] `pnpm --filter web test:e2e` passes (Playwright full-stack; needs Docker + the root `.env`)

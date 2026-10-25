@@ -55,17 +55,30 @@ api/
 │   │   └── error.model.ts   # api-dao.md
 │   ├── helpers/
 │   │   ├── dao.helper.ts    # api-dao.md
+│   │   ├── list-input.helper.ts  # api-dao.md
 │   │   └── query-parser.helper.ts  # api-dao.md
 │   ├── daos/                # entity.dao.ts, api-entity.md
 │   ├── controllers/         # api-entity.md
 │   └── middleware/
 │       ├── error.middleware.ts
 │       └── not-found.middleware.ts
-└── tests/                   # mirrors src/, one *.test.ts per module
-    ├── helpers/dao.helper.test.ts
-    ├── helpers/query-parser.helper.test.ts
-    ├── db/schemas/entity.schema.test.ts
-    └── controllers/entity.controller.test.ts
+└── tests/                   # grouped by kind (not mirrored to src), one *.test.ts per module
+    ├── unit/                # fast, no DB — api-dao.md, api-entity.md
+    │   ├── dao.helper.test.ts
+    │   ├── list-input.helper.test.ts
+    │   ├── query-parser.helper.test.ts
+    │   └── entity.schema.test.ts
+    ├── api/                 # routes via fetch + fake DAO, one per controller — api-entity.md
+    │   ├── entity.controller.test.ts
+    │   ├── home.controller.test.ts
+    │   └── health.controller.test.ts
+    ├── db/                  # Testcontainers Postgres + drizzle migrator — api-entity.md
+    │   └── entity.dao.test.ts
+    └── utils/               # test helpers, not tests — api-entity.md
+        ├── pg-container.ts
+        ├── fake-dao.ts
+        ├── test-server.ts
+        └── entity-seed.ts
 ```
 
 **No `db/migrations/` is shipped.** The scaffold writes the schema source only; the first `pnpm db:generate` emits one
@@ -86,7 +99,8 @@ Scripts and metadata only. Dependencies are added with `pnpm add` (next section)
     "build": "tsc -p tsconfig.app.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project api",
+    "test:db": "vitest run --project db",
     "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "start": "node --env-file=../.env dist/server.js",
@@ -103,6 +117,9 @@ Rules:
 - `db:*` scripts run drizzle-kit's bin **under node with `--env-file`** because drizzle-kit does not load `.env`.
 - Only `db:generate` and `db:migrate`; there is no `db:push`.
 - `typecheck` runs **both** tsconfigs so the tests and config files are type-checked too.
+- `test` runs only the Docker-free vitest projects (`unit` + `api`); it needs no database. `test:db` runs the `db`
+  project, which spins up a Testcontainers Postgres and so needs a running Docker daemon and an existing
+  `db/migrations/` (run `db:generate` first). See the `vitest.config.ts` section.
 
 ## Dependencies
 
@@ -111,10 +128,12 @@ Run from the repo root, after the web app exists, so the shared tooling lands in
 ```sh
 pnpm --filter api add cors drizzle-orm drizzle-zod express http-errors pg pino pino-http zod
 pnpm --filter api add -D @types/cors @types/express @types/http-errors @types/node@24 @types/pg \
-  drizzle-kit pino-pretty tsx vitest
+  @testcontainers/postgresql drizzle-kit pino-pretty tsx vitest
 ```
 
-`@types/node` follows the Node major the Dockerfile runs (24). The shared tooling (ESLint, Prettier, TypeScript) is
+`@types/node` follows the Node major the Dockerfile runs (24). `@testcontainers/postgresql` powers the DB-backed DAO
+tests (the `db` vitest project) and needs a running Docker daemon; its optional native sub-deps are marked
+non-building in `pnpm-workspace.yaml` (see `monorepo-root.md`). The shared tooling (ESLint, Prettier, TypeScript) is
 added by the root step in `monorepo-root.md`.
 
 ## TypeScript (3 files)
@@ -180,7 +199,7 @@ file goes into `include`, or ESLint reports it as belonging to no project.
 ## `api/drizzle.config.ts`
 
 ```ts
-import { type Config, defineConfig } from 'drizzle-kit';
+import { defineConfig } from 'drizzle-kit';
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is required');
@@ -198,7 +217,7 @@ export default defineConfig({
     table: '__migrations__',
     schema: 'public'
   }
-}) satisfies Config;
+});
 ```
 
 No fallback for `DATABASE_URL`: it throws loud and early. `schema` points at the per-resource schema files, not at
@@ -206,21 +225,50 @@ No fallback for `DATABASE_URL`: it throws loud and early. `schema` points at the
 
 ## `api/vitest.config.ts`
 
+One config, three named `projects` selected by test folder. Shared options (silent logs) live at the root and are
+inherited by each inline project.
+
 ```ts
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.ts'],
+    // Shared by every project (inline projects inherit this config by default).
     // pino-http logs every request; keep test output readable.
-    env: { LOG_LEVEL: 'silent' }
+    env: { LOG_LEVEL: 'silent' },
+    projects: [
+      {
+        test: {
+          name: { label: 'unit', color: 'cyan' },
+          include: ['tests/unit/**/*.test.ts']
+        }
+      },
+      {
+        test: {
+          name: { label: 'api', color: 'magenta' },
+          include: ['tests/api/**/*.test.ts']
+        }
+      },
+      {
+        test: {
+          name: { label: 'db', color: 'green' },
+          include: ['tests/db/**/*.test.ts'],
+          // A Testcontainers Postgres boots in beforeAll; allow for the first image pull.
+          hookTimeout: 120_000,
+          testTimeout: 30_000
+        }
+      }
+    ]
   }
 });
 ```
 
-Tests import sources with the `.js` extension, as the sources do; Vite resolves them to the `.ts` files. No test opens
-a database connection: DAO-level code is tested through the SQL it builds, and controllers through `createApp` with a
-fake DAO on the context.
+Tests import sources with the `.js` extension, as the sources do; Vite resolves them to the `.ts` files. The suites
+run at two tiers. The `unit` and `api` projects need **no database**: DAO-level SQL is tested through what it renders
+(`PgDialect`), and the routes through `createApp` with a fake DAO on the context, driven over `fetch`. The `db`
+project uses Testcontainers to run the **real** DAO against a throwaway Postgres (one container per suite, migrations
+applied by the drizzle migrator), so it needs Docker. `pnpm test` runs `--project unit --project api`; `pnpm test:db`
+runs `--project db`.
 
 ## `api/src/express.d.ts`
 
@@ -285,7 +333,10 @@ import { Pool } from 'pg';
 import { schema } from './schema.js';
 import { logger } from '../logger.js';
 
-const connectionString = process.env.DATABASE_URL ?? 'postgres://postgres:s3cr3t@localhost:5432/app';
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL is not set');
+}
 
 export const pool = new Pool({ connectionString });
 export const db = drizzle(pool, { schema });
@@ -298,6 +349,8 @@ pool.on('error', (err) => {
   logger.error({ err }, 'Unexpected error on idle Postgres client');
 });
 ```
+
+No fallback for `DATABASE_URL`: the runtime client throws loud and early, mirroring `drizzle.config.ts` — never a hardcoded DSN (and so never a credential in source).
 
 The idle-error listener is **not optional**. Without it, a transient DB drop crashes the process.
 
@@ -347,9 +400,9 @@ import { pinoHttp } from 'pino-http';
 import { logger } from './logger.js';
 import type { AppContext } from './models/app-context.model.js';
 import { errorHandler } from './middleware/error.middleware.js';
-import { notFoundMiddleware } from './middleware/not-found.middleware.js';
-import { healthController } from './controllers/health.controller.js';
-import { homeController } from './controllers/home.controller.js';
+import { notFoundHandler } from './middleware/not-found.middleware.js';
+import { getHealth } from './controllers/health.controller.js';
+import { getHome } from './controllers/home.controller.js';
 import { createEntity, deleteEntity, getEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
 
 export function createApp(context: AppContext): Express {
@@ -360,8 +413,8 @@ export function createApp(context: AppContext): Express {
   app.use(cors());
   app.use(express.json());
 
-  app.get('/', homeController);
-  app.get('/health', healthController);
+  app.get('/', getHome);
+  app.get('/health', getHealth);
 
   app.get('/entities', listEntities);
   app.post('/entities', createEntity);
@@ -370,7 +423,7 @@ export function createApp(context: AppContext): Express {
   app.delete('/entities/:id', deleteEntity);
 
   // Unmatched routes -> 404, then the terminal error handler.
-  app.use(notFoundMiddleware);
+  app.use(notFoundHandler);
   app.use(errorHandler);
 
   return app;
@@ -416,7 +469,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
 import type { NextFunction, Request, Response } from 'express';
 import createError from 'http-errors';
 
-export function notFoundMiddleware(req: Request, _res: Response, next: NextFunction): void {
+export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
   next(createError(404, `Not Found: ${req.method} ${req.originalUrl}`));
 }
 ```

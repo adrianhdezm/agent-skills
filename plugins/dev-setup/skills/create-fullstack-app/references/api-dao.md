@@ -10,25 +10,28 @@ typed `<Type>FilterInput`s per column kind, and named `<Operation><Resource>Inpu
 - [How the layers fit](#how-the-layers-fit)
 - [`api/src/models/dao.model.ts`](#apisrcmodelsdaomodelts)
 - [`api/src/models/list-input.model.ts`](#apisrcmodelslist-inputmodelts)
+- [`api/src/helpers/list-input.helper.ts`](#apisrchelperslist-inputhelperts)
 - [`api/src/models/error.model.ts`](#apisrcmodelserrormodelts)
 - [`api/src/helpers/dao.helper.ts`](#apisrchelpersdaohelperts)
 - [`api/src/helpers/query-parser.helper.ts`](#apisrchelpersquery-parserhelperts)
-- [`api/tests/helpers/dao.helper.test.ts`](#apitestshelpersdaohelpertestts)
-- [`api/tests/helpers/query-parser.helper.test.ts`](#apitestshelpersquery-parserhelpertestts)
+- [`api/tests/unit/dao.helper.test.ts`](#apitestsunitdaohelpertestts)
+- [`api/tests/unit/query-parser.helper.test.ts`](#apitestsunitquery-parserhelpertestts)
+- [`api/tests/unit/list-input.helper.test.ts`](#apitestsunitlist-inputhelpertestts)
 - [Extending the vocabulary](#extending-the-vocabulary)
 
 ## How the layers fit
 
 Each layer has one job, and types flow downward. Only the last two rows mention a specific resource.
 
-| layer | file | holds |
-| --- | --- | --- |
-| contract | `models/dao.model.ts` | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`. No zod, no drizzle. |
-| list-input vocabulary | `models/list-input.model.ts` | the scalar filter inputs (id, string, number, date, boolean), `createFilterInputSchema`, `sortDirectionSchema`, `SortInput`, `createSortInputSchema`, `createListInputSchema`, the page-size limits, and the types derived from them |
-| translation | `helpers/dao.helper.ts` | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult` |
-| HTTP parsing | `helpers/query-parser.helper.ts` | `normalizeQuery` |
-| resource schema | `db/schemas/<resource>.schema.ts` | the drizzle table, the create / update / filter / sort / list input schemas, the default sort, and the types inferred from them |
-| DAO | `daos/<resource>.dao.ts` | one class implementing `Dao`; runs queries, holds no configuration |
+| layer                 | file                              | holds                                                                                                                                                                                                                                |
+| --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| contract              | `models/dao.model.ts`             | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`. No zod, no drizzle.                                                                                                                                     |
+| list-input vocabulary | `models/list-input.model.ts`      | the scalar filter inputs (id, string, number, date, boolean), `sortDirectionSchema`, `SortInput`, and the types derived from them                                                                                                     |
+| list-input builders   | `helpers/list-input.helper.ts`    | `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`, and the page-size limits                                                                                                                                 |
+| translation           | `helpers/dao.helper.ts`           | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult`                                                                                                                                                         |
+| HTTP parsing          | `helpers/query-parser.helper.ts`  | `normalizeQuery`                                                                                                                                                                                                                     |
+| resource schema       | `db/schemas/<resource>.schema.ts` | the drizzle table, the create / update / filter / sort / list input schemas, the default sort, and the types inferred from them                                                                                                      |
+| DAO                   | `daos/<resource>.dao.ts`          | one class implementing `Dao`; runs queries, holds no configuration                                                                                                                                                                   |
 
 A list request passes through them in this order:
 
@@ -94,15 +97,12 @@ export interface Dao<T, ListInput, CreateInput, UpdateInput extends IdInput> {
 
 ## `api/src/models/list-input.model.ts`
 
-The single source of truth for which operators each column kind accepts, the three builders every resource schema calls (`createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`), the page-size limits, and the types derived from them.
+The single source of truth for which operators each column kind accepts: one strict zod schema per scalar kind, `sortDirectionSchema`, and the types derived from them (including the exported `ScalarFilterInputSchema`, the union the filter builder is generic over). The three builders that assemble these into a resource's filter / sort / list schemas live in `helpers/list-input.helper.ts` (next section).
 
 ```ts
 import { z } from 'zod';
 
-export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;
 const MAX_IN_VALUES = 100;
-const MAX_LOGICAL_BRANCHES = 20;
 
 function equatable<T extends z.ZodType>(value: T) {
   return {
@@ -145,7 +145,7 @@ export const dateFilterInputSchema = z.strictObject(comparable(z.coerce.date()))
 
 export const booleanFilterInputSchema = z.strictObject(equatable(z.boolean()));
 
-type ScalarFilterInputSchema =
+export type ScalarFilterInputSchema =
   | typeof idFilterInputSchema
   | typeof stringFilterInputSchema
   | typeof numberFilterInputSchema
@@ -153,6 +153,47 @@ type ScalarFilterInputSchema =
   | typeof booleanFilterInputSchema;
 
 export const sortDirectionSchema = z.enum(['ASC', 'DESC']);
+
+export type IdFilterInput = z.infer<typeof idFilterInputSchema>;
+export type StringFilterInput = z.infer<typeof stringFilterInputSchema>;
+export type NumberFilterInput = z.infer<typeof numberFilterInputSchema>;
+export type DateFilterInput = z.infer<typeof dateFilterInputSchema>;
+export type BooleanFilterInput = z.infer<typeof booleanFilterInputSchema>;
+export type ScalarFilterInput = IdFilterInput | StringFilterInput | NumberFilterInput | DateFilterInput | BooleanFilterInput;
+export type SortDirection = z.infer<typeof sortDirectionSchema>;
+
+export interface SortInput<SortField extends string> {
+  readonly field: SortField;
+  readonly direction: SortDirection;
+}
+
+export interface LogicalFilterInput<Filter> {
+  and?: Filter[];
+  or?: Filter[];
+  not?: Filter;
+}
+
+export type FilterField<Filter> = {
+  [K in keyof Filter]-?: NonNullable<Filter[K]> extends ScalarFilterInput ? K : never;
+}[keyof Filter];
+
+type KeysOfUnion<U> = U extends unknown ? keyof U : never;
+type ValueOfUnion<U, K extends PropertyKey> = U extends unknown ? (K extends keyof U ? U[K] : never) : never;
+
+export type FieldFilterInput = { [K in KeysOfUnion<ScalarFilterInput>]?: ValueOfUnion<ScalarFilterInput, K> };
+```
+
+## `api/src/helpers/list-input.helper.ts`
+
+The three builders every resource schema calls — `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema` — plus the page-size limits. They are functions that assemble the scalar schemas and `sortDirectionSchema` from `list-input.model.ts` into a resource's filter, sort and list input schemas, so they live in `helpers/` (logic), not `models/` (shapes). The import is one-directional: the helper depends on the model, never the reverse.
+
+```ts
+import { z } from 'zod';
+import { type ScalarFilterInputSchema, sortDirectionSchema } from '../models/list-input.model.js';
+
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 100;
+const MAX_LOGICAL_BRANCHES = 20;
 
 export function createFilterInputSchema<Fields extends Record<string, ScalarFilterInputSchema>>(fields: Fields) {
   const schema = z.strictObject({
@@ -185,34 +226,6 @@ export function createListInputSchema<Filter extends z.ZodType, Sort extends z.Z
     pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE)
   });
 }
-
-export type IdFilterInput = z.infer<typeof idFilterInputSchema>;
-export type StringFilterInput = z.infer<typeof stringFilterInputSchema>;
-export type NumberFilterInput = z.infer<typeof numberFilterInputSchema>;
-export type DateFilterInput = z.infer<typeof dateFilterInputSchema>;
-export type BooleanFilterInput = z.infer<typeof booleanFilterInputSchema>;
-export type ScalarFilterInput = IdFilterInput | StringFilterInput | NumberFilterInput | DateFilterInput | BooleanFilterInput;
-export type SortDirection = z.infer<typeof sortDirectionSchema>;
-
-export interface SortInput<SortField extends string> {
-  readonly field: SortField;
-  readonly direction: SortDirection;
-}
-
-export interface LogicalFilterInput<Filter> {
-  and?: Filter[];
-  or?: Filter[];
-  not?: Filter;
-}
-
-export type FilterField<Filter> = {
-  [K in keyof Filter]-?: NonNullable<Filter[K]> extends ScalarFilterInput ? K : never;
-}[keyof Filter];
-
-type KeysOfUnion<U> = U extends unknown ? keyof U : never;
-type ValueOfUnion<U, K extends PropertyKey> = U extends unknown ? (K extends keyof U ? U[K] : never) : never;
-
-export type FieldFilterInput = { [K in KeysOfUnion<ScalarFilterInput>]?: ValueOfUnion<ScalarFilterInput, K> };
 ```
 
 ## `api/src/models/error.model.ts`
@@ -354,9 +367,10 @@ export function normalizeQuery(params: unknown): Record<string, unknown> {
 }
 ```
 
-## `api/tests/helpers/dao.helper.test.ts`
+## `api/tests/unit/dao.helper.test.ts`
 
-Renders the built SQL with `PgDialect`, so the translator is tested without a database. The test table has one column per scalar kind.
+Renders the built SQL with `PgDialect`, so the translator is tested without a database. The test table has one column per
+scalar kind, and the whole file wraps in a single `describe('dao.helper')`.
 
 ```ts
 import { type SQL } from 'drizzle-orm';
@@ -400,110 +414,161 @@ function translate(filter: TestFilterInput): { sql: string; params: unknown[] } 
   return render(filterToSql(filter, table));
 }
 
-describe('filterToSql: field operators', () => {
-  it('returns undefined for an empty filter or field input', () => {
-    // Act + Assert
-    expect(translate({})).toBeUndefined();
-    expect(translate({ name: {} })).toBeUndefined();
+function sqlOf(clauses: SQL[]): (string | undefined)[] {
+  return clauses.map((clause) => render(clause)?.sql);
+}
+
+describe('dao.helper', () => {
+  describe('filterToSql: field operators', () => {
+    it('returns undefined for an empty filter or field input', () => {
+      // Act + Assert
+      expect(translate({})).toBeUndefined();
+      expect(translate({ name: {} })).toBeUndefined();
+    });
+
+    it('translates contains / beginsWith into escaped, case-insensitive patterns', () => {
+      // Act
+      const query = translate({ name: { contains: '50%', beginsWith: 'a_' } });
+
+      // Assert
+      expect(query?.sql).toBe('("t"."name" ilike $1 and "t"."name" ilike $2)');
+      expect(query?.params).toEqual(['%50\\%%', 'a\\_%']);
+    });
+
+    it('translates comparisons and between', () => {
+      // Act
+      const query = translate({ score: { gt: 1.5, between: [0, 10] } });
+
+      // Assert
+      expect(query?.sql).toBe('("t"."score" > $1 and "t"."score" between $2 and $3)');
+      expect(query?.params).toEqual([1.5, 0, 10]);
+    });
+
+    it('translates in, and turns an empty in list into false', () => {
+      // Act + Assert
+      expect(translate({ name: { in: ['a', 'b'] } })?.sql).toBe('"t"."name" in ($1, $2)');
+      expect(translate({ id: { in: [] } })?.sql).toBe('false');
+    });
+
+    it('translates boolean and date inputs', () => {
+      // Act + Assert
+      expect(translate({ active: { eq: true } })?.sql).toBe('"t"."active" = $1');
+      expect(translate({ createdAt: { ge: new Date('2026-01-01') } })?.sql).toBe('"t"."created_at" >= $1');
+    });
+
+    it('translates each comparison operator', () => {
+      // Act + Assert
+      expect(translate({ score: { eq: 1 } })?.sql).toBe('"t"."score" = $1');
+      expect(translate({ score: { ne: 1 } })?.sql).toBe('"t"."score" <> $1');
+      expect(translate({ score: { lt: 1 } })?.sql).toBe('"t"."score" < $1');
+      expect(translate({ score: { le: 1 } })?.sql).toBe('"t"."score" <= $1');
+      expect(translate({ score: { ge: 1 } })?.sql).toBe('"t"."score" >= $1');
+    });
+
+    it('translates notContains into an escaped, case-insensitive negative match', () => {
+      // Act
+      const query = translate({ name: { notContains: '50%' } });
+
+      // Assert
+      expect(query?.sql).toBe('"t"."name" not ilike $1');
+      expect(query?.params).toEqual(['%50\\%%']);
+    });
+
+    it('ANDs the branches of a top-level and', () => {
+      // Act
+      const query = translate({ and: [{ name: { eq: 'a' } }, { score: { gt: 1 } }] });
+
+      // Assert
+      expect(query?.sql).toBe('("t"."name" = $1 and "t"."score" > $2)');
+    });
+
+    it('ANDs several fields', () => {
+      // Act
+      const query = translate({ name: { eq: 'a' }, score: { lt: 3 } });
+
+      // Assert
+      expect(query?.sql).toBe('("t"."name" = $1 and "t"."score" < $2)');
+    });
   });
 
-  it('translates contains / beginsWith into escaped, case-insensitive patterns', () => {
-    // Act
-    const query = translate({ name: { contains: '50%', beginsWith: 'a_' } });
+  describe('filterToSql: and / or / not', () => {
+    it('nests and / or / not', () => {
+      // Act
+      const query = translate({ or: [{ name: { eq: 'a' } }, { not: { score: { gt: 1 } } }] });
 
-    // Assert
-    expect(query?.sql).toBe('("t"."name" ilike $1 and "t"."name" ilike $2)');
-    expect(query?.params).toEqual(['%50\\%%', 'a\\_%']);
+      // Assert
+      expect(query?.sql).toBe('("t"."name" = $1 or not "t"."score" > $2)');
+    });
+
+    it('treats a branch that matches everything as making the whole or match everything', () => {
+      // Act + Assert
+      expect(translate({ or: [{ name: { eq: 'a' } }, {}] })).toBeUndefined();
+    });
+
+    it('negates a match-everything filter into false', () => {
+      // Act + Assert
+      expect(translate({ not: {} })?.sql).toBe('false');
+    });
   });
 
-  it('translates comparisons and between', () => {
-    // Act
-    const query = translate({ score: { gt: 1.5, between: [0, 10] } });
+  describe('sortToSql', () => {
+    it('sorts by the requested column with an id tie-breaker', () => {
+      // Act
+      const clauses = sqlOf(sortToSql({ field: 'createdAt', direction: 'DESC' }, table));
 
-    // Assert
-    expect(query?.sql).toBe('("t"."score" > $1 and "t"."score" between $2 and $3)');
-    expect(query?.params).toEqual([1.5, 0, 10]);
+      // Assert
+      expect(clauses).toEqual(['"t"."created_at" desc', '"t"."id" asc']);
+    });
+
+    it('sorts ascending when the direction is ASC', () => {
+      // Act
+      const clauses = sqlOf(sortToSql({ field: 'name', direction: 'ASC' }, table));
+
+      // Assert
+      expect(clauses).toEqual(['"t"."name" asc', '"t"."id" asc']);
+    });
   });
 
-  it('translates in, and turns an empty in list into false', () => {
-    // Act + Assert
-    expect(translate({ name: { in: ['a', 'b'] } })?.sql).toBe('"t"."name" in ($1, $2)');
-    expect(translate({ id: { in: [] } })?.sql).toBe('false');
-  });
+  describe('escapeLike / toPaginatedResult', () => {
+    it('escapes LIKE metacharacters', () => {
+      // Act + Assert
+      expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\');
+    });
 
-  it('translates boolean and date inputs', () => {
-    // Act + Assert
-    expect(translate({ active: { eq: true } })?.sql).toBe('"t"."active" = $1');
-    expect(translate({ createdAt: { ge: new Date('2026-01-01') } })?.sql).toBe('"t"."created_at" >= $1');
-  });
+    it('derives totalPages from total and pageSize', () => {
+      // Act + Assert
+      expect(toPaginatedResult(['x'], 21, { page: 2, pageSize: 10 })).toEqual({
+        items: ['x'],
+        total: 21,
+        page: 2,
+        pageSize: 10,
+        totalPages: 3
+      });
+    });
 
-  it('ANDs several fields', () => {
-    // Act
-    const query = translate({ name: { eq: 'a' }, score: { lt: 3 } });
-
-    // Assert
-    expect(query?.sql).toBe('("t"."name" = $1 and "t"."score" < $2)');
-  });
-});
-
-describe('filterToSql: and / or / not', () => {
-  it('nests and / or / not', () => {
-    // Act
-    const query = translate({ or: [{ name: { eq: 'a' } }, { not: { score: { gt: 1 } } }] });
-
-    // Assert
-    expect(query?.sql).toBe('("t"."name" = $1 or not "t"."score" > $2)');
-  });
-
-  it('treats a branch that matches everything as making the whole or match everything', () => {
-    // Act + Assert
-    expect(translate({ or: [{ name: { eq: 'a' } }, {}] })).toBeUndefined();
-  });
-
-  it('negates a match-everything filter into false', () => {
-    // Act + Assert
-    expect(translate({ not: {} })?.sql).toBe('false');
-  });
-});
-
-describe('sortToSql', () => {
-  it('sorts by the requested column with an id tie-breaker', () => {
-    // Act
-    const clauses = sortToSql({ field: 'createdAt', direction: 'DESC' }, table).map((clause) => render(clause)?.sql);
-
-    // Assert
-    expect(clauses).toEqual(['"t"."created_at" desc', '"t"."id" asc']);
-  });
-});
-
-describe('escapeLike / toPaginatedResult', () => {
-  it('escapes LIKE metacharacters', () => {
-    // Act + Assert
-    expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\');
-  });
-
-  it('derives totalPages from total and pageSize', () => {
-    // Act + Assert
-    expect(toPaginatedResult(['x'], 21, { page: 2, pageSize: 10 })).toEqual({
-      items: ['x'],
-      total: 21,
-      page: 2,
-      pageSize: 10,
-      totalPages: 3
+    it('yields zero pages for an empty result', () => {
+      // Act + Assert
+      expect(toPaginatedResult([], 0, { page: 1, pageSize: 10 })).toEqual({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 10,
+        totalPages: 0
+      });
     });
   });
 });
 ```
 
-## `api/tests/helpers/query-parser.helper.test.ts`
+## `api/tests/unit/query-parser.helper.test.ts`
 
-Tests the normalizer on its own. The list input schema has its own test next to the entity schema ([api-entity.md](api-entity.md)), and URL decoding is tested through the controller.
+Tests the normalizer on its own, wrapped in `describe('query-parser.helper')`. The list-input builders have their own test (next section) and URL decoding is tested through the route test ([api-entity.md](api-entity.md)).
 
 ```ts
 import { describe, expect, it } from 'vitest';
 import { normalizeQuery } from '../../src/helpers/query-parser.helper.js';
 
-describe('normalizeQuery', () => {
+describe('query-parser.helper', () => {
   it('keeps the first value of a repeated param', () => {
     // Act + Assert
     expect(normalizeQuery({ page: ['3', '9'] })).toEqual({ page: '3' });
@@ -522,11 +587,110 @@ describe('normalizeQuery', () => {
 });
 ```
 
+## `api/tests/unit/list-input.helper.test.ts`
+
+Tests the builders directly against an ad-hoc field config (`id` / `name` / `age`), so the generic behaviour — field optionality, recursive `and` / `or` / `not`, strictness, the logical-branch cap, the `in`-list cap (`MAX_IN_VALUES`) at and over the limit, the `between` tuple arity, the sort allowlist, and the page defaults and range — is covered without any one resource. The per-resource schema test then only checks that resource's own column and sort wiring.
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { createFilterInputSchema, createListInputSchema, createSortInputSchema } from '../../src/helpers/list-input.helper.js';
+import { idFilterInputSchema, numberFilterInputSchema, stringFilterInputSchema } from '../../src/models/list-input.model.js';
+
+const filterInputSchema = createFilterInputSchema({
+  id: idFilterInputSchema,
+  name: stringFilterInputSchema,
+  age: numberFilterInputSchema
+});
+const sortInputSchema = createSortInputSchema(['name', 'age']);
+const listInputSchema = createListInputSchema({ filter: filterInputSchema, sort: sortInputSchema });
+
+const UUID = '00000000-0000-4000-8000-000000000001';
+
+// Hoisted so the Array.from callback doesn't nest inside the `it` callback (max-nested-callbacks).
+const IN_AT_MAX = Array.from({ length: 100 }, (_, i) => i);
+
+describe('list-input.helper', () => {
+  describe('createFilterInputSchema', () => {
+    it('makes every field optional (an empty filter parses)', () => {
+      // Act + Assert
+      expect(filterInputSchema.parse({})).toEqual({});
+    });
+
+    it('accepts the declared fields and recursive and / or / not', () => {
+      // Arrange
+      const raw = { or: [{ name: { contains: 'a' } }, { not: { age: { gt: 1 } } }], and: [{ id: { eq: UUID } }] };
+
+      // Act + Assert
+      expect(filterInputSchema.safeParse(raw).success).toBe(true);
+    });
+
+    it('accepts an in list at the maximum size', () => {
+      // Act + Assert: MAX_IN_VALUES is 100.
+      const raw = { age: { in: IN_AT_MAX } };
+      expect(filterInputSchema.safeParse(raw).success).toBe(true);
+    });
+
+    it.each([
+      ['an undeclared field', { title: { eq: 'a' } }],
+      ['an operator the scalar does not allow', { age: { contains: '1' } }],
+      ['an invalid nested branch', { or: [{ name: { gt: 1 } }] }],
+      ['more logical branches than allowed', { and: Array.from({ length: 21 }, () => ({ name: { eq: 'a' } })) }],
+      ['an in list over the maximum size', { age: { in: Array.from({ length: 101 }, (_, i) => i) } }],
+      ['a between tuple with too few elements', { age: { between: [1] } }],
+      ['a between tuple with too many elements', { age: { between: [1, 2, 3] } }]
+    ])('rejects %s', (_label, raw) => {
+      // Act + Assert
+      expect(filterInputSchema.safeParse(raw).success).toBe(false);
+    });
+  });
+
+  describe('createSortInputSchema', () => {
+    it('accepts a field in the allowlist with a direction', () => {
+      // Act + Assert
+      expect(sortInputSchema.parse({ field: 'name', direction: 'DESC' })).toEqual({ field: 'name', direction: 'DESC' });
+    });
+
+    it.each([
+      ['a field outside the allowlist', { field: 'other', direction: 'ASC' }],
+      ['a lowercase direction', { field: 'name', direction: 'asc' }],
+      ['a missing direction', { field: 'name' }],
+      ['an unknown key', { field: 'name', direction: 'ASC', nulls: 'last' }]
+    ])('rejects %s', (_label, raw) => {
+      // Act + Assert
+      expect(sortInputSchema.safeParse(raw).success).toBe(false);
+    });
+  });
+
+  describe('createListInputSchema', () => {
+    it('applies the page defaults and leaves filter / sort optional', () => {
+      // Act + Assert
+      expect(listInputSchema.parse({})).toEqual({ page: 1, pageSize: 20 });
+    });
+
+    it('keeps a provided page and pageSize', () => {
+      // Act + Assert
+      expect(listInputSchema.parse({ page: 3, pageSize: 50 })).toMatchObject({ page: 3, pageSize: 50 });
+    });
+
+    it.each([
+      ['a pageSize over the max', { pageSize: 101 }],
+      ['a zero page', { page: 0 }],
+      ['a fractional pageSize', { pageSize: 1.5 }],
+      ['an unknown key', { cursor: 'abc' }]
+    ])('rejects %s', (_label, raw) => {
+      // Act + Assert
+      expect(listInputSchema.safeParse(raw).success).toBe(false);
+    });
+  });
+});
+```
+
 ## Extending the vocabulary
 
 - **A new operator** (e.g. `notBeginsWith`): one line in the matching scalar schema in `list-input.model.ts`, one
-  line in `comparisonsToSql` or `textMatchesToSql` in `dao.helper.ts`, a `filterToSql` test, and a list-input
-  rejection case in `tests/db/schemas/entity.schema.test.ts`. `FieldFilterInput` picks the operator up by itself.
+  line in `comparisonsToSql` or `textMatchesToSql` in `dao.helper.ts`, a `filterToSql` case in
+  `tests/unit/dao.helper.test.ts`, and a rejection case in `tests/unit/entity.schema.test.ts`. `FieldFilterInput`
+  picks the operator up by itself.
 - **A new scalar kind** (e.g. `jsonbFilterInputSchema`): a new strict schema in `list-input.model.ts` listing only the
   operators that make sense for it, added to the `ScalarFilterInputSchema` and `ScalarFilterInput` unions. If it needs
   SQL the existing operators cannot express, add a branch to `fieldFilterToSql`.

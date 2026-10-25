@@ -9,16 +9,16 @@ convention, so a rejected alternative is not reintroduced by accident.
 - [Tooling](#tooling): TypeScript, catalog, tsconfig, Prettier vs ESLint, dev loop, tests
 - [API](#api): context, routers, controllers, errors, logging, query parsing
 - [DAO layer](#dao-layer): contract, filter inputs, sorting, pagination, file layout, naming
-- [Web](#web): URL as state, slice placement, file layout, templates, styling
+- [Web](#web): URL as state, slice placement, file layout, templates, styling, Storybook, the three test layers
 
 ## Infrastructure
 
 ### The browser calls the API directly, configured by the Angular environment file
 
-| approach                     | verdict  | why                                                                                    |
-| ---------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| Nginx `/api` reverse proxy   | rejected | couples the web image to the API's address; the API URL should be configuration, not a route |
-| Runtime `config.json` fetch  | rejected | a startup round-trip and extra code for no gain while every environment uses the same URL shape |
+| approach                     | verdict  | why                                                                                                |
+| ---------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| Nginx `/api` reverse proxy   | rejected | couples the web image to the API's address; the API URL should be configuration, not a route       |
+| Runtime `config.json` fetch  | rejected | a startup round-trip and extra code for no gain while every environment uses the same URL shape    |
 | **Angular environment file** | chosen   | zero runtime cost; one build works on any host by deriving the URL from `window.location.hostname` |
 
 So the browser calls the API host on port 3000, and Nginx serves static files with an SPA fallback only.
@@ -43,7 +43,9 @@ that does not exist on day one. There is no `db:push`: schema changes always go 
 ### `--env-file` is strict
 
 The API should fail fast when `.env` is missing, so `dev` and `start` use `--env-file=../.env`, not
-`--env-file-if-exists`. `drizzle.config.ts` throws when `DATABASE_URL` is unset, with no fallback.
+`--env-file-if-exists`. `drizzle.config.ts` throws when `DATABASE_URL` is unset, with no fallback — and `db/client.ts`
+does the same at runtime: it reads `process.env.DATABASE_URL` and throws if it is absent, rather than defaulting to a
+hardcoded local connection string (which would both embed a credential in source and mask a misconfiguration).
 
 ## Tooling
 
@@ -81,12 +83,35 @@ API. To share one config later, add a root `.prettierrc` and delete the per-proj
 
 Node's `--watch` provides the restart loop and `--import=tsx` the TypeScript loader: stock Node, one concern each.
 
-### Tests need no database
+### Tests run in three projects; only the DAO tier needs a database
 
-The API is tested at two levels that run without Postgres: the filter / sort translator through the SQL it renders with
-`PgDialect`, and the controllers through `createApp` with a fake DAO on the context. The DAO itself is covered by the
-Compose smoke test. The web tests the URL (de)serializer every list page depends on. `test` is a required check in both
-projects.
+The API is tested in three vitest `projects`. `unit` and `api` run without Postgres: the filter / sort translator
+through the SQL it renders with `PgDialect`, the list-input builders directly, and the controllers through `createApp`
+with a fake DAO on the context, driven over real HTTP with `fetch` (not `supertest`). The `db` project uses
+Testcontainers (`@testcontainers/postgresql`) to run the real DAO against a throwaway `postgres:17-alpine`, migrated
+with the drizzle migrator. The DAO used to be covered only by the Compose smoke test; the `db` tier now exercises
+`list`'s filter, sort and pagination exhaustively (each alone and combined) against real Postgres, plus the create /
+get / update / delete happy and edge paths. It is a separate `pnpm test:db` script so the default `pnpm test`
+(`unit` + `api`) stays Docker-free and runs in CI without a daemon; `test:db` needs Docker and an existing
+`db/migrations/` (so it runs after the first `db:generate`). The web tests the URL (de)serializer every list page
+depends on. `test` is a required check in both projects.
+
+### One vitest config with projects, not multiple config files
+
+A single `api/vitest.config.ts` defines named `projects` (`unit`, `api`, `db`) selected by folder glob, with shared
+options at the root that each project inherits. A second `vitest.config.db.ts` was tried and dropped: two config files
+duplicated the shared setup and drifted. Scripts pick projects on the command line — `test` runs
+`--project unit --project api`, `test:db` runs `--project db` — so one config serves every suite.
+
+### Tests are grouped by kind, each file one describe
+
+`api/tests/` is split into `unit/`, `api/`, `db/` and `utils/` by test kind, not mirrored against `src/`. Each test
+file wraps its suites in a single top-level `describe` named for the module under test (`describe('entity.dao')`,
+`describe('dao.helper')`, …), with nested describes only where a file covers several functions. There is one route-test
+file per controller (`entity` / `home` / `health`). `utils/` holds shared, non-test helpers: the Testcontainers
+bootstrap (`pg-container.ts`), the fake-DAO / app factory (`fake-dao.ts`), the HTTP test-server helper
+(`test-server.ts`) and seed generators (`entity-seed.ts`). Grouping by kind is what lets the vitest `projects` select a
+suite by folder and keeps the Docker-free tiers apart from the DB tier.
 
 ## API
 
@@ -97,7 +122,10 @@ projects.
 
 ### No routers
 
-`app.get('/health', healthController)` on the app is clearer than an intermediate router at this size.
+`app.get('/health', getHealth)` on the app is clearer than an intermediate router at this size. Controller handlers are
+named verb+resource — `listEntities`, `getEntity`, `createEntity`, `updateEntity`, `deleteEntity`, and likewise
+`getHealth` / `getHome` — not `<noun>Controller`. Middleware exports pair as `errorHandler` + `notFoundHandler` (the
+`*Handler` suffix; the files keep the `*.middleware.ts` name).
 
 ### Controllers are fully inlined
 
@@ -149,11 +177,11 @@ Taking an Express `Request` would tie it to one transport.
 
 ### Filter inputs follow AppSync's `Model<Type>FilterInput`
 
-| approach | verdict | why |
-| --- | --- | --- |
-| Hasura `where` tree (`_eq`, `_ilike`, `_and`, …) | rejected | the zod side was typed, but the SQL translator worked on `Record<string, unknown>` and a string-keyed column map, so the types stopped where they mattered most |
-| flat per-resource filters (`name`, `createdAfter`) | rejected | every new case is a new field plus a new SQL clause, and OR / NOT cannot be expressed |
-| **typed filter input per column kind** | chosen | `IdFilterInput`, `StringFilterInput`, `NumberFilterInput`, `DateFilterInput`, `BooleanFilterInput`, plus nestable `and` / `or` / `not`: a familiar model, fully inferred, and one translator for all kinds |
+| approach                                           | verdict  | why                                                                                                                                                                                                        |
+| -------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hasura `where` tree (`_eq`, `_ilike`, `_and`, …)   | rejected | the zod side was typed, but the SQL translator worked on `Record<string, unknown>` and a string-keyed column map, so the types stopped where they mattered most                                            |
+| flat per-resource filters (`name`, `createdAfter`) | rejected | every new case is a new field plus a new SQL clause, and OR / NOT cannot be expressed                                                                                                                      |
+| **typed filter input per column kind**             | chosen   | `IdFilterInput`, `StringFilterInput`, `NumberFilterInput`, `DateFilterInput`, `BooleanFilterInput`, plus nestable `and` / `or` / `not`: a familiar model, fully inferred, and one translator for all kinds |
 
 AppSync's set is adapted: `between` is a validated `[from, to]` pair, `in` exists for every kind except boolean,
 `contains` / `notContains` / `beginsWith` are case-insensitive, and ids drop the string operators that make no sense
@@ -200,12 +228,17 @@ default sort, so the DAO only runs queries. `db/schema.ts` is a registry, `expor
 by the client as `{ schema }`. `drizzle.config.ts` points at `src/db/schemas/*.schema.ts`, because drizzle-kit finds
 tables from module exports, not inside an object.
 
-### The vocabulary is built with `create<Thing>Schema` builders, kept together
+### The vocabulary is built with `create<Thing>Schema` builders, kept in a helper
 
 `createFilterInputSchema({ column: scalarFilterInputSchema, … })`, `createSortInputSchema([...])` and
-`createListInputSchema({ filter, sort })` make every list piece read the same way in each resource schema, and all
-three live in `models/list-input.model.ts` with the scalar inputs, `SortInput` and the page-size limits.
-`models/dao.model.ts` keeps only the contract (`Dao`, `PaginatedResult`, `IdInput`), with no zod and no drizzle.
+`createListInputSchema({ filter, sort })` make every list piece read the same way in each resource schema. The three
+builders and the page-size limits live together in `helpers/list-input.helper.ts`, while `models/list-input.model.ts`
+keeps the scalar filter inputs, `sortDirectionSchema` and the inferred types. The split follows the suffix rule —
+`*.helper.ts` is functions, `*.model.ts` is shapes and types — and the helper imports the scalar schema type from the
+model (no cycle: the model never imports the helper). Keeping the builders out of the model also gives them a direct
+test (`tests/unit/list-input.helper.test.ts`) against an ad-hoc field config, instead of only being exercised through a
+resource's schema test. `models/dao.model.ts` keeps only the contract (`Dao`, `PaginatedResult`, `IdInput`), with no
+zod and no drizzle.
 
 ### The list input type is inferred from its schema
 
@@ -333,3 +366,48 @@ Styling is Tailwind utilities in the template plus a `host` class for host-eleme
 
 `styles.css` imports Tailwind's layers one by one. Preflight is on by default; with FD-NGX it is removed, because its
 reset clobbers FD-NGX's base styles, and `body` margin and font are set by hand.
+
+### Storybook runs on the Vite/Analog builder, not webpack
+
+Components (`components/`, `input()`/`output()`, store-free) are developed and documented in Storybook. The Angular
+webpack builder (`@storybook/angular`) would pull a second, webpack toolchain into a project that is deliberately
+esbuild/Vite (`@angular/build`). `@storybook/angular-vite` compiles Angular through `@analogjs/vite-plugin-angular` on
+Vite instead, so Storybook shares the app's toolchain (and the one the browser tests use). `zone.js` and
+`@angular/animations` come along as peers of the Storybook Angular tooling, not because the app uses them — the app is
+zoneless.
+
+### Web tests are three layers, and `web` is pinned to Vitest 4
+
+`ng test` (Vitest + jsdom, via the Angular builder) covers services, every slice and the helpers as `*.spec.ts` beside
+the file — the required `test` check. On top, **browser-mode** page tests (`pnpm test:browser`, Vitest browser mode +
+Playwright) render each page in real Chromium with a mocked store, and **full-stack e2e** (`pnpm test:e2e`, Playwright
+Test) drives the real app → API → Postgres. The jsdom layer is kept fast and Docker-free; the real browser and the
+backend only enter the two opt-in scripts.
+
+`web` is pinned to **Vitest 4** (`vitest`, `@vitest/browser`, `@vitest/browser-playwright` all pinned to the one exact
+version `4.1.12`, no caret — so the tightly-coupled browser-mode family cannot drift to different 4.x minors, the same
+reasoning as the exact TypeScript pin). Vitest 5's
+browser mode never injects its `@vitest/browser/context` virtual module here — the toolchain (Storybook, Analog,
+`@angular/build`, the API) resolves several `vitest@5` realms, so the `vitest` running the browser plugin and the
+`@vitest/browser` the test imports are different instances and `page` throws. `@angular/build` accepts
+`vitest ^4.0.8 || ^5.0.0`, so `ng test` is unaffected; the API, a separate package, stays on Vitest 5. Revisit when
+browser mode works on 5 in this workspace.
+
+### The web e2e is full-stack, not stubbed
+
+`pnpm test:e2e` starts the real app (`ng serve`), the real API (node) and real Postgres (compose), applies migrations
+and truncates, then drives CRUD through the browser, seeding setup data through the API `request` fixture. Stubbing the
+API with `page.route` was the first cut and dropped: the point of the e2e layer is the web↔API contract (the web
+mirrors the API types by hand), which a stub cannot catch. The cost is that `test:e2e` needs Docker and the root
+`.env`; the fast jsdom and browser-mode layers do not, so only this script depends on the backend.
+
+### Signal-input components are covered by Storybook + e2e, not browser-mode unit tests
+
+Analog's browser-mode compile emits empty `inputs`/`outputs` metadata for components that use signal `input()` /
+`output()` (a rendered component's `ɵcmp.inputs` is `[]`), so neither a parent template binding nor `setInput` can
+reach them in Vitest browser mode (`NG0303` / `NG0315`). AOT, JIT, split projects/processes and the
+`vitest-browser-angular` helper were all tried; none recovered the metadata. Rather than drop signal inputs (switching
+`ConfirmDialog` to `@Input()`/`@Output()` would make it browser-testable but abandons the component convention), such
+components are exercised in **Storybook** and through the **e2e** flow, and the browser-mode layer sticks to the pages
+(which read the store, not component inputs). The list page's browser spec therefore asserts rendering only; the delete
+flow through `ConfirmDialog` is an e2e test.
