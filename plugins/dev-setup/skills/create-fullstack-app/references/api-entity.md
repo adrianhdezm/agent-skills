@@ -14,13 +14,14 @@ real resource, and the template for every later one. The resource-agnostic piece
 - [`api/src/controllers/entity.controller.ts`](#apisrccontrollersentitycontrollerts)
 - [Test layout](#test-layout)
 - [`api/tests/utils/`](#apitestsutils)
-- [`api/tests/controllers/entity.controller.test.ts`](#apitestscontrollersentitycontrollertestts)
-- [`api/tests/controllers/home.controller.test.ts`](#apitestscontrollershomecontrollertestts)
-- [`api/tests/controllers/health.controller.test.ts`](#apitestscontrollershealthcontrollertestts)
-- [`api/tests/controllers/error.middleware.test.ts`](#apitestscontrollerserrormiddlewaretestts)
+- [`api/tests/unit/controllers/entity.controller.test.ts`](#apitestsunitcontrollersentitycontrollertestts)
+- [`api/tests/unit/controllers/home.controller.test.ts`](#apitestsunitcontrollershomecontrollertestts)
+- [`api/tests/unit/controllers/health.controller.test.ts`](#apitestsunitcontrollershealthcontrollertestts)
+- [`api/tests/unit/middlewares/error.middleware.test.ts`](#apitestsunitmiddlewareserrormiddlewaretestts)
+- [`api/tests/unit/middlewares/not-found.middleware.test.ts`](#apitestsunitmiddlewaresnot-foundmiddlewaretestts)
+- [`api/tests/unit/db/schemas/entity.schema.test.ts`](#apitestsunitdbschemasentityschematestts)
 - [`api/tests/db/entity.dao.test.ts`](#apitestsdbentitydaotestts)
 - [`api/tests/api/entity.api.test.ts`](#apitestsapientityapitestts)
-- [`api/tests/unit/entity.schema.test.ts`](#apitestsunitentityschematestts)
 - [Adding another resource](#adding-another-resource)
 
 ## `api/src/db/schemas/entity.schema.ts`
@@ -360,90 +361,115 @@ export async function deleteEntity(req: Request, res: Response, next: NextFuncti
 
 ## Test layout
 
-Tests are grouped by kind, not mirrored against `src/` (full rules in `coding-conventions.md`):
-
 | folder | what it tests | DAO / DB | project, script |
 | --- | --- | --- | --- |
-| `tests/unit/` | helpers and schemas: `dao.helper`, `list-input.helper`, `query-parser.helper`, `entity.schema` | none | `unit`, `pnpm test` |
-| `tests/controllers/` | **controller unit tests**: one file per controller plus `error.middleware.test.ts` — validation, status codes, error mapping, response shape | fake DAO | `controllers`, `pnpm test` |
+| `tests/unit/` | **unit tests, mirroring `src/`**: `helpers/`, `db/schemas/`, `controllers/` and `middlewares/`. A handler is a plain function, called directly with a mock `req` (its context on `req.app.locals`), a spy `res` and a spy `next` | stub DAO | `unit`, `pnpm test` |
 | `tests/db/` | the DAO itself: one `<resource>.dao.test.ts`, every query path | real DAO, Testcontainers Postgres | `db`, `pnpm test:integration` |
-| `tests/api/` | **API tests, end to end**: one `<resource>.api.test.ts`, real HTTP → controller → DAO → Postgres | real DAO, Testcontainers Postgres | `api`, `pnpm test:integration` |
+| `tests/api/` | **API tests, end to end**: one `<resource>.api.test.ts`, real HTTP → `createApp` → controller → DAO → Postgres | real DAO, Testcontainers Postgres | `api`, `pnpm test:integration` |
 | `tests/utils/` | shared helpers, not tests | — | — |
 
-A controller test proves what the controller does with whatever the DAO returns; it cannot prove the real DAO accepts
-what the controller sends or returns what the controller serializes. The API test closes that gap per resource, and the
-DAO test covers every query path without HTTP in between.
+A unit test checks one function: what a controller does with the input and with whatever the stub DAO returns, or
+what a middleware does with an error. Nothing is served, so it cannot see what `app.ts` adds around the handlers —
+`express.json()` (malformed or oversize bodies), the route table, the not-found → error-handler chain — and it cannot
+prove the real DAO accepts what the controller sends. The API test covers exactly that, per resource; the DAO test
+covers every query path without HTTP in between.
 
 Each test file wraps its suites in one top-level `describe` named for the file's module (`describe('entity.controller')`,
-`describe('entity.dao')`, `describe('entity.api')`, …). `vitest.config.ts` defines four projects (`unit`,
-`controllers`, `db`, `api`); `pnpm --filter api test` runs `unit` + `controllers` (no Docker), and
+`describe('error.middleware')`, `describe('entity.dao')`, `describe('entity.api')`, …). `vitest.config.ts` defines
+three projects (`unit`, `db`, `api`); `pnpm --filter api test` runs `unit` (no Docker), and
 `pnpm --filter api test:integration` runs `db` + `api`.
 
 ## `api/tests/utils/`
 
-Shared test helpers, not tests themselves. The `controllers` suites use `test-server.ts` + `fake-dao.ts`; the `db`
-suite uses `pg-container.ts` + `entity-seed.ts`; the `api` suite uses `pg-container.ts`, `entity-seed.ts` and
-`test-server.ts`'s `serve`.
+Shared test helpers, not tests themselves. The `unit` controller and middleware tests use `http-mocks.ts`; the `db`
+suite uses `pg-container.ts` + `entity-seed.ts`; the `api` suite uses those two plus `test-server.ts`.
 
-### `api/tests/utils/fake-dao.ts`
+### `api/tests/utils/http-mocks.ts`
 
-A vitest mock standing in for `EntityDao`, a minimal `db` stub for the health probe, and `createTestApp`, which builds an
-app whose context carries both and returns them so tests can program and assert on them.
+The stand-ins a handler is called with. `createStubContext` gives one `vi.fn()` per DAO method plus the db's
+`execute`, and the `AppContext` built from them; `mockRequest` puts that context on `req.app.locals` (where the
+handlers read it) with the given `params` / `query` / `body`; `mockResponse` makes `status` / `json` / `send`
+chainable spies; `mockNext` is a spy `next`; `httpError(status)` matches the `http-errors` error a handler forwarded.
+`mockLog` replaces pino-http's `req.log`, so the error-handler test can assert the log level. The response and log
+spies are plain properties, not methods, so `expect(res.json)` passes the `unbound-method` lint rule.
 
 ```ts
-import { vi } from 'vitest';
-import { createApp } from '../../src/app.js';
+import type { NextFunction, Request, Response } from 'express';
+import { expect, type Mock, vi } from 'vitest';
 import type { EntityDao } from '../../src/daos/entity.dao.js';
 import type { DbClient } from '../../src/db/client.js';
 import type { AppContext } from '../../src/models/app-context.model.js';
 
-/** A vitest mock standing in for an EntityDao — one vi.fn() per Dao method. */
-export function createFakeDao() {
+/** One stub per Dao method plus the db's `execute`, and the AppContext the handlers read them from. */
+export function createStubContext() {
+  const entityDao = { get: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() };
+  const db = { execute: vi.fn().mockResolvedValue(undefined) };
+  const context: AppContext = { db: db as unknown as DbClient, entityDao: entityDao as unknown as EntityDao };
+  return { context, entityDao, db };
+}
+
+/** Spies standing in for pino-http's `req.log`. */
+export function mockLog() {
+  return { warn: vi.fn(), error: vi.fn() };
+}
+
+export interface MockRequestInit {
+  context?: AppContext;
+  log?: ReturnType<typeof mockLog>;
+  params?: Record<string, string>;
+  query?: Record<string, string | string[]>;
+  body?: unknown;
+  method?: string;
+  originalUrl?: string;
+}
+
+/** The parts of an Express request the handlers touch: the context on `app.locals`, the parsed inputs and `log`. */
+export function mockRequest(init: MockRequestInit = {}): Request {
+  const { context, log, ...rest } = init;
   return {
-    get: vi.fn(),
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn()
-  };
+    params: {},
+    query: {},
+    method: 'GET',
+    originalUrl: '/',
+    ...rest,
+    app: { locals: { context: context ?? createStubContext().context } },
+    log: log ?? mockLog()
+  } as unknown as Request;
 }
 
-/** A minimal stub of the drizzle client: only `execute`, used by the health probe. */
-export function createFakeDb() {
-  return { execute: vi.fn().mockResolvedValue(undefined) };
+export type MockResponse = Omit<Response, 'status' | 'json' | 'send'> & { status: Mock; json: Mock; send: Mock };
+
+/** A response whose `status` / `json` / `send` are chainable spies. */
+export function mockResponse(init: { headersSent?: boolean } = {}): MockResponse {
+  const res = { headersSent: init.headersSent ?? false, status: vi.fn(), json: vi.fn(), send: vi.fn() };
+  res.status.mockReturnValue(res);
+  res.json.mockReturnValue(res);
+  res.send.mockReturnValue(res);
+  return res as unknown as MockResponse;
 }
 
-export type FakeDao = ReturnType<typeof createFakeDao>;
-export type FakeDb = ReturnType<typeof createFakeDb>;
+/** A spy `next`, typed so it can be passed where Express expects a `NextFunction`. */
+export function mockNext(): Mock<(err?: unknown) => void> & NextFunction {
+  return vi.fn<NextFunction>() as Mock<(err?: unknown) => void> & NextFunction;
+}
 
-/** Build an app whose context carries a fake DAO and db, returning both so tests can program and assert on them. */
-export function createTestApp(): { app: ReturnType<typeof createApp>; dao: FakeDao; db: FakeDb } {
-  const dao = createFakeDao();
-  const db = createFakeDb();
-  const context: AppContext = { db: db as unknown as DbClient, entityDao: dao as unknown as EntityDao };
-  return { app: createApp(context), dao, db };
+/** Matches the `http-errors` error a handler forwarded to `next`, by status. */
+export function httpError(status: number): unknown {
+  return expect.objectContaining({ status }) as unknown;
 }
 ```
 
 ### `api/tests/utils/test-server.ts`
 
-Starts an app on an ephemeral port and hands back its base URL. `startTestServer` serves the app with the fake DAO and
-db, so each controller test is a few lines of `fetch`; `serve` takes any app, which is how the API test serves the real
-one.
+Serves an app on an ephemeral port and hands back its base URL, for the API tests.
 
 ```ts
 import { createServer, type RequestListener, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createTestApp, type FakeDao, type FakeDb } from './fake-dao.js';
 
 export interface ServedApp {
   readonly baseUrl: string;
   readonly close: () => Promise<void>;
-}
-
-export interface TestServer extends ServedApp {
-  readonly dao: FakeDao;
-  readonly db: FakeDb;
 }
 
 /** Serve an app on an ephemeral port and hand back its base URL. */
@@ -455,12 +481,6 @@ export async function serve(app: RequestListener): Promise<ServedApp> {
     baseUrl: `http://127.0.0.1:${port}`,
     close: () => new Promise<void>((resolve) => server.close(() => resolve()))
   };
-}
-
-/** Start the app (with a fake DAO + db) on an ephemeral port and hand back its base URL and mocks. */
-export async function startTestServer(): Promise<TestServer> {
-  const { app, dao, db } = createTestApp();
-  return { ...(await serve(app)), dao, db };
 }
 ```
 
@@ -545,420 +565,475 @@ export function seedCanonical(db: DbClient): Promise<Entity[]> {
 }
 ```
 
-## `api/tests/controllers/entity.controller.test.ts`
+## `api/tests/unit/controllers/entity.controller.test.ts`
 
-Runs the real app from `createApp` on a random port, with a fake DAO on the context (via `startTestServer`). This is what
-the context singleton buys: no database, no module mocking. Uses `fetch`, not `supertest`, and asserts status **and**
-response body for each route, plus the 400/404 cases — including the body-parser edges (malformed JSON → 400, an
-over-the-limit body → 413), the `PATCH` validation refine (no updatable fields → 400) and an invalid field → 400, the
-DAO's `NotFoundError` → 404 on **both** update and delete, and repeated query params collapsing to the first value.
+Every handler called as a function. Each case builds a stub context, programs the DAO stub, calls the handler with
+`mockRequest` / `mockResponse` / `mockNext`, and asserts either the response (`res.status`, `res.json`, `res.send`) or
+the `http-errors` error passed to `next`, plus what the DAO received. Covered: the list input decoded from the query
+(numbers, the `ASC` default, the first value of a repeated param) and each rejected query (bad JSON, an unknown param,
+a non-numeric page, a sort field outside the allowlist, a pageSize over the max, an operator the field does not take);
+an unexpected DAO error forwarded unchanged; `get` (row, 404 on `null`, 400 on a non-uuid id); `create` (201 + row,
+400 for an empty or over-long name or no body); `update` (the id inside the input, 400 for no updatable field, an
+invalid field or a non-uuid id, the DAO's `NotFoundError` → 404); `delete` (204 with no body, `NotFoundError` → 404).
+Every 400 also asserts the DAO was never called.
 
 ```ts
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NotFoundError } from '../../src/models/error.model.js';
-import { startTestServer, type TestServer } from '../utils/test-server.js';
+import { describe, expect, it } from 'vitest';
+import { createEntity, deleteEntity, getEntity, listEntities, updateEntity } from '../../../src/controllers/entity.controller.js';
+import { NotFoundError } from '../../../src/models/error.model.js';
+import { createStubContext, httpError, mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
 
 const ID = '00000000-0000-4000-8000-000000000001';
-
-let srv: TestServer;
-
-beforeEach(async () => {
-  srv = await startTestServer();
-});
-
-afterEach(async () => {
-  await srv.close();
-});
+const row = { id: ID, name: 'Acme', description: null, createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') };
 
 describe('entity.controller', () => {
-  describe('GET /entities', () => {
-    it('passes the parsed list input to the DAO and returns its paginated result', async () => {
+  describe('listEntities', () => {
+    it('passes the decoded list input to the DAO and responds with its result', async () => {
       // Arrange
-      const result = { items: [{ id: ID, name: 'a' }], total: 1, page: 2, pageSize: 5, totalPages: 1 };
-      srv.dao.list.mockResolvedValue(result);
-      const filter = encodeURIComponent(JSON.stringify({ name: { contains: 'a' } }));
+      const { context, entityDao } = createStubContext();
+      const result = { items: [row], total: 1, page: 2, pageSize: 5, totalPages: 1 };
+      entityDao.list.mockResolvedValue(result);
+      const req = mockRequest({
+        context,
+        query: { filter: JSON.stringify({ name: { contains: 'a' } }), sortField: 'name', sortDirection: 'DESC', page: '2', pageSize: '5' }
+      });
+      const res = mockResponse();
+      const next = mockNext();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities?filter=${filter}&sortField=name&sortDirection=DESC&page=2&pageSize=5`);
+      await listEntities(req, res, next);
 
       // Assert
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual(result);
-      expect(srv.dao.list).toHaveBeenCalledWith({
+      expect(entityDao.list).toHaveBeenCalledWith({
         filter: { name: { contains: 'a' } },
         sort: { field: 'name', direction: 'DESC' },
         page: 2,
         pageSize: 5
       });
+      expect(res.json).toHaveBeenCalledWith(result);
+      expect(next).not.toHaveBeenCalled();
     });
 
-    it('decodes the URL params: numbers, and ASC when only a sort field is given', async () => {
+    it('decodes numbers, defaults the direction to ASC and keeps the first value of a repeated param', async () => {
       // Arrange
-      srv.dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 10, totalPages: 0 });
+      const { context, entityDao } = createStubContext();
+      entityDao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 10, totalPages: 0 });
+      const req = mockRequest({ context, query: { sortField: 'createdAt', page: ['3', '9'], pageSize: '10' } });
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities?sortField=createdAt&page=3&pageSize=10`);
+      await listEntities(req, mockResponse(), mockNext());
 
       // Assert
-      expect(res.status).toBe(200);
-      expect(srv.dao.list).toHaveBeenCalledWith({ sort: { field: 'createdAt', direction: 'ASC' }, page: 3, pageSize: 10 });
-    });
-
-    it('keeps the first value of a repeated param', async () => {
-      // Arrange
-      srv.dao.list.mockResolvedValue({ items: [], total: 0, page: 3, pageSize: 20, totalPages: 0 });
-
-      // Act
-      const res = await fetch(`${srv.baseUrl}/entities?page=3&page=9`);
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(srv.dao.list).toHaveBeenCalledWith({ page: 3, pageSize: 20 });
+      expect(entityDao.list).toHaveBeenCalledWith({ sort: { field: 'createdAt', direction: 'ASC' }, page: 3, pageSize: 10 });
     });
 
     it.each([
-      ['a filter that is not JSON', 'filter=%7B'],
-      ['an unknown param', 'nme=a'],
-      ['a page that is not a number', 'page=abc'],
-      ['a sort field outside the allowlist', 'sortField=description'],
-      ['a pageSize over the max', 'pageSize=101']
-    ])('rejects %s with 400 without reaching the DAO', async (_label, query) => {
+      ['a filter that is not JSON', { filter: '{' }],
+      ['an unknown param', { nme: 'a' }],
+      ['a page that is not a number', { page: 'abc' }],
+      ['a sort field outside the allowlist', { sortField: 'description' }],
+      ['a pageSize over the max', { pageSize: '101' }],
+      ['an operator the field does not take', { filter: JSON.stringify({ name: { gt: 1 } }) }]
+    ])('forwards a 400 for %s without reaching the DAO', async (_label, query) => {
+      // Arrange
+      const { context, entityDao } = createStubContext();
+      const res = mockResponse();
+      const next = mockNext();
+
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities?${query}`);
+      await listEntities(mockRequest({ context, query }), res, next);
 
       // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.list).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(httpError(400));
+      expect(entityDao.list).not.toHaveBeenCalled();
+      expect(res.json).not.toHaveBeenCalled();
     });
 
-    it('rejects a malformed filter with 400 without reaching the DAO', async () => {
+    it('forwards an unexpected DAO error unchanged', async () => {
+      // Arrange
+      const { context, entityDao } = createStubContext();
+      const failure = new Error('connection lost');
+      entityDao.list.mockRejectedValue(failure);
+      const next = mockNext();
+
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities?filter=${encodeURIComponent('{"name":{"gt":1}}')}`);
+      await listEntities(mockRequest({ context }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.list).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(failure);
     });
   });
 
-  describe('POST /entities', () => {
-    it('creates from a valid body and returns 201 with the created row', async () => {
+  describe('getEntity', () => {
+    it('responds with the row', async () => {
       // Arrange
-      const created = { id: ID, name: 'first', description: null };
-      srv.dao.create.mockResolvedValue(created);
+      const { context, entityDao } = createStubContext();
+      entityDao.get.mockResolvedValue(row);
+      const res = mockResponse();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'first' })
-      });
+      await getEntity(mockRequest({ context, params: { id: ID } }), res, mockNext());
 
       // Assert
-      expect(res.status).toBe(201);
-      expect(await res.json()).toEqual(created);
-      expect(srv.dao.create).toHaveBeenCalledWith({ name: 'first' });
+      expect(entityDao.get).toHaveBeenCalledWith({ id: ID });
+      expect(res.json).toHaveBeenCalledWith(row);
     });
 
-    it('rejects an empty name with 400', async () => {
+    it('forwards a 404 when the DAO finds no row', async () => {
+      // Arrange
+      const { context, entityDao } = createStubContext();
+      entityDao.get.mockResolvedValue(null);
+      const next = mockNext();
+
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: '' })
-      });
+      await getEntity(mockRequest({ context, params: { id: ID } }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.create).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(httpError(404));
     });
 
-    it('rejects a malformed JSON body with 400 without reaching the DAO', async () => {
-      // Act: the JSON body parser fails before the controller runs.
-      const res = await fetch(`${srv.baseUrl}/entities`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{'
-      });
+    it('forwards a 400 for an id that is not a uuid, without reaching the DAO', async () => {
+      // Arrange
+      const { context, entityDao } = createStubContext();
+      const next = mockNext();
+
+      // Act
+      await getEntity(mockRequest({ context, params: { id: 'nope' } }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.create).not.toHaveBeenCalled();
-    });
-
-    it('rejects a body over the size limit with 413 without reaching the DAO', async () => {
-      // Act: express.json()'s default 100kb limit rejects the request before the controller runs.
-      const res = await fetch(`${srv.baseUrl}/entities`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'x'.repeat(200 * 1024) })
-      });
-
-      // Assert
-      expect(res.status).toBe(413);
-      expect(srv.dao.create).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(httpError(400));
+      expect(entityDao.get).not.toHaveBeenCalled();
     });
   });
 
-  describe('/entities/:id', () => {
-    it('returns 200 with the row on GET', async () => {
+  describe('createEntity', () => {
+    it('creates from a valid body and responds 201 with the row', async () => {
       // Arrange
-      const row = { id: ID, name: 'found', description: null };
-      srv.dao.get.mockResolvedValue(row);
+      const { context, entityDao } = createStubContext();
+      entityDao.create.mockResolvedValue(row);
+      const res = mockResponse();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+      await createEntity(mockRequest({ context, body: { name: 'Acme', description: null } }), res, mockNext());
 
       // Assert
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual(row);
-      expect(srv.dao.get).toHaveBeenCalledWith({ id: ID });
+      expect(entityDao.create).toHaveBeenCalledWith({ name: 'Acme', description: null });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(row);
     });
 
-    it('returns 404 when GET finds no row', async () => {
+    it.each([
+      ['an empty name', { name: '' }],
+      ['a name over 200 characters', { name: 'x'.repeat(201) }],
+      ['no body', undefined]
+    ])('forwards a 400 for %s without reaching the DAO', async (_label, body) => {
       // Arrange
-      srv.dao.get.mockResolvedValue(null);
+      const { context, entityDao } = createStubContext();
+      const next = mockNext();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+      await createEntity(mockRequest({ context, body }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(404);
+      expect(next).toHaveBeenCalledWith(httpError(400));
+      expect(entityDao.create).not.toHaveBeenCalled();
     });
+  });
 
-    it('returns 200 with the updated row on PATCH', async () => {
+  describe('updateEntity', () => {
+    it('passes the id inside the input and responds with the updated row', async () => {
       // Arrange
-      const updated = { id: ID, name: 'renamed', description: null };
-      srv.dao.update.mockResolvedValue(updated);
+      const { context, entityDao } = createStubContext();
+      entityDao.update.mockResolvedValue({ ...row, name: 'Renamed' });
+      const res = mockResponse();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'renamed' })
-      });
+      await updateEntity(mockRequest({ context, params: { id: ID }, body: { name: 'Renamed' } }), res, mockNext());
 
       // Assert
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual(updated);
-      expect(srv.dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
+      expect(entityDao.update).toHaveBeenCalledWith({ id: ID, name: 'Renamed' });
+      expect(res.json).toHaveBeenCalledWith({ ...row, name: 'Renamed' });
     });
 
-    it('rejects a PATCH with no updatable fields with 400 without reaching the DAO', async () => {
-      // Act: the update schema's refine requires at least one field besides id.
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({})
-      });
-
-      // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.update).not.toHaveBeenCalled();
-    });
-
-    it('rejects a PATCH with an invalid field with 400 without reaching the DAO', async () => {
-      // Act: name exceeds its 200-character limit.
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'x'.repeat(201) })
-      });
-
-      // Assert
-      expect(res.status).toBe(400);
-      expect(srv.dao.update).not.toHaveBeenCalled();
-    });
-
-    it('rejects an id that is not a uuid with 400', async () => {
-      // Act
-      const res = await fetch(`${srv.baseUrl}/entities/not-a-uuid`);
-
-      // Assert
-      expect(res.status).toBe(400);
-    });
-
-    it('maps NotFoundError from the DAO to 404', async () => {
+    it.each([
+      ['no updatable fields', { id: ID }, {}],
+      ['an invalid field', { id: ID }, { name: 'x'.repeat(201) }],
+      ['an id that is not a uuid', { id: 'nope' }, { name: 'Renamed' }]
+    ])('forwards a 400 for %s without reaching the DAO', async (_label, params, body) => {
       // Arrange
-      srv.dao.update.mockRejectedValue(new NotFoundError('Entity', ID));
+      const { context, entityDao } = createStubContext();
+      const next = mockNext();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'renamed' })
-      });
+      await updateEntity(mockRequest({ context, params, body }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(404);
-      expect(srv.dao.update).toHaveBeenCalledWith({ id: ID, name: 'renamed' });
+      expect(next).toHaveBeenCalledWith(httpError(400));
+      expect(entityDao.update).not.toHaveBeenCalled();
     });
 
-    it('maps NotFoundError from the DAO to 404 on delete', async () => {
+    it("maps the DAO's NotFoundError to a 404", async () => {
       // Arrange
-      srv.dao.delete.mockRejectedValue(new NotFoundError('Entity', ID));
+      const { context, entityDao } = createStubContext();
+      entityDao.update.mockRejectedValue(new NotFoundError('Entity', ID));
+      const next = mockNext();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, { method: 'DELETE' });
+      await updateEntity(mockRequest({ context, params: { id: ID }, body: { name: 'Renamed' } }), mockResponse(), next);
 
       // Assert
-      expect(res.status).toBe(404);
-      expect(srv.dao.delete).toHaveBeenCalledWith({ id: ID });
+      expect(next).toHaveBeenCalledWith(httpError(404));
+    });
+  });
+
+  describe('deleteEntity', () => {
+    it('deletes by id and responds 204 with no body', async () => {
+      // Arrange
+      const { context, entityDao } = createStubContext();
+      entityDao.delete.mockResolvedValue(undefined);
+      const res = mockResponse();
+
+      // Act
+      await deleteEntity(mockRequest({ context, params: { id: ID } }), res, mockNext());
+
+      // Assert
+      expect(entityDao.delete).toHaveBeenCalledWith({ id: ID });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.send).toHaveBeenCalledWith();
     });
 
-    it('returns 204 with an empty body on delete', async () => {
+    it("maps the DAO's NotFoundError to a 404", async () => {
       // Arrange
-      srv.dao.delete.mockResolvedValue(undefined);
+      const { context, entityDao } = createStubContext();
+      entityDao.delete.mockRejectedValue(new NotFoundError('Entity', ID));
+      const res = mockResponse();
+      const next = mockNext();
 
       // Act
-      const res = await fetch(`${srv.baseUrl}/entities/${ID}`, { method: 'DELETE' });
+      await deleteEntity(mockRequest({ context, params: { id: ID } }), res, next);
 
       // Assert
-      expect(res.status).toBe(204);
-      expect(await res.text()).toBe('');
-      expect(srv.dao.delete).toHaveBeenCalledWith({ id: ID });
+      expect(next).toHaveBeenCalledWith(httpError(404));
+      expect(res.status).not.toHaveBeenCalled();
     });
   });
 });
 ```
 
-## `api/tests/controllers/home.controller.test.ts`
-
-One file per controller: the home descriptor, and the unmatched-path 404 (the not-found middleware's job, exercised at
-the app edge).
+## `api/tests/unit/controllers/home.controller.test.ts`
 
 ```ts
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { startTestServer, type TestServer } from '../utils/test-server.js';
-
-let srv: TestServer;
-
-beforeEach(async () => {
-  srv = await startTestServer();
-});
-
-afterEach(async () => {
-  await srv.close();
-});
+import { describe, expect, it } from 'vitest';
+import { getHome } from '../../../src/controllers/home.controller.js';
+import { mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
 
 describe('home.controller', () => {
-  it('returns the service descriptor on GET /', async () => {
+  it('responds with the service descriptor', async () => {
+    // Arrange
+    const res = mockResponse();
+    const next = mockNext();
+
     // Act
-    const res = await fetch(`${srv.baseUrl}/`);
+    await getHome(mockRequest(), res, next);
 
     // Assert
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ service: 'api', status: 'running' });
-  });
-
-  it('returns 404 for an unmatched path', async () => {
-    // Act
-    const res = await fetch(`${srv.baseUrl}/nope`);
-
-    // Assert
-    expect(res.status).toBe(404);
+    expect(res.json).toHaveBeenCalledWith({ service: 'api', status: 'running' });
+    expect(next).not.toHaveBeenCalled();
   });
 });
 ```
 
-## `api/tests/controllers/health.controller.test.ts`
+## `api/tests/unit/controllers/health.controller.test.ts`
 
-The health probe both ways: `ok` when the db stub resolves, `503` when it rejects.
+The probe's two outcomes: `ok` with a numeric latency when `db.execute` resolves, and an exposed 503 carrying the
+original error as its `cause` when it rejects.
 
 ```ts
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { startTestServer, type TestServer } from '../utils/test-server.js';
-
-let srv: TestServer;
-
-beforeEach(async () => {
-  srv = await startTestServer();
-});
-
-afterEach(async () => {
-  await srv.close();
-});
+import { describe, expect, it } from 'vitest';
+import { getHealth } from '../../../src/controllers/health.controller.js';
+import { createStubContext, httpError, mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
 
 describe('health.controller', () => {
-  it('reports ok when the database responds', async () => {
+  it('reports ok with the probe latency when the database answers', async () => {
+    // Arrange
+    const { context, db } = createStubContext();
+    const res = mockResponse();
+
     // Act
-    const res = await fetch(`${srv.baseUrl}/health`);
+    await getHealth(mockRequest({ context }), res, mockNext());
 
     // Assert
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ status: 'ok', db: 'up' });
-    expect(srv.db.execute).toHaveBeenCalledOnce();
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    const [[body]] = res.json.mock.calls as [[{ status: string; db: string; latencyMs: unknown; timestamp: unknown }]];
+    expect(body).toMatchObject({ status: 'ok', db: 'up' });
+    expect(typeof body.latencyMs).toBe('number');
+    expect(typeof body.timestamp).toBe('string');
   });
 
-  it('reports 503 when the database query fails', async () => {
+  it('forwards an exposed 503 when the database query fails', async () => {
     // Arrange
-    srv.db.execute.mockRejectedValue(new Error('down'));
+    const { context, db } = createStubContext();
+    const failure = new Error('connection refused');
+    db.execute.mockRejectedValue(failure);
+    const res = mockResponse();
+    const next = mockNext();
 
     // Act
-    const res = await fetch(`${srv.baseUrl}/health`);
+    await getHealth(mockRequest({ context }), res, next);
 
     // Assert
-    expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({ status: 'error' });
+    expect(next).toHaveBeenCalledWith(httpError(503));
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ expose: true, cause: failure });
+    expect(res.json).not.toHaveBeenCalled();
   });
 });
 ```
 
-## `api/tests/controllers/error.middleware.test.ts`
+## `api/tests/unit/middlewares/error.middleware.test.ts`
 
-Exercises the terminal error handler through the real app (fake DAO). The key guarantee is that an **unexpected** error
-(a non-`http-error`) becomes a `500` whose body does **not** leak the original message — only `4xx` errors created with
-`createError(..., { expose: true })` surface their message. Also pins the uniform body shape `{ status, message }`
-returned at every status.
+The terminal handler called directly: an exposed 4xx keeps its message and logs at `warn`; an unexpected error becomes
+a 500 whose body hides the original message and logs at `error`; an unexposed http error hides its message too; and
+an error after the headers went out is handed on to Express's `next`.
 
 ```ts
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { startTestServer, type TestServer } from '../utils/test-server.js';
-
-const ID = '00000000-0000-4000-8000-000000000001';
-
-let srv: TestServer;
-
-beforeEach(async () => {
-  srv = await startTestServer();
-});
-
-afterEach(async () => {
-  await srv.close();
-});
+import createError from 'http-errors';
+import { describe, expect, it } from 'vitest';
+import { errorHandler } from '../../../src/middlewares/error.middleware.js';
+import { mockLog, mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
 
 describe('error.middleware', () => {
-  it('maps an unexpected error to 500 without leaking the internal message', async () => {
-    // Arrange: a non-HTTP error from deep in the stack.
-    srv.dao.get.mockRejectedValue(new Error('secret db detail'));
-
-    // Act
-    const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
-
-    // Assert: the status is 500 and the body hides the original message.
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ status: 'error', message: 'Internal Server Error' });
-  });
-
-  it('exposes the message of a client (4xx) error in the standard body shape', async () => {
-    // Act: an invalid uuid produces a 400 from the controller.
-    const res = await fetch(`${srv.baseUrl}/entities/not-a-uuid`);
-
-    // Assert
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ status: 'error', message: 'Invalid id' });
-  });
-
-  it('returns the standard body shape on a 404', async () => {
+  it('answers an exposed client error with its status and message, logged at warn', () => {
     // Arrange
-    srv.dao.get.mockResolvedValue(null);
+    const log = mockLog();
+    const req = mockRequest({ log });
+    const res = mockResponse();
+    const err = createError(400, 'Invalid body', { expose: true });
 
     // Act
-    const res = await fetch(`${srv.baseUrl}/entities/${ID}`);
+    errorHandler(err, req, res, mockNext());
 
     // Assert
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ status: 'error', message: `Entity not found: ${ID}` });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ status: 'error', message: 'Invalid body' });
+    expect(log.warn).toHaveBeenCalledWith({ err }, expect.any(String));
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('answers an unexpected error with 500 without leaking its message, logged at error', () => {
+    // Arrange
+    const log = mockLog();
+    const req = mockRequest({ log });
+    const res = mockResponse();
+    const err = new Error('password=hunter2 in a stack trace');
+
+    // Act
+    errorHandler(err, req, res, mockNext());
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ status: 'error', message: 'Internal Server Error' });
+    expect(log.error).toHaveBeenCalledWith({ err }, expect.any(String));
+  });
+
+  it('hides the message of an http error that is not exposed', () => {
+    // Arrange
+    const res = mockResponse();
+
+    // Act
+    errorHandler(createError(503, 'db host 10.0.0.5 unreachable', { expose: false }), mockRequest(), res, mockNext());
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({ status: 'error', message: 'Internal Server Error' });
+  });
+
+  it('hands the error on to Express when the response has already started', () => {
+    // Arrange
+    const res = mockResponse({ headersSent: true });
+    const next = mockNext();
+    const err = new Error('late failure');
+
+    // Act
+    errorHandler(err, mockRequest(), res, next);
+
+    // Assert
+    expect(next).toHaveBeenCalledWith(err);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+```
+
+## `api/tests/unit/middlewares/not-found.middleware.test.ts`
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { notFoundHandler } from '../../../src/middlewares/not-found.middleware.js';
+import { httpError, mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
+
+describe('not-found.middleware', () => {
+  it('forwards a 404 naming the method and path', () => {
+    // Arrange
+    const next = mockNext();
+
+    // Act
+    notFoundHandler(mockRequest({ method: 'POST', originalUrl: '/nope?x=1' }), mockResponse(), next);
+
+    // Assert
+    expect(next).toHaveBeenCalledWith(httpError(404));
+    expect(next.mock.calls[0]?.[0]).toHaveProperty('message', 'Not Found: POST /nope?x=1');
+  });
+});
+```
+
+## `api/tests/unit/db/schemas/entity.schema.test.ts`
+
+Covers only the entity's own column/sort wiring on `listEntityInputSchema` — a nested filter over the real columns with
+date coercion, and the rejections specific to this resource (a column the entity lacks, a bad uuid, a sort field outside
+its allowlist). The generic builder behaviour (defaults, strictness, the logical-branch cap) is covered once in
+`tests/unit/helpers/list-input.helper.test.ts` ([api-dao.md](api-dao.md)), so it is not repeated here. No URL strings appear;
+the controller test covers decoding.
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { listEntityInputSchema } from '../../../../src/db/schemas/entity.schema.js';
+
+describe('entity.schema', () => {
+  it('accepts a nested filter over the entity columns and coerces date strings', () => {
+    // Arrange
+    const raw = {
+      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }] },
+      sort: { field: 'name', direction: 'DESC' },
+      page: 2,
+      pageSize: 5
+    };
+
+    // Act
+    const input = listEntityInputSchema.parse(raw);
+
+    // Assert
+    expect(input).toEqual({
+      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: new Date('2026-01-01T00:00:00Z') } }] },
+      sort: { field: 'name', direction: 'DESC' },
+      page: 2,
+      pageSize: 5
+    });
+  });
+
+  it('accepts a date-only value in a date filter', () => {
+    // Act
+    const input = listEntityInputSchema.parse({ filter: { createdAt: { ge: '2026-01-01' } } });
+
+    // Assert
+    expect(input.filter).toEqual({ createdAt: { ge: new Date('2026-01-01') } });
+  });
+
+  it.each([
+    ['a filter field the entity does not have', { filter: { title: { eq: 'a' } } }],
+    ['an invalid uuid for the id column', { filter: { id: { eq: 'nope' } } }],
+    ['a sort field outside the entity allowlist', { sort: { field: 'description', direction: 'ASC' } }]
+  ])('rejects %s', (_label, raw) => {
+    // Act + Assert
+    expect(listEntityInputSchema.safeParse(raw).success).toBe(false);
   });
 });
 ```
@@ -970,7 +1045,7 @@ Exercises the real DAO against a throwaway `postgres:17-alpine` (via `startTestD
 clears rows (a delete) so each test is isolated. `create` / `get` / `update` / `delete` cover the happy path and the edge
 cases (`NotFoundError` on a missing id, null description, a partial patch leaving omitted fields untouched vs. clearing a
 field with `null`); `list` is exhaustive — pagination, sort (with the `id`
-tie-breaker and the default sort), filter (every operator kind possible on the entity's columns, a second string and a
+tie-breaker and the default sort), filter (most operators the entity's columns take — strings `eq ne lt between in contains notContains beginsWith`, dates `eq between ge le lt`, ids `eq in` — a second string and a
 second date column, `and` / `or` / `not`, empty `in`), the three combined, and a dedicated
 `list: filter escaping and injection safety` block proving `escapeLike` treats `%` / `_` as literals and that a hostile
 value is parameterized, not executed.
@@ -1308,18 +1383,22 @@ describe('entity.dao', () => {
 
 ## `api/tests/api/entity.api.test.ts`
 
-The resource's API, end to end: the real app served by `serve` on the real `EntityDao` and a Testcontainers Postgres,
-driven over `fetch`, with no fake. Where the controller test programs the DAO's answers, this one gets them from real
-rows, so it covers what only the real stack can show:
+The resource's API, end to end: the real app from `createApp`, served by `serve` on the real `EntityDao` and a
+Testcontainers Postgres, driven over `fetch`, with no stub. Where the unit tests program the DAO's answers and call the
+handlers directly, this one goes through Express and gets its answers from real rows, so it covers what only the real
+stack can show:
 
 - `POST` creates a row, and the response carries ISO-8601 `createdAt` / `updatedAt` strings.
 - `GET /entities` answers a `filter` (with `or`), `sortField` / `sortDirection` and `page` / `pageSize` sent as a real
   query string from seeded rows, with the right `total` and `totalPages`; an unknown filter field is a 400.
 - `GET` / `PATCH` / `DELETE /entities/:id` read, update and delete a stored row, and a deleted row then 404s.
 - A row that does not exist is a 404 on `GET`, `PATCH` and `DELETE` — the `NotFoundError` the real DAO throws.
+- What `app.ts` adds around the handlers: a malformed JSON body is a 400 and a body over `express.json()`'s 100 kB
+  limit a 413, and an unmatched path goes through the not-found and error handlers to a 404 in the standard
+  `{ status, message }` shape.
 
-Every route's happy path and every DAO-raised error belong here; validation edge cases (malformed JSON, oversize
-bodies, each invalid field) stay in the controller test. Needs Docker and `db/migrations/`, like the DAO test.
+Every route's happy path, every DAO-raised error and the app-level behaviour belong here; input validation and error
+mapping stay in the controller unit test. Needs Docker and `db/migrations/`, like the DAO test.
 
 ```ts
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -1334,33 +1413,33 @@ import { serve, type ServedApp } from '../utils/test-server.js';
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-let testDb: TestDb;
-let server: ServedApp;
-
-beforeAll(async () => {
-  testDb = await startTestDb();
-  const context: AppContext = { db: testDb.db, entityDao: new EntityDao(testDb.db) };
-  server = await serve(createApp(context));
-});
-
-afterAll(async () => {
-  await server.close();
-  await testDb.stop();
-});
-
-beforeEach(async () => {
-  await testDb.db.delete(entity);
-});
-
-function request(path: string, init?: { method: string; body?: unknown }): Promise<Response> {
-  return fetch(`${server.baseUrl}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: init?.body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: init?.body === undefined ? undefined : JSON.stringify(init.body)
-  });
-}
-
 describe('entity.api', () => {
+  let testDb: TestDb;
+  let server: ServedApp;
+
+  beforeAll(async () => {
+    testDb = await startTestDb();
+    const context: AppContext = { db: testDb.db, entityDao: new EntityDao(testDb.db) };
+    server = await serve(createApp(context));
+  });
+
+  afterAll(async () => {
+    await server.close();
+    await testDb.stop();
+  });
+
+  beforeEach(async () => {
+    await testDb.db.delete(entity);
+  });
+
+  function request(path: string, init?: { method: string; body?: unknown }): Promise<Response> {
+    return fetch(`${server.baseUrl}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: init?.body === undefined ? undefined : { 'content-type': 'application/json' },
+      body: init?.body === undefined ? undefined : JSON.stringify(init.body)
+    });
+  }
+
   describe('POST /entities', () => {
     it('creates a row and returns it with ISO dates', async () => {
       // Act
@@ -1421,58 +1500,37 @@ describe('entity.api', () => {
       expect((await request(`/entities/${MISSING_ID}`, { method: 'DELETE' })).status).toBe(404);
     });
   });
-});
-```
 
-## `api/tests/unit/entity.schema.test.ts`
+  describe('the app around the routes', () => {
+    it('rejects a malformed JSON body with 400 in the standard error shape', async () => {
+      // Act
+      const res = await fetch(`${server.baseUrl}/entities`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"name":'
+      });
 
-Covers only the entity's own column/sort wiring on `listEntityInputSchema` — a nested filter over the real columns with
-date coercion, and the rejections specific to this resource (a column the entity lacks, a bad uuid, a sort field outside
-its allowlist). The generic builder behaviour (defaults, strictness, the logical-branch cap) is covered once in
-`tests/unit/list-input.helper.test.ts` ([api-dao.md](api-dao.md)), so it is not repeated here. No URL strings appear;
-the controller test covers decoding.
-
-```ts
-import { describe, expect, it } from 'vitest';
-import { listEntityInputSchema } from '../../src/db/schemas/entity.schema.js';
-
-describe('entity.schema', () => {
-  it('accepts a nested filter over the entity columns and coerces date strings', () => {
-    // Arrange
-    const raw = {
-      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }] },
-      sort: { field: 'name', direction: 'DESC' },
-      page: 2,
-      pageSize: 5
-    };
-
-    // Act
-    const input = listEntityInputSchema.parse(raw);
-
-    // Assert
-    expect(input).toEqual({
-      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: new Date('2026-01-01T00:00:00Z') } }] },
-      sort: { field: 'name', direction: 'DESC' },
-      page: 2,
-      pageSize: 5
+      // Assert
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ status: 'error' });
     });
-  });
 
-  it('accepts a date-only value in a date filter', () => {
-    // Act
-    const input = listEntityInputSchema.parse({ filter: { createdAt: { ge: '2026-01-01' } } });
+    it('rejects a body over the 100 kB limit with 413', async () => {
+      // Act
+      const res = await request('/entities', { method: 'POST', body: { name: 'x', description: 'y'.repeat(110_000) } });
 
-    // Assert
-    expect(input.filter).toEqual({ createdAt: { ge: new Date('2026-01-01') } });
-  });
+      // Assert
+      expect(res.status).toBe(413);
+    });
 
-  it.each([
-    ['a filter field the entity does not have', { filter: { title: { eq: 'a' } } }],
-    ['an invalid uuid for the id column', { filter: { id: { eq: 'nope' } } }],
-    ['a sort field outside the entity allowlist', { sort: { field: 'description', direction: 'ASC' } }]
-  ])('rejects %s', (_label, raw) => {
-    // Act + Assert
-    expect(listEntityInputSchema.safeParse(raw).success).toBe(false);
+    it('answers an unmatched path with 404 in the standard error shape', async () => {
+      // Act
+      const res = await request('/nope');
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ status: 'error', message: 'Not Found: GET /nope' });
+    });
   });
 });
 ```
@@ -1493,10 +1551,11 @@ createSortInputSchema([...])`, `ListUserInput`, `listUserInputSchema` and `userD
 5. `server.ts`: instantiate `new UserDao(db)` in the context literal.
 6. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the schemas and the DAO.
 7. `app.ts`: wire the routes.
-8. Tests: copy `tests/controllers/user.controller.test.ts` (routes, fake DAO), `tests/db/user.dao.test.ts`
-   (Testcontainers), `tests/api/user.api.test.ts` (end to end over HTTP) and `tests/unit/user.schema.test.ts` (schema
-   wiring) from the entity ones, swapping the schema and DAO. Add a
-   `tests/utils/user-seed.ts` seed generator for the DAO suite; `fake-dao.ts`, `test-server.ts` and `pg-container.ts` are
+8. Tests: copy `tests/unit/controllers/user.controller.test.ts` (handlers called directly, stub DAO),
+   `tests/unit/db/schemas/user.schema.test.ts` (schema wiring), `tests/db/user.dao.test.ts` (Testcontainers) and
+   `tests/api/user.api.test.ts` (end to end over HTTP) from the entity ones, swapping the schema and DAO; add a
+   `userDao` stub to `createStubContext` in `tests/utils/http-mocks.ts`. Add a
+   `tests/utils/user-seed.ts` seed generator for the DAO and API suites; `test-server.ts` and `pg-container.ts` are
    reused as-is.
 9. Web: mirror `User`, `UserFilterInput`, `UserSortInput` and `ListUserInput` in `models/user.model.ts`, then add the
    page slices `store/user-list-page/`, `store/user-detail-page/` and `store/user-form-page/` and register each on its

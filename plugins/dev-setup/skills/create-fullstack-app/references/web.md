@@ -1354,7 +1354,8 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
   not shown.
 - Sort is a select of `field:direction` pairs, exactly these, in this order: _Newest first_ (`createdAt:DESC`, the
   default), _Oldest first_ (`createdAt:ASC`), _Name A–Z_ (`name:ASC`), _Name Z–A_ (`name:DESC`), _Recently updated_
-  (`updatedAt:DESC`). Page size is a select of 10 / 20 / 50 / 100. Changing either resets to page 1.
+  (`updatedAt:DESC`). Picking an option always writes its field and direction to the URL. Page size is a select of
+  10 / 20 / 50 / 100. Changing either resets to page 1.
 - Each select has its own `<label for>` and an `id` (`entity-list-sort` / `Sort`, `entity-list-page-size` /
   `Per page`), not a wrapping `<label>`: a wrapping label folds the option text into the accessible name, and the
   specs' `getByLabelText('Sort')` stops matching. Each `<option>` shows the URL's value with
@@ -1384,8 +1385,8 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 - Reads the `id` with `selectRouteParam('id')` (typed `string | undefined`), dispatches
   `EntityDetailPageActions.load({ id })` on init when the id is present, and `leave()` on destroy.
 - Shows the description (`—` when it is `null`) and `createdAt` / `updatedAt` with `date: 'medium'`.
-- Renders with `@switch (status())`: _Loading…_, the error banner, or (on `'loaded'`) the entity with a link to the
-  edit page.
+- The error banner is an `@if (status() === 'error')`; under it, `@switch (status())` renders _Loading…_ or (on
+  `'loaded'`) the entity with a link to the edit page.
 - Accessible names: the entity's name as the heading, link _Edit_, link _← Back to entities_.
 
 ### `pages/entity-form-page.component.ts`

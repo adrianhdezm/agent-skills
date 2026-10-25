@@ -14,9 +14,9 @@ typed `<Type>FilterInput`s per column kind, and named `<Operation><Resource>Inpu
 - [`api/src/models/error.model.ts`](#apisrcmodelserrormodelts)
 - [`api/src/helpers/dao.helper.ts`](#apisrchelpersdaohelperts)
 - [`api/src/helpers/query-parser.helper.ts`](#apisrchelpersquery-parserhelperts)
-- [`api/tests/unit/dao.helper.test.ts`](#apitestsunitdaohelpertestts)
-- [`api/tests/unit/query-parser.helper.test.ts`](#apitestsunitquery-parserhelpertestts)
-- [`api/tests/unit/list-input.helper.test.ts`](#apitestsunitlist-inputhelpertestts)
+- [`api/tests/unit/helpers/dao.helper.test.ts`](#apitestsunithelpersdaohelpertestts)
+- [`api/tests/unit/helpers/query-parser.helper.test.ts`](#apitestsunithelpersquery-parserhelpertestts)
+- [`api/tests/unit/helpers/list-input.helper.test.ts`](#apitestsunithelperslist-inputhelpertestts)
 - [Extending the vocabulary](#extending-the-vocabulary)
 
 ## How the layers fit
@@ -367,7 +367,7 @@ export function normalizeQuery(params: unknown): Record<string, unknown> {
 }
 ```
 
-## `api/tests/unit/dao.helper.test.ts`
+## `api/tests/unit/helpers/dao.helper.test.ts`
 
 Renders the built SQL with `PgDialect`, so the translator is tested without a database. The test table has one column per
 scalar kind, and the whole file wraps in a single `describe('dao.helper')`.
@@ -376,14 +376,14 @@ scalar kind, and the whole file wraps in a single `describe('dao.helper')`.
 import { type SQL } from 'drizzle-orm';
 import { boolean, integer, PgDialect, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
-import { escapeLike, filterToSql, sortToSql, toPaginatedResult } from '../../src/helpers/dao.helper.js';
+import { escapeLike, filterToSql, sortToSql, toPaginatedResult } from '../../../src/helpers/dao.helper.js';
 import type {
   BooleanFilterInput,
   DateFilterInput,
   IdFilterInput,
   NumberFilterInput,
   StringFilterInput
-} from '../../src/models/list-input.model.js';
+} from '../../../src/models/list-input.model.js';
 
 const table = pgTable('t', {
   id: uuid('id'),
@@ -560,13 +560,13 @@ describe('dao.helper', () => {
 });
 ```
 
-## `api/tests/unit/query-parser.helper.test.ts`
+## `api/tests/unit/helpers/query-parser.helper.test.ts`
 
-Tests the normalizer on its own, wrapped in `describe('query-parser.helper')`. The list-input builders have their own test (next section) and URL decoding is tested through the route test ([api-entity.md](api-entity.md)).
+Tests the normalizer on its own, wrapped in `describe('query-parser.helper')`. The list-input builders have their own test (next section) and URL decoding is tested through the controller unit test ([api-entity.md](api-entity.md)).
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { normalizeQuery } from '../../src/helpers/query-parser.helper.js';
+import { normalizeQuery } from '../../../src/helpers/query-parser.helper.js';
 
 describe('query-parser.helper', () => {
   it('keeps the first value of a repeated param', () => {
@@ -587,14 +587,14 @@ describe('query-parser.helper', () => {
 });
 ```
 
-## `api/tests/unit/list-input.helper.test.ts`
+## `api/tests/unit/helpers/list-input.helper.test.ts`
 
 Tests the builders directly against an ad-hoc field config (`id` / `name` / `age`), so the generic behaviour — field optionality, recursive `and` / `or` / `not`, strictness, the logical-branch cap, the `in`-list cap (`MAX_IN_VALUES`) at and over the limit, the `between` tuple arity, the sort allowlist, and the page defaults and range — is covered without any one resource. The per-resource schema test then only checks that resource's own column and sort wiring.
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { createFilterInputSchema, createListInputSchema, createSortInputSchema } from '../../src/helpers/list-input.helper.js';
-import { idFilterInputSchema, numberFilterInputSchema, stringFilterInputSchema } from '../../src/models/list-input.model.js';
+import { createFilterInputSchema, createListInputSchema, createSortInputSchema } from '../../../src/helpers/list-input.helper.js';
+import { idFilterInputSchema, numberFilterInputSchema, stringFilterInputSchema } from '../../../src/models/list-input.model.js';
 
 const filterInputSchema = createFilterInputSchema({
   id: idFilterInputSchema,
@@ -689,7 +689,7 @@ describe('list-input.helper', () => {
 
 - **A new operator** (e.g. `notBeginsWith`): one line in the matching scalar schema in `list-input.model.ts`, one
   line in `comparisonsToSql` or `textMatchesToSql` in `dao.helper.ts`, a `filterToSql` case in
-  `tests/unit/dao.helper.test.ts`, and a rejection case in `tests/unit/entity.schema.test.ts`. `FieldFilterInput`
+  `tests/unit/helpers/dao.helper.test.ts`, and a rejection case in `tests/unit/db/schemas/entity.schema.test.ts`. `FieldFilterInput`
   picks the operator up by itself.
 - **A new scalar kind** (e.g. `jsonbFilterInputSchema`): a new strict schema in `list-input.model.ts` listing only the
   operators that make sense for it, added to the `ScalarFilterInputSchema` and `ScalarFilterInput` unions. If it needs

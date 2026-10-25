@@ -56,13 +56,12 @@ my-app/
 │   │   ├── helpers/          # dao.helper.ts (input → SQL), list-input.helper.ts (schema builders), query-parser.helper.ts (normalizeQuery)
 │   │   ├── daos/             # one *.dao.ts per table, nothing else
 │   │   ├── controllers/      # *.controller.ts, wired directly on the app
-│   │   └── middleware/       # error + not-found
-│   └── tests/                # grouped by kind, not mirroring src/:
-│       ├── unit/             #   helpers + schema, no database
-│       ├── controllers/      #   controller unit tests: one *.controller.test.ts each + error.middleware (fetch + fake DAO)
+│   │   └── middlewares/      # error + not-found
+│   └── tests/                # grouped by kind; unit/ mirrors src/:
+│       ├── unit/             #   mirrors src/: helpers, db/schemas, controllers, middlewares — functions called directly, stub DAO
 │       ├── db/               #   <resource>.dao.test.ts (Testcontainers)
 │       ├── api/              #   API tests, end to end: <resource>.api.test.ts (real HTTP → DAO → Testcontainers)
-│       └── utils/            #   shared test helpers (pg-container, fake-dao, test-server, seeds)
+│       └── utils/            #   shared test helpers (http-mocks, pg-container, test-server, seeds)
 └── web/
     ├── Dockerfile            # multi-stage → Nginx, SPA fallback
     ├── nginx.conf
@@ -127,8 +126,8 @@ Copy this checklist and tick it off:
 3. **Write the API** from [references/api-setup.md](references/api-setup.md) (manifest, configs, app shell,
    Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary and builder helper,
    SQL translator, query parser, their `unit/` tests) and [references/api-entity.md](references/api-entity.md) (resource
-   schema, DAO and its Testcontainers `db/` test, the three controllers with one `controllers/` test file each plus the
-   error-middleware test, the end-to-end `api/` test, and the shared `tests/utils/` helpers). Read the "How the layers
+   schema, DAO and its Testcontainers `db/` test, the three controllers and both middlewares with a `unit/` test each,
+   the end-to-end `api/` test, and the shared `tests/utils/` helpers). Read the "How the layers
    fit" section of `api-dao.md` first. Write files only: every `pnpm add` runs in step 5. Add `api/.prettierrc`,
    `api/.prettierignore` and `api/eslint.config.mjs` from [references/eslint-prettier.md](references/eslint-prettier.md).
    Do not create `db/migrations/`.
@@ -242,19 +241,19 @@ These bite first when writing code in the project. The full set is in
   inputs from the `createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema` builders in
   `helpers/list-input.helper.ts`. Controllers validate every input inline with `safeParse` and throw
   `createError(400, …)` on failure.
-- **Tests are grouped by kind under `tests/{unit,api,db,utils}/`**, not mirrored against `src/`, and each file wraps its
+- **Tests are grouped by kind under `tests/{unit,db,api,utils}/`**, `unit/` mirroring `src/`, and each file wraps its
   suites in one top-level `describe` named for the module. A single `vitest.config.ts` defines three `projects`:
-  - `pnpm test` runs **`unit` + `controllers`** with no database — the filter / sort translator through the SQL it
-    renders, the list-input builders directly, and every controller through `createApp` with a fake DAO on the
-    context, driven over `fetch` (not `supertest`), asserting status and body. These are the **controller unit tests**:
-    one file per controller, every validation and error branch.
+  - `pnpm test` runs **`unit`** with no database — the filter / sort translator through the SQL it renders, the
+    list-input builders directly, and **every controller and middleware as a plain function**: called with
+    `mockRequest` (a stub DAO on `req.app.locals.context`), `mockResponse` and `mockNext` from `tests/utils/http-mocks.ts`,
+    asserting the response or the error forwarded to `next`, and what the DAO received. No app, no server.
   - `pnpm test:integration` runs **`db` + `api`** against a throwaway `postgres:17-alpine` via Testcontainers
     (`@testcontainers/postgresql`), migrated with the drizzle migrator. `db` tests the real DAO directly, `list`
     exhaustively (filter, sort, pagination, alone and combined). `api` is the **API tests, end to end**: the real app
     on the real DAO, one `<resource>.api.test.ts` per resource covering every route and the errors only the real stack
-    produces. It needs Docker and an existing `db/migrations/`, so it runs after the first `db:generate`. A new resource
-    gets a controller test in `tests/controllers/`, a DAO test in `tests/db/`, an API test in `tests/api/`, and a
-    schema test in `tests/unit/`.
+    produces, plus what `app.ts` adds around the handlers (body parsing, the route table, the not-found → error chain).
+    It needs Docker and an existing `db/migrations/`, so it runs after the first `db:generate`. A new resource gets a
+    controller and a schema test in `tests/unit/`, a DAO test in `tests/db/` and an API test in `tests/api/`.
 - **`types: ["node"]` is explicit** in `tsconfig.app.json`: TypeScript 6 defaults `types` to `[]`. Every new config file
   goes into the `include` of `tsconfig.node.json`, or ESLint reports it as belonging to no project.
 - **Pino logs plain JSON.** `pino-pretty` is only a pipe in the `dev` script.
@@ -365,14 +364,17 @@ pnpm workspace, then:
 - **API DAO layer** (how the layers fit, DAO contract, list-input vocabulary, the builder helper, errors, SQL
   translator, query normalizer, their `unit/` tests, extending the vocabulary): [references/api-dao.md](references/api-dao.md)
 - **API entity example** (resource schema, table registry, DAO and its Testcontainers `db/` test, the three
-  controllers with one `api/` test file each, the shared `tests/utils/` helpers, the schema test, adding a resource):
+  controllers, the controller and middleware unit tests, the end-to-end API test, the shared `tests/utils/` helpers,
+  the schema test, adding a resource):
   [references/api-entity.md](references/api-entity.md)
 - **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, components, pages, spec, Nginx): [references/web.md](references/web.md)
 - **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the `ConfirmDialog` story): [references/web-storybook.md](references/web-storybook.md)
 - **Web tests** (Analog's Vitest builder, the unit and browser projects, full-stack Playwright e2e on its own stack): [references/web-testing.md](references/web-testing.md)
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
-- **Coding conventions** (copied to the repo root): [references/coding-conventions.md](references/coding-conventions.md)
+- **Coding conventions** (copied to the repo root: architecture and building blocks of both projects, HTTP contract,
+  list queries, where web state lives, naming, code style, the test tiers, adding a resource, a before-you-merge
+  checklist): [references/coding-conventions.md](references/coding-conventions.md)
 - **Decisions and their reasons**: [references/decisions.md](references/decisions.md)
 
 ## Review Checklist
@@ -389,7 +391,7 @@ pnpm workspace, then:
 - [ ] `POST /entities` creates; `GET /entities?filter=<json>&sortField=…&sortDirection=…&page=&pageSize=` returns
       `{items,total,page,pageSize,totalPages}`; an unknown filter field or operator returns 400; `PATCH /entities/:id`
       updates; `DELETE /entities/:id` returns 204, and 404 for a missing id
-- [ ] `.env` is not committed and `.env.example` is
+- [ ] `.env` is git-ignored and `.env.example` is not (`git check-ignore .env`)
 - [ ] `coding-conventions.md` is at the repo root
 - [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook --smoke-test --ci` starts and exits 0, and
       `storybook-static/index.json` lists the three `ConfirmDialog` stories

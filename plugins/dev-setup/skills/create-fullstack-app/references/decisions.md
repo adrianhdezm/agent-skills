@@ -83,46 +83,51 @@ API. To share one config later, add a root `.prettierrc` and delete the per-proj
 
 Node's `--watch` provides the restart loop and `--import=tsx` the TypeScript loader: stock Node, one concern each.
 
-### Tests run in four projects: controller unit tests apart from end-to-end API tests
+### Tests run in three projects: unit tests apart from end-to-end API tests
 
-The API is tested in four vitest `projects`. `unit` and `controllers` run without Postgres: the filter / sort
-translator through the SQL it renders with `PgDialect`, the list-input builders directly, and each controller through
-`createApp` with a fake DAO on the context, driven over real HTTP with `fetch` (not `supertest`). `db` and `api` use
-Testcontainers (`@testcontainers/postgresql`) with a throwaway `postgres:17-alpine`, migrated with the drizzle
+The API is tested in three vitest `projects`. `unit` runs without Postgres: the filter / sort translator through the
+SQL it renders with `PgDialect`, the list-input builders directly, and every controller and middleware **called as a
+plain function** — a mock `req` with a stub DAO on `req.app.locals.context`, a spy `res`, a spy `next`. `db` and `api`
+use Testcontainers (`@testcontainers/postgresql`) with a throwaway `postgres:17-alpine`, migrated with the drizzle
 migrator: `db` runs the real DAO directly, exercising `list`'s filter, sort and pagination exhaustively (each alone and
 combined) plus the create / get / update / delete happy and edge paths; `api` serves the real app on the real DAO and
 drives each route end to end.
 
-The two HTTP tiers answer different questions. A controller test checks what the controller does with whatever the
-DAO returns, so it can test every validation and error branch cheaply, but it cannot show that the real DAO accepts
-what the controller sends or returns what the controller serializes. The API test shows exactly that, per resource.
-The fake-DAO tests used to live in `tests/api/` and the one real round trip in `tests/db/entity.full-stack.test.ts`,
-so the folder named `api` held the unit-style tests; the folders now say what each tier is.
+The two tiers answer different questions. A unit test checks one function: what a controller does with its input and
+with whatever the stub DAO returns, or what a middleware does with an error, so every validation, error-mapping and
+logging branch is cheap to reach and assert directly (which error went to `next`, which log level the error handler
+used). It cannot see what `app.ts` adds around the handlers — body parsing, the route table, the not-found → error
+chain — nor show that the real DAO accepts what the controller sends. The API test covers exactly that, per resource.
 
-The Docker tiers are a separate `pnpm test:integration` script (it was `test:db` while it ran only the DAO suite), so the
-default `pnpm test` (`unit` + `controllers`) stays Docker-free and runs in CI without a daemon; `test:integration`
-needs Docker and an existing `db/migrations/` (so it runs after the first `db:generate`). The web's layers are under [Web](#web). `test` is a
-required check in both projects.
+The controllers were tested two other ways first. A `tests/api/` folder started the whole app on a port with a fake
+DAO and drove it over `fetch`, so the folder named `api` held the narrow tests while the one real round trip lived in
+`tests/db/entity.full-stack.test.ts`. Renamed to `tests/controllers/`, those tests still booted pino-http, CORS and
+`express.json()` for every case: slower, and testing Express as much as the controller. Calling the handlers directly
+removed the fake app factory (`fake-dao.ts`, `startTestServer`) and left `serve(app)` for the API tests only.
+
+The Docker tiers are a separate `pnpm test:integration` script (it was `test:db` while it ran only the DAO suite), so
+the default `pnpm test` (`unit`) stays Docker-free and runs in CI without a daemon; `test:integration` needs Docker
+and an existing `db/migrations/` (so it runs after the first `db:generate`). The web's layers are under [Web](#web).
+`test` is a required check in both projects.
 
 ### One vitest config with projects, not multiple config files
 
-A single `api/vitest.config.ts` defines named `projects` (`unit`, `controllers`, `db`, `api`) selected by folder glob, with shared
+A single `api/vitest.config.ts` defines named `projects` (`unit`, `db`, `api`) selected by folder glob, with shared
 options at the root that each project inherits. A second `vitest.config.db.ts` was tried and dropped: two config files
-duplicated the shared setup and drifted. Scripts pick projects on the command line — `test` runs
-`--project unit --project controllers`, `test:integration` runs `--project db --project api` — so one config serves
-every suite.
+duplicated the shared setup and drifted. Scripts pick projects on the command line — `test` runs `--project unit`,
+`test:integration` runs `--project db --project api` — so one config serves every suite.
 
-### Tests are grouped by kind, each file one describe
+### Tests are grouped by kind; unit tests mirror `src/`
 
-`api/tests/` is split into `unit/`, `controllers/`, `db/`, `api/` and `utils/` by test kind, not mirrored against
-`src/`. Each test file wraps its suites in a single top-level `describe` named for the file's module
-(`describe('entity.dao')`, `describe('dao.helper')`, `describe('entity.api')`, …), with nested describes only where a
-file covers several functions. There is one controller-test file per controller (`entity` / `home` / `health`) plus
-`error.middleware.test.ts` for the terminal handler, one DAO test and one API test per resource. `utils/` holds shared,
-non-test helpers: the Testcontainers bootstrap (`pg-container.ts`), the fake-DAO / app factory (`fake-dao.ts`), the
-HTTP test-server helper (`test-server.ts`, whose `serve(app)` both the controller and API tests use) and seed
-generators (`entity-seed.ts`). Grouping by kind is what lets the vitest `projects` select a suite by folder and keeps
-the Docker-free tiers apart from the Docker ones.
+`api/tests/` is split into `unit/`, `db/`, `api/` and `utils/` by test kind, which is what lets the vitest `projects`
+select a suite by folder and keeps the Docker-free tier apart from the Docker ones. Inside `unit/`, files mirror
+`src/` (`unit/helpers/dao.helper.test.ts`, `unit/db/schemas/entity.schema.test.ts`,
+`unit/controllers/entity.controller.test.ts`, `unit/middlewares/error.middleware.test.ts`), so a module's test is found
+by its path; `db/` and `api/` hold one file per resource. Each test file wraps its suites in a single top-level
+`describe` named for the file's module (`describe('entity.dao')`, `describe('error.middleware')`,
+`describe('entity.api')`, …), with nested describes only where a file covers several functions. `utils/` holds
+shared, non-test helpers: the unit-test stand-ins (`http-mocks.ts`), the Testcontainers bootstrap (`pg-container.ts`),
+`serve(app)` for the API tests (`test-server.ts`) and seed generators (`entity-seed.ts`).
 
 ## API
 
@@ -178,6 +183,8 @@ A `checkDatabase()` helper would wrap one line. The probe is not a resource, so 
 
 `models/` holds `*.model.ts` type files and error classes, matching the web's model convention. `helpers/` holds
 transport-agnostic functions. `express.d.ts` stays at the `src/` root: it is TypeScript tooling, not a model.
+Every source folder is plural — `controllers/`, `daos/`, `helpers/`, `middlewares/`, `models/`, `db/schemas/` — and
+the files inside keep the singular suffix (`error.middleware.ts`, `entity.dao.ts`).
 
 ### The query normalizer takes a plain params dict
 
@@ -247,7 +254,7 @@ builders and the page-size limits live together in `helpers/list-input.helper.ts
 keeps the scalar filter inputs, `sortDirectionSchema` and the inferred types. The split follows the suffix rule —
 `*.helper.ts` is functions, `*.model.ts` is shapes and types — and the helper imports the scalar schema type from the
 model (no cycle: the model never imports the helper). Keeping the builders out of the model also gives them a direct
-test (`tests/unit/list-input.helper.test.ts`) against an ad-hoc field config, instead of only being exercised through a
+test (`tests/unit/helpers/list-input.helper.test.ts`) against an ad-hoc field config, instead of only being exercised through a
 resource's schema test. `models/dao.model.ts` keeps only the contract (`Dao`, `PaginatedResult`, `IdInput`), with no
 zod and no drizzle.
 

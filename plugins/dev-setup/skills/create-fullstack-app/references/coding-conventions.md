@@ -1,255 +1,638 @@
 # Coding Conventions
 
-This file is **written to the root of every repo** scaffolded by the `create-fullstack-app` skill. It documents the rules the scaffold applies so future contributors (and future Claude sessions) stay consistent with the original intent.
+This file is **written to the root of every repo** scaffolded by the `create-fullstack-app` skill. It is the working
+guide for everyone who changes the code afterwards, people and Claude sessions alike: how the two projects are put
+together, what each building block may and may not do, how to name things, and which test proves what.
+
+The rules are not suggestions: the scaffold's code follows every one of them, and a change that breaks one should
+change this file in the same commit.
 
 ## Contents
 
-- [Repository shape](#repository-shape)
-- [pnpm catalog rule](#pnpm-catalog-rule)
-- [File-naming suffixes](#file-naming-suffixes)
-- [API source tree](#api-source-tree)
-- [API conventions](#api-conventions)
-- [Web conventions](#web-conventions)
-- [Tests](#tests)
-- [Formatting & lint](#formatting--lint)
-- [Docker](#docker)
-- [Decisions deliberately NOT taken](#decisions-deliberately-not-taken)
-- [Review checklist](#review-checklist)
+1. [How to use this file](#1-how-to-use-this-file)
+2. [Repository](#2-repository)
+3. [API](#3-api)
+4. [Web](#4-web)
+5. [Naming](#5-naming)
+6. [Code style](#6-code-style)
+7. [Testing](#7-testing)
+8. [Adding a resource](#8-adding-a-resource)
+9. [Formatting, lint and Docker](#9-formatting-lint-and-docker)
+10. [Not done on purpose](#10-not-done-on-purpose)
+11. [Before you merge](#11-before-you-merge)
 
-## Repository shape
+## 1. How to use this file
+
+Read the architecture section of the project you are changing ([API](#31-architecture), [Web](#41-architecture))
+once, then look things up. The quickest way in is the question you have:
+
+| I want to…                                    | where it goes                                                              | section                                   |
+| --------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------- |
+| add a table or resource                       | `api/src/db/schemas/`, `daos/`, `controllers/`, then the web slice + pages | [Adding a resource](#8-adding-a-resource) |
+| add an API route                              | a handler in `controllers/<resource>.controller.ts`, mounted in `app.ts`   | [API building blocks](#32-building-blocks) |
+| make a column filterable or sortable          | one line in the resource's schema file                                     | [List queries](#34-list-queries)          |
+| change what an error response looks like     | `middlewares/error.middleware.ts`                                          | [HTTP contract](#33-http-contract)        |
+| add a reusable UI piece                       | `web/src/app/components/` + its story + its browser spec                   | [Web building blocks](#43-building-blocks) |
+| keep some state on the web                    | depends on the kind of state                                               | [Where state lives](#42-where-state-lives) |
+| call the API from the web                     | a method on `services/<resource>.service.ts`, called from an effect        | [Web building blocks](#43-building-blocks) |
+| know which test to write                      | —                                                                          | [Which test do I write?](#73-which-test-do-i-write) |
+
+## 2. Repository
+
+### Shape
 
 ```
 <repo>/
-├── api/              # Express 5 + Drizzle + Pino + zod (DAO pattern, AppSync-style filter inputs)
-├── web/              # Angular 22 + NgRx + router-store + Tailwind (URL as source of truth)
-├── pnpm-workspace.yaml   # catalog + allowBuilds
-├── docker-compose.yml    # db + api + web (Nginx static serving)
-├── .env  / .env.example  # single root env
-└── coding-conventions.md # this file
+├── api/                    # Express 5 + Drizzle + Postgres + zod + Pino
+├── web/                    # Angular 22 + NgRx + router-store + Tailwind v4
+├── package.json            # root scripts; packageManager pins pnpm
+├── pnpm-workspace.yaml     # packages + catalog + allowBuilds
+├── docker-compose.yml      # db + api + web
+├── .env / .env.example     # the single env file; only .env.example is committed
+└── coding-conventions.md   # this file
 ```
 
-- **Package manager**: pnpm 11 or newer, as a workspace. `npm` / `yarn` are not supported. The exact version is the
-  root `packageManager` field.
-- **Node**: 24 or newer.
-- **Env**: a single `.env` at the repo root. API loads it with strict `--env-file=../.env` (fails fast if missing). Web reads `apiBaseUrl` / `appName` from Angular `environment.ts` only.
+- **pnpm 11 or newer**, as a workspace; `npm` and `yarn` are not used. The exact version is the root `packageManager`
+  field, which Corepack also uses inside the Docker images.
+- **Node 24 or newer.**
+- **Catalog rule:** a package goes in `pnpm-workspace.yaml`'s `catalog:` only when two or more manifests use it with the
+  same range; everything else is a direct dependency of the one manifest that uses it. Today the catalog holds the
+  shared tooling: TypeScript (pinned **exactly** to one 6.0.x — Angular 22 needs `>=6.0 <6.1` and typescript-eslint
+  `<6.1`; move it only when both ranges allow), ESLint, typescript-eslint, `@eslint/js`, `eslint-config-prettier`,
+  `globals`, Prettier, `@types/node` (`^24`) and Vitest (`^5`).
 
-## pnpm catalog rule
+### Commands
 
-A package belongs in `pnpm-workspace.yaml`'s `catalog:` **only when used in ≥ 2 manifests with the same version range**. Everything else is a direct dep in the one manifest that uses it.
+Run from the repo root.
 
-**TypeScript is in the catalog, pinned exactly** to one 6.0.x version for both projects. Angular 22 requires `>=6.0 <6.1`
-and typescript-eslint supports `<6.1`; move the pin only when both peer ranges allow it. `@types/node` is cataloged too
-(api and web share the same `^24.x` range), and so is `vitest` (both on `^5`).
+| command                  | does                                                                     | needs                         |
+| ------------------------ | ------------------------------------------------------------------------ | ----------------------------- |
+| `pnpm dev:api`           | API with `node --watch`, logs through `pino-pretty`                      | Postgres, `.env`              |
+| `pnpm dev:web`           | `ng serve` on `:4200`                                                    | —                             |
+| `pnpm build`             | API `tsc` → `api/dist/`; web `ng build` → `web/dist/web/browser/`         | —                             |
+| `pnpm typecheck`         | API: `tsconfig.app` + `tsconfig.node`; web: app + spec + e2e tsconfigs   | —                             |
+| `pnpm test`              | API `unit` project; web `unit` project (jsdom)                           | —                             |
+| `pnpm test:integration`  | API `db` + `api` projects (Testcontainers Postgres)                      | Docker, `api/db/migrations/`  |
+| `pnpm test:browser`      | web `browser` project (Chromium)                                         | `playwright install chromium` |
+| `pnpm test:e2e`          | Playwright against its own app + API + database                          | Docker, `.env`, migrations    |
+| `pnpm storybook`         | Storybook on `:6006`                                                     | —                             |
+| `pnpm lint` / `pnpm format` / `pnpm format:check` | ESLint / Prettier write / Prettier check, per project | —                     |
+| `pnpm up` / `pnpm down`  | `docker compose up --build` / `docker compose down -v`                   | Docker                        |
+| `pnpm --filter api db:generate --name <name>` / `db:migrate` | write a migration from the schema files / apply pending ones | `.env`, Postgres for `migrate` |
 
-## File-naming suffixes
+`build`, `typecheck`, `test`, `lint` and `format:check` are the five required checks.
 
-| area                             | pattern                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------ |
-| API handlers                     | `*.controller.ts`                                                              |
-| API middleware                   | `*.middleware.ts`                                                              |
-| API data access                  | `*.dao.ts`                                                                     |
-| API transport-agnostic utilities | `*.helper.ts`                                                                  |
-| API shared types + errors        | `*.model.ts` (under `src/models/`)                                             |
-| Web components                   | `*.component.ts` (flat, no wrapping folder)                                    |
-| NgRx slice                       | `*.model.ts`, `*.actions.ts`, `*.reducer.ts`, `*.selectors.ts`, `*.effects.ts` |
+### Ports and environment
 
-Angular files live flat under `components/`, `layouts/`, `pages/` — no `health/health-page.component.ts` wrapping folder; it is `pages/health-page.component.ts`.
+| port   | what                              |
+| ------ | --------------------------------- |
+| `5432` | Postgres (Compose `db`)           |
+| `3000` | API (local and Compose)           |
+| `4200` | web (`ng serve`, Compose Nginx)   |
+| `3100` | e2e API                           |
+| `4300` | e2e `ng serve`                    |
+| `6006` | Storybook                         |
 
-## API source tree
+| variable       | used by                                | default / rule                                |
+| -------------- | -------------------------------------- | --------------------------------------------- |
+| `DATABASE_URL` | API, drizzle-kit                       | required; both throw when it is unset         |
+| `PORT`         | API                                    | `3000`                                        |
+| `LOG_LEVEL`    | API logger                             | `debug`, or `info` when `NODE_ENV=production` |
+| `DB_PASSWORD`  | Compose `db` and the API's Compose URL | `s3cr3t` in `.env.example`                    |
+
+- One `.env` at the root. The API loads it with a strict `--env-file=../.env`: a missing file fails at start.
+- The web has no runtime env. Its config is build-time, in `web/src/environments/`: `environment.ts` (production,
+  `apiBaseUrl` derived from the page's host on port 3000), `environment.development.ts` (`localhost:3000`) and
+  `environment.e2e.ts` (`localhost:3100`), swapped by `angular.json`'s `fileReplacements`. Only the `app-context` slice
+  imports `environment`.
+
+## 3. API
+
+### 3.1 Architecture
 
 ```
-src/
-├── express.d.ts            # ambient Express.Locals (stays at src root — tooling, not model)
-├── logger.ts
-├── app.ts                  # createApp(context) — pure factory
-├── server.ts               # http listener + composition root (DAO wiring)
-├── db/
-│   ├── client.ts
-│   ├── schema.ts           # `export const schema = { entity, … }` — every table, passed to drizzle()
-│   └── schemas/
-│       └── <resource>.schema.ts   # drizzle table + create/update inputs + <resource>FilterInput + List<Resource>Input / list<Resource>InputSchema + <resource>DefaultSort
-├── models/                 # contract types, error classes, and the zod scalar filter inputs for list inputs
-│   ├── app-context.model.ts
-│   ├── dao.model.ts        # Dao<T,ListInput,CreateInput,UpdateInput> + PaginatedResult<T> + IdInput
-│   ├── list-input.model.ts     # Id / String / Number / Date / Boolean FilterInput (zod + inferred types) + sortDirectionSchema + ScalarFilterInputSchema + derived ScalarFilterInput / FieldFilterInput / LogicalFilterInput / FilterField
-│   └── error.model.ts      # NotFoundError
-├── helpers/                # transport-agnostic utilities
-│   ├── dao.helper.ts            # FilterTable / SortTable / filterToSql / sortToSql / toPaginatedResult
-│   ├── list-input.helper.ts     # createFilterInputSchema / createSortInputSchema / createListInputSchema builders + page limits
-│   └── query-parser.helper.ts   # normalizeQuery
-├── daos/                   # only classes implementing Dao — one *.dao.ts per table
-│   └── <resource>.dao.ts
-├── controllers/            # thin HTTP edge; validates input and translates DAO errors to http-errors
-└── middleware/
+server.ts  builds the AppContext once: { db, entityDao: new EntityDao(db) }
+   │
+   ▼
+createApp(context)   app.ts — sets app.locals.context, then the pipeline:
+
+request ─► pino-http ─► cors ─► express.json() ─► route ─► controller
+                                                             │  validates its input (zod safeParse)
+                                                             ▼
+                                               req.app.locals.context.entityDao
+                                                             │
+                                                             ▼
+                                         DAO ─► dao.helper (filter / sort → SQL) ─► Drizzle ─► Postgres
+
+errors:  any throw ─► next(err) ─► … ─► notFoundHandler (no route) ─► errorHandler ─► { status: 'error', message }
 ```
 
-**`models/` vs `types/`.** The folder is named `models/` to match the `.model.ts` suffix and to signal "shapes of things". Ambient `.d.ts` files (framework glue) stay at `src/` root — they aren't models.
+- **`server.ts` is the composition root.** It is the only place that creates the database pool and the DAOs, puts them
+  on the context, starts the HTTP listener and closes the pool on `SIGINT` / `SIGTERM`.
+- **`app.ts` is a pure factory.** `createApp(context)` takes the context, stores it once on `app.locals.context` (a
+  singleton, not a middleware), registers the global middleware, mounts every handler directly on the app (no routers)
+  and ends with `notFoundHandler` + `errorHandler`. Nothing in it reads the environment or opens connections, which is
+  what lets tests build an app around any context.
+- **Controllers are the HTTP edge; DAOs are the only code that touches Drizzle.** A controller decodes and validates,
+  calls a DAO through the context, and shapes the response; a DAO runs queries and knows nothing about HTTP.
 
-## API conventions
+### 3.2 Building blocks
 
-- **App factory + composition root**: `createApp(context)` in `src/app.ts`; `src/server.ts` constructs the context — including every DAO instance — and wires the HTTP listener. The context is a **singleton on `app.locals.context`**, set once at `createApp` time (not a middleware).
-- **No routers**. Controllers are mounted directly: `app.get('/entities', listEntities)`.
-- **Uniform controller shape**, even for synchronous-looking handlers:
-  ```ts
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try { … }
-    catch (err) { next(err); }
+| block            | lives in                                    | is                                                                     | may use                                                          | must not                                                                  |
+| ---------------- | ------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| resource schema  | `db/schemas/<resource>.schema.ts`           | the table and every input schema + type of one resource                | drizzle, drizzle-zod, zod, the list-input builders and scalars   | hold logic, carry comments                                                |
+| table registry   | `db/schema.ts`                              | `export const schema = { entity, … }`, passed to `drizzle()`           | the resource schemas                                             | —                                                                         |
+| db client        | `db/client.ts`                              | the `pg` pool and the Drizzle client                                   | `DATABASE_URL`                                                   | fall back to a hard-coded URL                                             |
+| contract         | `models/dao.model.ts`                       | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput` | —                                                           | import zod or drizzle                                                     |
+| list vocabulary  | `models/list-input.model.ts`                | the scalar filter inputs, `sortDirectionSchema`, the derived types     | zod                                                              | build resource schemas                                                    |
+| list builders    | `helpers/list-input.helper.ts`              | `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`, page limits | the list vocabulary                       | know about a resource or the URL                                          |
+| SQL translation  | `helpers/dao.helper.ts`                     | `filterToSql`, `sortToSql`, `toPaginatedResult`, `escapeLike`          | drizzle's SQL builders                                           | know about a resource or HTTP                                             |
+| query normalizer | `helpers/query-parser.helper.ts`            | `normalizeQuery`: first value of a repeated param, empties dropped     | —                                                                | take an Express `Request`                                                 |
+| errors           | `models/error.model.ts`                     | `NotFoundError(resource, id)`                                          | —                                                                | extend `http-errors`                                                      |
+| DAO              | `daos/<resource>.dao.ts`                    | one class `implements Dao<…>`, created once in `server.ts`              | the db client type, its schema file, `dao.helper`, `NotFoundError` | read the request, throw `http-errors`, hold configuration of its own     |
+| controller       | `controllers/<resource>.controller.ts`      | one exported `async (req, res, next)` function per route                | its schema file, `normalizeQuery`, `http-errors`, `NotFoundError`, the DAO via `req.app.locals.context` | import Drizzle or a DAO class, build SQL, log errors itself   |
+| middleware       | `middlewares/<name>.middleware.ts`          | `errorHandler` (terminal) and `notFoundHandler`                         | `http-errors`, `req.log`                                         | call a DAO                                                                |
+| context type     | `models/app-context.model.ts` + `express.d.ts` | `AppContext` and its typing on `Express.Locals`                     | —                                                                | —                                                                         |
+| logger           | `logger.ts`                                 | one Pino instance emitting plain JSON                                   | `LOG_LEVEL`                                                      | import `pino-pretty` (the `dev` script pipes through it)                  |
+
+**Controller shape.** Every handler has the same skeleton, even when it has nothing to await:
+
+```ts
+export async function getEntity(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // decode → safeParse → DAO call → res.json / res.status(…).json / res.status(204).send()
+  } catch (err) {
+    next(err);
   }
-  ```
-  The one deliberate exception is the health controller, which maps any failure in its `try` to a 503 in the `catch` (`next(createError(503, …, { cause: err }))`) rather than forwarding the raw error.
-- **Errors forward via `next(err)` only.** Responses are shaped by the error handler using `http-errors`: `createError(status, msg, { expose, cause })`. Severity follows status (`5xx → error`, `4xx → warn`); do not log every error at `error`.
-- **DAO layer** — the core of the API. Each layer has one job, and types flow downward:
+}
+```
 
-  | layer                 | file                              | holds                                                                                                                                                                                                                                                                          |
-  | --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-  | contract              | `models/dao.model.ts`             | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`. No zod, no drizzle.                                                                                                                                                                               |
-  | list-input vocabulary | `models/list-input.model.ts`      | the scalar filter inputs (id, string, number, date, boolean), `sortDirectionSchema`, `SortInput`, and the derived `ScalarFilterInput` / `FieldFilterInput` / `LogicalFilterInput` / `FilterField` / `ScalarFilterInputSchema`                                                  |
-  | list-input builders   | `helpers/list-input.helper.ts`    | `createFilterInputSchema` / `createSortInputSchema` / `createListInputSchema` and the page-size limits (`DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE`)                                                                                                                                  |
-  | resource schema       | `db/schemas/<resource>.schema.ts` | the drizzle table, `Create<Resource>Input` / `Update<Resource>Input` (drizzle-zod), `<resource>FilterInputSchema`, `<resource>SortInputSchema`, `list<Resource>InputSchema` (the structured `List<Resource>Input`), `<resource>DefaultSort`, and every type inferred from them |
-  | table registry        | `db/schema.ts`                    | `export const schema = { entity, … }`, passed to `drizzle()`                                                                                                                                                                                                                   |
-  | translation           | `helpers/dao.helper.ts`           | `FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult` — resource-agnostic                                                                                                                                                                               |
-  | HTTP parsing          | `helpers/query-parser.helper.ts`  | `normalizeQuery` (first value of a repeated param, empty values dropped); the rest of the URL decoding is written in the controller                                                                                                                                            |
-  | DAO                   | `daos/<resource>.dao.ts`          | one class implementing `Dao`; runs queries, nothing else                                                                                                                                                                                                                       |
+- Every input (`req.params`, `req.query`, `req.body`) is validated inline with `safeParse`; a failure throws
+  `createError(400, …, { expose: true, cause: z.flattenError(error) })`. There is no shared `parseOr400` helper, so each
+  handler shows every error it can produce.
+- A `NotFoundError` from the DAO becomes `createError(404, err.message, { expose: true, cause: err })`; a `null` from
+  `get` becomes a 404 in the handler.
+- Errors leave a controller only through `next(err)`. The health controller is the one handler whose `catch` creates
+  the error (`createError(503, 'Database connection failed', { expose: true, cause: err })`) instead of forwarding the
+  original.
+- The DAO contract is single-input: `get({ id })` → `T | null`, `list(input)` → `PaginatedResult<T>`,
+  `create(input)` → `T`, `update(input)` → `T` (the input carries `id`), `delete({ id })` → `void`; `update` and
+  `delete` throw `NotFoundError` for a missing row.
 
-- **DAO contract**:
-  - `class EntityDao implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput>`. `Dao` takes the resource's list input as one generic, so DAOs never name the filter or sort-field types. Every input type is inferred from its schema; `dao.model.ts` defines none of them.
-  - Methods are generic, each taking a single input object: `get({ id })` → `T | null`, `list(input)` → `PaginatedResult<T>`, `create(input)`, `update(input)` (the input carries `id`), `delete({ id })` → `void`.
-  - The DAO holds no configuration of its own: everything resource-specific lives in `<resource>.schema.ts`.
-  - Resource schema files (`db/schemas/<resource>.schema.ts`) carry **no comments**: they are declarations whose meaning comes from the naming patterns and the builders. The explanations live in this file. They follow one order: the table; the schemas (`select<Resource>Schema`, `<resource>IdInputSchema`, `create…`, `update…`, `<resource>FilterInputSchema`, `<resource>SortInputSchema`, `list<Resource>InputSchema`); `<resource>DefaultSort`; then every inferred type, in the same order.
-  - Controllers call DAOs; drizzle calls never appear in controllers.
-  - DAOs are transport-agnostic — they throw `NotFoundError` / regular errors, never `http-errors`.
-  - Controllers validate every input inline with `safeParse` and throw `createError(400, …)` on failure, and translate `NotFoundError → 404` from the DAO.
-  - DAOs are instantiated once in `server.ts` and placed on the context; they're not per-request.
-- **Filter inputs** (modelled on AppSync's `Model<Type>FilterInput`):
-  - One zod schema per scalar kind in `models/list-input.model.ts`, with the TS type inferred: `IdFilterInput` (`eq ne in`), `StringFilterInput` (`eq ne lt le gt ge between in contains notContains beginsWith`; the last three case-insensitive), `NumberFilterInput` (any number) / `DateFilterInput` (ISO date or date-time) (`eq ne lt le gt ge between in`), `BooleanFilterInput` (`eq ne`). `between` is an inclusive `[from, to]` pair; `in` takes up to 100 values, and an empty list matches nothing.
-  - Each resource declares `<resource>FilterInputSchema = createFilterInputSchema({ <column>: <scalar>FilterInputSchema, … })`, mirroring `<resource>SortInputSchema = createSortInputSchema([...])` (builders from `helpers/list-input.helper.ts`). The builder makes every field optional and adds recursive `and` / `or` / `not` (zod 4 getters, so the type is inferred — no hand-written mirror). Schemas are strict: unknown fields and operators are rejected.
-  - Filter and sort fields are **named after the table's columns**, and the DAO passes the drizzle table itself as the column source: `filterToSql(filter, entity)`, `sortToSql(sort, entity)`. `FilterTable` / `SortTable` make a field without a matching column a compile error.
-  - One translator serves all scalar kinds, because the zod schemas already restrict which operators each kind accepts.
-  - Translation rules (`helpers/dao.helper.ts`): fields are ANDed; a filter that matches every row (`{}`) makes an enclosing `or` match every row, and `not {}` matches none; an empty `in` matches nothing; LIKE metacharacters in `contains` / `notContains` / `beginsWith` values are escaped; every sort gets an `id` tie-breaker. The file has no comments: public API first (`FilterTable` / `SortTable`, `filterToSql`, `sortToSql`, `toPaginatedResult`, `escapeLike`), then the private helpers in the order they are called.
-  - `models/list-input.model.ts` follows one order and, like the resource schemas, carries no comments: the operator groups (`equatable` = `eq ne`, `comparable` = those plus `lt le gt ge between in`, `oneOf` for `in`); the five scalar schemas, each composed from those groups; `sortDirectionSchema`; then the types. The builders live in `helpers/list-input.helper.ts` (`createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`) together with the page-size limits (`DEFAULT_PAGE_SIZE` / `MAX_PAGE_SIZE`) and the logical-branch cap. The operator semantics are the ones listed above.
-  - Adding a filterable column is one line in the filter input schema; adding an operator is one line in the scalar schema and one in `dao.helper.ts`.
-- **list**: `list({ filter?, sort?, page, pageSize })` → `PaginatedResult<T>` = `{ items, total, page, pageSize, totalPages }`. Page-based (no cursors). `List<Resource>Input = z.infer<typeof list<Resource>InputSchema>`: the schema applies the page defaults (1, `DEFAULT_PAGE_SIZE`) and enforces their range, so `page` / `pageSize` always arrive set. The DAO falls back to `<resource>DefaultSort` (rows need a defined order to page reliably) and always adds an `id` tie-breaker. It runs the page query, then the count query, one after the other on the same `where`: simple and predictable on the pool, at the cost of one extra round trip (the two are not one snapshot, so `total` can lag a concurrent write). Sortable fields are an explicit allowlist: `entitySortInputSchema = createSortInputSchema(['name', …])`, from which `EntitySortInput` / `EntitySortField` are inferred.
-- **URL query transport**: `?filter=<json>&sortField=<field>&sortDirection=ASC|DESC&page=<n>&pageSize=<n>` (`pageSize` ≤ `MAX_PAGE_SIZE`). Decoding the URL is the **controller's** job, written out in the handler: `normalizeQuery` (first value of a repeated param, empties dropped), reject unknown params with a 400, `JSON.parse` the `filter` (invalid JSON → 400), build `sort` from `sortField` / `sortDirection` (`ASC` by default), and turn `page` / `pageSize` into numbers. The result goes to `list<Resource>InputSchema.safeParse(...)` (400 on failure) and its `data` straight to `list`. The list input schema itself knows nothing about the URL: `createListInputSchema({ filter, sort })` validates the structured `{ filter, sort, page, pageSize }`, so the DAO's input type carries no transport detail.
-- **Naming**: inputs follow `<Operation><Resource>Input` (`CreateEntityInput`, `UpdateEntityInput`, `ListEntityInput`) and their schemas `<operation><Resource>InputSchema`; resource list pieces follow `<resource><Kind>` (`entityFilterInputSchema`, `entitySortInputSchema`, `entityDefaultSort`); builders are `create<Thing>Schema`. Controller handlers are **verb+resource** (`listEntities`, `getEntity`, `createEntity`, `updateEntity`, `deleteEntity`, and `getHealth` / `getHome`), not `<noun>Controller`. Middleware exports pair as `errorHandler` + `notFoundHandler` (the `*Handler` suffix; the file keeps the `*.middleware.ts` name).
-- **drizzle-zod** generates `createInsertSchema` / `createUpdateSchema` / `createSelectSchema` from each drizzle table. Row-level validation (POST / PATCH bodies) uses these, and the row type comes from the select schema: `type Entity = z.infer<typeof selectEntitySchema>`, not `typeof entity.$inferSelect`, so every resource type in the schema file is a `z.infer`.
-- **Logger**: Pino emits plain JSON always. `pino-pretty` is a devDependency piped by the `dev` script externally — never imported in code.
-- **Drizzle config throws** when `DATABASE_URL` is unset. No fallback. Its `schema` points at `src/db/schemas/*.schema.ts`, because drizzle-kit discovers tables from module exports, not from the `schema` object. The runtime `db/client.ts` throws the same way — it reads `process.env.DATABASE_URL` and errors if unset, with no hardcoded connection-string fallback.
-- **New table**: add `src/db/schemas/<resource>.schema.ts` and register the table in `src/db/schema.ts`.
-- **Migrations only**: use `db:generate` + `db:migrate`. `db:push` is deliberately absent.
-- **No migrations are shipped by the scaffold.** The first `pnpm db:generate` emits a single fresh schema snapshot locally.
-- **tsconfigs** (three files):
-  - `tsconfig.json` — solution root, pure (`files: []` + `references`), no `compilerOptions`.
-  - `tsconfig.app.json` — all app compiler options live here.
-  - `tsconfig.app.json` sets `types: ['node']` explicitly; TypeScript 6 defaults `types` to `[]`.
-  - `tsconfig.node.json` — extends `app` with `composite: false`, and `include`s `tests/` and every config file
-    (`drizzle.config.ts`, `vitest.config.ts`). A new config file goes into that `include`, or ESLint reports it as
-    belonging to no project.
-- **Dev loop**: `node --import=tsx --watch src/server.ts`. Node provides the restart loop; tsx provides the TS loader. Do not use `tsx watch`.
+### 3.3 HTTP contract
 
-## Web conventions
+| route                 | success                          | errors                                                                                   |
+| --------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /`               | 200 `{ service, status }`        | —                                                                                        |
+| `GET /health`         | 200 `{ status: 'ok', db: 'up', latencyMs, timestamp }` | 503 `Database connection failed`                                  |
+| `GET /entities`       | 200 `PaginatedResult<Entity>`    | 400 `Unknown query params: …`, `filter must be valid JSON`, `Invalid query`               |
+| `POST /entities`      | 201 the created row              | 400 `Invalid body`; 400 malformed JSON and 413 over 100 kB, from `express.json()`         |
+| `GET /entities/:id`   | 200 the row                      | 400 `Invalid id`; 404 `Entity not found: <id>`                                           |
+| `PATCH /entities/:id` | 200 the updated row              | 400 `Invalid id` / `Invalid body` (including no updatable field); 404                    |
+| `DELETE /entities/:id`| 204, no body                     | 400 `Invalid id`; 404                                                                    |
+| anything else         | —                                | 404 `Not Found: <METHOD> <path>`                                                         |
 
-- **Structure**: `src/app/{components,layouts,pages,models,services,helpers,store}/`. `models/` holds resource types shared by several slices (`entity.model.ts`), `services/` one data-access service per resource (`entity.service.ts`), `helpers/` plain functions (`entity-list-params.helper.ts`, `http-error.helper.ts`), and `store/` the global slices plus one slice per page; pages only dispatch actions (navigation included, as `AppRouterActions.navigate`).
-- **Inline templates only** — no `.html` or `.scss` sibling files. The `@Component` decorator carries `template:` directly. Angular ESLint's `processInlineTemplates` keeps them linted.
-- **Styling**: Tailwind utilities in the inline template + one `host` class per component for host-element rules. The only global stylesheet is `src/styles.css` (Tailwind imports + `body` reset).
-- **Tailwind preflight**: enabled only when Fundamental NGX is **not** in use. When FD-NGX is enabled, use theme + utilities layers only; preflight clobbers FD-NGX base styles.
-- **Components take `input()` / `output()`** — components do not touch the store. Only **pages** and **layouts** may read the store. Reusable components live in `components/` (the example is `ConfirmDialog`) and are developed and documented in **Storybook** (`@storybook/angular-vite`), with a `*.stories.ts` and a `*.component.browser.spec.ts` beside each; components keep Angular 22's default change detection (`OnPush`) and do not set `changeDetection`; a host binds a component's signal inputs with property syntax (`[title]="…"`).
-- **Pages and layouts inject only the `Store`.** Route params come from the app-router selectors (`selectRouteParam('id')`, `selectQueryParams`), never from `ActivatedRoute`. Navigation is an action, `AppRouterActions.navigate({ commands, queryParams })`, dispatched by pages or page effects; the app-router `navigate$` effect is the only code that calls the Angular `Router`. Forms use `new FormGroup` / `new FormControl`, not an injected `FormBuilder`. Services (`EntityService`, `Router`) are injected only in effects.
-- **Data access goes through a service.** `services/<resource>.service.ts` (`providedIn: 'root'`) is the only code that uses `HttpClient`; its methods (`list`, `get`, `create`, `update`, `delete`) return `Observable`s and read `apiBaseUrl` from the app-context slice. Each method writes its full URL explicitly (`` `${this.apiBaseUrl()}/entities/${id}` ``) and builds its own params inline; there is no private URL or params helper, so a method reads as the request it sends. Effects call it and map the result to success / failure actions.
-- **Pages load through `Load` / `Leave`.** Every page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`; the reducers reset on both. `Load` moves the slice to `'loading'` and an effect calls the service; success moves it to `'loaded'` (`'ready'` for the form) with the data, failure to `'error'`. The list page's `Load` starts an effect that follows the list input in the URL until `Leave` and dispatches `Fetch({ input })` for the first value and every change, so the first load and every query change go through the same path.
-- **Actions are named for what they do, not for a lifecycle moment.** A page asks for its data with `Load`, not `Enter` / `Init` / `Mounted`, even though it dispatches it from `ngOnInit`; a request for one specific input is `Fetch`; results are `<Action> Success` / `<Action> Failure` named for the action that fired the request. On the list page the request is `Fetch` (the URL-following effect), so its results are `Fetch Success` / `Fetch Failure`; on the detail and form pages the request fires on `Load` itself, so theirs are `Load Success` / `Load Failure`. The action group's `source` is the page name (`'Entity List Page'`).
-- **One `status` per page state, no boolean flags.** Each slice has `status`, a union of that page's states (list `'idle' | 'loading' | 'loaded' | 'deleting' | 'error'`, detail `'idle' | 'loading' | 'loaded' | 'error'`, form `'idle' | 'loading' | 'ready' | 'saving' | 'error'`), plus `error: string | null` set only in `'error'`. No `loading` / `saving` / `deleting` booleans. Templates branch with `@switch (status())`.
-- **NgRx slice placement**:
-  - **One slice per page.** Each page owns `store/<page-name>/` (`<page-name>.model.ts`, `.actions.ts`, `.reducer.ts`, `.selectors.ts`, `.effects.ts`), named after its component (`entity-list-page`, `entity-detail-page`, `entity-form-page`), and **registers it on its route** with `provideState` + `provideEffects`. A page reads only its own slice.
-  - Data two pages both show is loaded by each page for itself (detail and form each load the entity); there are no cross-page reducer updates.
-  - A page component used by several routes (the form on `new` and `:id/edit`) registers its slice once, on a shared componentless parent route, so its effects do not run twice.
-  - Route-level effects stay registered after the page is left: an effect that reacts to navigation filters by path.
-  - Pages dispatch `Load` on init and `Leave` on destroy, and reset their state on both, so a revisit never shows stale data.
-  - Only `appContext` (`apiBaseUrl` + `appName`, the only consumer of Angular `environment.ts`) and the router state (`store/app-router/`, feature key `appRouter`: `provideRouterStore({ stateKey: ROUTER_FEATURE_KEY })`, read through `getRouterSelectors(selectRouterState)`) are **global**, in `app.config.ts`, which also calls `provideEffects()` once so route-level effects can join.
-- **Web resource types mirror the API** in `models/<resource>.model.ts`, by name and shape: `EntityFilterInput` (with the scalar filter inputs it uses), `EntitySortInput`, `ListEntityInput`, `PaginatedResult<T>`. The web cannot import the API package, so change both sides together.
-- **router-store + URL as source of truth**: `@ngrx/router-store` is registered globally. For list pages (filter / sort / pagination), the URL is the single source of truth — pages dispatch `AppRouterActions.navigate({ commands: [], queryParams })`, and the list page's effect, running from `Load` to `Leave`, fetches whenever the list input in the URL changes. Do not duplicate the query in a reducer slice.
-- **Forms**: every input, select and textarea has a `name`; free-text fields that are not personal data set `autocomplete="off"`. Date filters are days in the viewer's time zone, sent as local midnight in ISO-8601.
-- **Lists stay consistent after writes**: a delete from the list page fetches the list again (totals change), and a page past the end steps back to the last page — both are list-slice effects (`fetchAfterDelete$`, `stepBackPastLastPage$`), not page code.
-- **Angular `environment.ts`** is the single consumer of build-time config. The browser calls the API host directly on `apiBaseUrl` — there is **no `/api` reverse proxy** and **no runtime `config.json`** fetch.
+- **Error body:** always `{ status: 'error', message }`, written by `errorHandler`. The message is the error's own for
+  an `http-errors` error created with `expose: true` (every 4xx here, and the health 503); anything else — an
+  unexpected error, an unexposed http error — answers `Internal Server Error`, so internals never reach the client.
+- **Log level follows status:** `errorHandler` logs 5xx at `error` and 4xx at `warn`. Nothing else logs a failed
+  request; pino-http logs every request.
+- **Dates** travel as ISO-8601 strings; **ids** are UUIDs. CORS is open (`cors()`), because the browser calls the API
+  host directly.
 
-## Tests
+### 3.4 List queries
 
-- **Both projects have a `test` script, and it must pass.** API: `vitest run` (over the `unit` + `controllers` projects); web: `ng test` (Analog's Vitest builder, the `unit` project). The web app also has `test:browser` (Vitest browser mode) and `test:e2e` (Playwright) — see **Web tests** below.
-- **API tests** live in `api/tests/`, grouped by **kind** into five folders — `unit/`, `controllers/`, `db/`, `api/` and `utils/` — not mirrored against `src/`. One `*.test.ts` per module, in Arrange / Act / Assert, and **each file wraps its suites in a single top-level `describe` named for the module under test** (`describe('entity.dao')`, `describe('dao.helper')`, `describe('entity.controller')`, `describe('entity.api')`, …), with nested describes inside structured however best reflects the module.
-  - **`unit/` — fast, database-free.** SQL builders tested through the SQL they render (`PgDialect`); helpers cover every exported function with a happy case and at least one edge case. The list-input builders (`list-input.helper.ts`) are tested directly against an ad-hoc field config (`list-input.helper.test.ts`) — defaults, strictness, logical-branch cap, allowlists — so the per-resource schema test (`entity.schema.test.ts`, pure zod, no DB) only covers that resource's own column/sort wiring.
-  - **`controllers/` — controller unit tests, database-free.** **One test file per controller** (`entity.controller.test.ts`, `home.controller.test.ts`, `health.controller.test.ts`), plus `error.middleware.test.ts` for the terminal error handler. Every route goes through `createApp(context)` with a **fake DAO** on the context, driven over real HTTP with the `fetch` API (a `node:http` server on an ephemeral port via `utils/test-server.ts`) — **not** `supertest`. Asserts status **and** response body for each route's happy path, plus every validation and error branch (4xx, the DAO's `NotFoundError` → 404), since the fake DAO makes each one cheap to provoke.
-  - **`db/` — DB-backed DAO tests.** Use **Testcontainers** (`@testcontainers/postgresql`) to spin up a throwaway `postgres:17-alpine` and apply `db/migrations/` with the **drizzle migrator** (same `__migrations__` table as `drizzle.config.ts`), then exercise the real DAO. One container per suite (`beforeAll` / `afterAll`); each test isolates its rows (`beforeEach` clears the table with a delete). Covers happy and edge cases (e.g. `NotFoundError` on a missing id); `list` is exhaustive — sort, filter and pagination independently and combined, with the filter covering most operator kinds possible on the resource's columns (id, string, date for `entity`).
-  - **`api/` — API tests, end to end.** One `<resource>.api.test.ts` per resource: the real app served on the real DAO and a Testcontainers Postgres (via `utils/test-server.ts`'s `serve`), driven over `fetch`. Covers every route's happy path and every error only the real stack produces — a missing row's 404 on get / update / delete, a filter + sort + page sent as a real query string and answered from seeded rows, ISO-8601 dates in the JSON. Validation edge cases stay in the controller tests.
-  - **`utils/` — shared test helpers, not tests.** The Testcontainers bootstrap (`pg-container.ts`), the fake-DAO/app factory (`fake-dao.ts`), the HTTP test-server helpers (`test-server.ts`: `startTestServer` with the fake DAO, `serve` for any app), and seed generators (`entity-seed.ts`). Put mocks and fixtures here.
-- **One vitest config, four projects.** `vitest.config.ts` defines named `projects` (`unit`, `controllers`, `db`, `api`) selected by folder; shared options (e.g. silent logs) live at the root and are inherited. The default `pnpm --filter api test` runs `--project unit --project controllers` (no Docker); `pnpm --filter api test:integration` (or `pnpm test:integration` at the root) runs `--project db --project api`, which needs a running Docker daemon.
-- **Web tests** come in three layers. The first two run on Analog's Vitest builder (`@analogjs/vitest-angular:test` as the `test` target), from one `vitest.config.mts` with two projects; every spec and both setup files are in `tsconfig.spec.json`, because Analog only compiles files in that program:
-  - **Unit (`ng test`, project `unit`, jsdom)** — `*.spec.ts` beside the file. Covers `EntityService` (via `provideHttpClient` + `HttpTestingController` + a `provideMockStore`), **every NgRx slice** — the list, detail and form page slices and the global `appContext` slice — with its specs as applicable (`*.reducer.spec.ts` pure, `*.selectors.spec.ts` via `.projector(...)`, `*.effects.spec.ts` via `provideMockActions` + `TestBed.runInInjectionContext`; `appContext`, having no effects, gets reducer + selectors specs), the routes and the helpers. This is the required `test` check.
-  - **Browser mode (`pnpm test:browser` = `ng test -c browser`, project `browser`)** — Vitest browser mode + Playwright render components (through their signal inputs and outputs) and pages (with a mock store) in real Chromium; co-located as `*.component.browser.spec.ts`, setup + `render()` in `src/testing/`.
-  - **Full-stack e2e (`pnpm test:e2e`)** — Playwright Test drives the real app → real API → real Postgres; specs in `e2e/pages/`, ports, database and seeding in `e2e/utils/`. It runs on its own stack (`app_e2e` database, API on `:3100`, `ng serve -c e2e` on `:4300`), so the dev database and a running dev or Compose stack are never touched; teardown stops Postgres only if setup started it. **Needs Docker, the root `.env` and the first migration.**
-- **Web `typecheck`** runs `tsc --noEmit` over `tsconfig.app.json`, `tsconfig.spec.json` and `e2e/tsconfig.json`, so specs, test setup, the e2e suite and the Playwright config are type-checked; `ng build` covers the templates.
-- A new resource gets a `controllers/<resource>.controller.test.ts`, a `db/<resource>.dao.test.ts` and an `api/<resource>.api.test.ts`, all copied from the entity ones; a new scalar filter input or operator gets a `unit/dao.helper.test.ts` case, a `unit/list-input.helper.test.ts` case for the builder behaviour, and a rejection case in the resource schema test (`unit/<resource>.schema.test.ts`). URL decoding is tested through the controller test. On the web, a new resource copies the service + slice specs and a browser spec per page; a new component gets a `*.stories.ts` and a browser spec.
+**On the wire:** `GET /entities?filter=<json>&sortField=<field>&sortDirection=ASC|DESC&page=<n>&pageSize=<n>`. Every
+param is optional; any other param is a 400.
 
-## Formatting & lint
+**Decoding is the controller's job,** written out in the handler: `normalizeQuery`, reject unknown params, `JSON.parse`
+the filter (invalid JSON → 400), build `sort` from `sortField` / `sortDirection` (`ASC` when only the field is given),
+turn `page` / `pageSize` into numbers, then `list<Resource>InputSchema.safeParse(…)` (400 on failure) and its `data`
+straight to the DAO. The schema validates the structured `{ filter, sort, page, pageSize }` and knows nothing about the
+URL, so the DAO can be called with plain objects from anywhere.
 
-- **Per-project ESLint + Prettier configs**. No shared root `.prettierrc`. If a future project wants shared formatting, re-add a root `.prettierrc` and remove the per-project ones.
-- **Prettier formats, ESLint judges.** `eslint-config-prettier` (last in each config) switches off ESLint's formatting
-  rules; `eslint-plugin-prettier` is not used. In the web flat config this means the prettier config comes **after**
-  Storybook's config block, so nothing re-enables a formatting rule after it. `pnpm lint` reports code problems,
-  `pnpm format:check` reports formatting. Run both in CI.
+**Filter inputs**, modelled on AppSync's `Model<Type>FilterInput`, one zod schema per scalar kind:
 
-## Docker
+| kind                 | operators                                                                     |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `IdFilterInput`      | `eq ne in`                                                                    |
+| `StringFilterInput`  | `eq ne lt le gt ge between in contains notContains beginsWith`                |
+| `NumberFilterInput`  | `eq ne lt le gt ge between in`                                                |
+| `DateFilterInput`    | `eq ne lt le gt ge between in` (ISO date or date-time)                        |
+| `BooleanFilterInput` | `eq ne`                                                                       |
 
-- **Postgres** runs on `postgres:17-alpine`. Data is **bind-mounted** at `./api/db/data/` (not a named volume) so the host can inspect and `rm -rf` it to reset.
-- The `app` database is created by `./api/db/scripts/init.sql`.
-- **Web Dockerfile** is multi-stage → `nginx:1.27-alpine` serving static files with SPA fallback. **No `/api` reverse proxy**; the browser calls the API host directly.
-- **API Dockerfile** uses `node:24-alpine`.
-- **Both images build from the repo root** (`context: .`, `dockerfile: api/Dockerfile`), because `catalog:` entries only
-  resolve against the root `pnpm-workspace.yaml` and lockfile. One root `.dockerignore` serves both. Corepack picks the
-  pnpm version from `packageManager`.
+- `between` is an inclusive `[from, to]` pair; `in` takes at most 100 values, and an empty `in` matches nothing;
+  `contains` / `notContains` / `beginsWith` are case-insensitive and escape LIKE metacharacters.
+- A resource declares `<resource>FilterInputSchema = createFilterInputSchema({ <column>: <kind>FilterInputSchema, … })`.
+  The builder makes every field optional and adds recursive `and` / `or` (at most 20 branches each) and `not`. Schemas
+  are strict: an unknown field or operator is a 400.
+- Fields across a filter object are ANDed. `{}` matches every row, so an `or` containing it matches every row and
+  `not {}` matches none.
+- **Fields are named after the table's columns.** The DAO passes the Drizzle table itself to `filterToSql` /
+  `sortToSql`, and `FilterTable` / `SortTable` make a field with no matching column a compile error; there are no column
+  maps.
 
-## Decisions deliberately NOT taken
+**Sorting:** an explicit allowlist, `<resource>SortInputSchema = createSortInputSchema(['name', …])`. The DAO falls
+back to `<resource>DefaultSort` (`createdAt DESC` for `entity`), and `sortToSql` always appends an `id` tie-breaker, so
+pages never repeat or skip rows.
 
-The reason behind each one is recorded in the `create-fullstack-app` skill's decisions reference. In short:
+**Pagination is page-based:** `page` (default 1) and `pageSize` (default 20, max 100) in; `{ items, total, page,
+pageSize, totalPages }` out. The schema fills the defaults, so the DAO always receives both. The DAO runs the page query
+and then the count query on the same `where`, one after the other: one pool connection per request, and `total` can lag
+a concurrent write (wrap both in a transaction when it must not).
 
-- **No Nginx `/api` reverse proxy**, no runtime `config.json`.
-- **No `pino-pretty` import in code** — piped externally in the `dev` script.
-- **No context middleware** — context is a singleton on `app.locals`.
-- **No `checkDatabase()` helper** — controllers run `SELECT 1` inline.
-- **No routers** — direct controller mounts.
-- **No SCSS, no per-component CSS files** — Tailwind + inline templates only.
-- **No `db:push` script** — migrations only.
-- **No shipped migrations** — scaffold writes schema source; user runs the first `db:generate`.
-- **No `--env-file-if-exists`** — strict `--env-file`.
-- **No caret range on TypeScript** — one exact 6.0.x pin in the catalog for both projects.
-- **No `eslint-plugin-prettier`** — formatting is checked by `format:check`, not `lint`.
-- **No per-project Docker build context** — both images build from the repo root.
-- **No hand-written TS mirrors of zod schemas** — always `z.infer`.
-- **No `types/` folder for runtime models** — `models/` for shapes + errors, `express.d.ts` at src root.
-- **No reducer slice for the list query** — URL (via router-store) is the source of truth.
-- **No global slice per resource** — every page owns its slice, registered on its route.
-- **No webpack Storybook builder** — Storybook runs on `@storybook/angular-vite` (Vite/Analog), matching the esbuild/Vite app toolchain.
-- **No `@angular/build:unit-test` builder** — `ng test` runs on Analog's Vitest builder, one config for the unit and browser projects.
-- **No separate tsconfig for browser specs** — Analog compiles only `tsconfig.spec.json`'s program, so every spec lives there.
-- **No `@Input()` decorators** — components keep signal `input()` / `output()`, and their browser specs drive them with `setInput`.
-- **No stubbed web e2e** — Playwright e2e exercises the real app, API and Postgres, not mocked HTTP.
-- **No e2e against the dev database** — the e2e run has its own database and ports and never stops the dev stack.
+**Extending:** a filterable column is one line in the resource's filter schema, a sortable one one entry in its sort
+allowlist; a new operator is one line in its scalar schema plus one branch in `dao.helper.ts`'s `fieldToSql`.
+
+### 3.5 Data and migrations
+
+- Types come from schemas: `type Entity = z.infer<typeof selectEntitySchema>`, and every input type is a `z.infer` of
+  its schema — including the recursive filter type. Never write a TypeScript type that mirrors a zod schema.
+- Row inputs come from drizzle-zod (`createInsertSchema` / `createUpdateSchema` / `createSelectSchema`); list inputs
+  from the builders.
+- **Resource schema files follow one order and carry no comments:** the table; the schemas (`select<Resource>Schema`,
+  `<resource>IdInputSchema`, `create…`, `update…`, `<resource>FilterInputSchema`, `<resource>SortInputSchema`,
+  `list<Resource>InputSchema`); `<resource>DefaultSort`; then the inferred types in the same order. The names and the
+  builders carry the meaning; this file explains them.
+- A new table is a new `db/schemas/<resource>.schema.ts` registered in `db/schema.ts`.
+- **Migrations only:** `db:generate` writes a migration from the schema files (drizzle-kit reads
+  `src/db/schemas/*.schema.ts`), `db:migrate` applies it. There is no `db:push`. The scaffold shipped no migrations; the
+  first `db:generate --name init` created them.
+- Postgres data is bind-mounted at `api/db/data/`; `rm -rf api/db/data/` resets it. `api/db/scripts/init.sql` creates
+  the `app` database on first start.
+
+### 3.6 Tooling
+
+- **tsconfigs:** `tsconfig.json` is a pure solution file (`files: []` + `references`); `tsconfig.app.json` holds every
+  compiler option, including `types: ["node"]` (TypeScript 6 defaults `types` to `[]`); `tsconfig.node.json` extends it
+  with `composite: false` and includes `tests/` and every config file. A new config file goes into that `include`, or
+  ESLint reports it as part of no project.
+- **Dev loop:** `node --import=tsx --watch src/server.ts`, not `tsx watch`: Node restarts, tsx loads TypeScript.
+- `dev`, `start`, `db:generate` and `db:migrate` all use `--env-file=../.env` (drizzle-kit does not load `.env` itself).
+
+## 4. Web
+
+### 4.1 Architecture
+
+```
+URL ──► @ngrx/router-store ──► appRouter slice  (route params + query params, in the store)
+                                     │
+route ─► page component              │ selectors
+           │  Load on init, Leave on destroy        ▲ state
+           ▼                                        │
+        page slice  ◄── reducer ◄── actions ──► effects ──► EntityService ──► HttpClient ──► API
+                                                   │
+                                                   └──► AppRouterActions.navigate ──► navigate$ ──► Router ──► URL
+```
+
+- **The URL is the source of truth for list queries.** The list page never holds filter / sort / page in the store:
+  it dispatches `AppRouterActions.navigate({ commands: [], queryParams })`, and its effect, running from `Load` to
+  `Leave`, dispatches `Fetch({ input })` for the first list input in the URL and for every change. Refresh, back,
+  forward and deep links all work for free.
+- **Pages talk to the store, effects talk to the world.** A page reads selectors and dispatches actions; effects call
+  the service and map results to actions; `navigate$` is the only code that calls the Angular `Router`.
+- **Each page owns one slice, registered on its route** (`provideState` + `provideEffects` in `app.routes.ts`). Only
+  `appContext` and `appRouter` are global, in `app.config.ts`. Route-level effects stay registered after the page is
+  left, so an effect that reacts to the URL stops on `Leave` or checks it is still on its page.
+
+### 4.2 Where state lives
+
+| state                                         | lives in                                              | example                                         |
+| --------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------- |
+| what the user is looking at, shareable        | the URL (router-store)                                | list filter, sort, page; the `:id` of a page    |
+| server data and the request's status          | the page's slice                                      | `items`, `total`, `entity`, `status`, `error`   |
+| UI-only, short-lived                          | a signal in the page (`signal` / `linkedSignal`)      | the filter strip's draft, the row pending delete |
+| build-time config                             | `environment*.ts`, read only by `appContext`          | `apiBaseUrl`, `appName`                         |
+
+Derive UI state from the store with `linkedSignal` when it must follow it — the filter draft resyncs from the URL on
+every change, the pending delete closes when a new page of items arrives — instead of syncing it by hand in an
+`effect()`.
+
+### 4.3 Building blocks
+
+| block            | lives in                                   | is                                                              | may use                                                    | must not                                                       |
+| ---------------- | ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| component        | `components/<name>.component.ts`           | a store-free UI piece: signal `input()` / `output()`            | other components                                           | inject the `Store`, a service or the `Router`                  |
+| layout           | `layouts/<name>-layout.component.ts`       | the shell around the pages                                      | the `Store` (read)                                         | inject services                                                |
+| page             | `pages/<name>-page.component.ts`           | one route's screen                                              | the `Store` (selectors, dispatch), components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`    |
+| slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's state and its transitions       | resource models, helpers                                   | hold another page's data, hold the list query                  |
+| effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly                     |
+| app-router slice | `store/app-router/`                        | router-store selectors, the `Navigate` action, `navigate$`      | the Angular `Router` (`navigate$` only)                    | —                                                              |
+| app-context slice| `store/app-context/`                       | `apiBaseUrl` + `appName`, seeded from `environment`             | `environment`                                              | change after start                                             |
+| service          | `services/<resource>.service.ts`           | every HTTP call for one resource (`providedIn: 'root'`)          | `HttpClient`, `selectApiBaseUrl`, helpers                  | be injected outside effects, keep state                        |
+| helper           | `helpers/<name>.helper.ts`                 | pure functions (URL params, filter form mapping, error message) | models                                                     | inject anything                                                |
+| model            | `models/<resource>.model.ts`               | the resource's types, mirroring the API by name and shape       | —                                                          | contain logic                                                  |
+
+- **Services write each request in full:** the method builds its URL (`` `${this.apiBaseUrl()}/entities/${id}` ``) and
+  params inline, with no private URL or params helper, and returns an `Observable`. `list` reuses the shared `toParams`
+  so the page URL and the API request use one format.
+- **Resource models mirror the API by hand** (`Entity`, `CreateEntityInput`, `EntityFilterInput`, `ListEntityInput`,
+  `PaginatedResult<T>`, …). The web cannot import the API package: change both sides in the same commit.
+- **Forms** are `new FormGroup` / `new FormControl`, validated like the API's schemas (`name` required, max 200;
+  `description` max 2000). Save trims the values and sends an empty description as `null`.
+
+### 4.4 The page contract
+
+- **Load and Leave.** Every page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`, and its reducer resets to
+  the initial state on both, so a revisit never shows stale data. Detail and form load the entity themselves; there are
+  no cross-page reducer updates.
+- **One `status` union per slice, never boolean flags:** list `'idle' | 'loading' | 'loaded' | 'deleting' | 'error'`,
+  detail `'idle' | 'loading' | 'loaded' | 'error'`, form `'idle' | 'loading' | 'ready' | 'saving' | 'error'`, plus
+  `error: string | null`, set only in `'error'`.
+- **Actions name intent, not lifecycle:** `Load` (not `Enter` / `Init`), `Fetch` for one request with a given input,
+  `<Action> Success` / `<Action> Failure` for its results — `Fetch Success` on the list, `Load Success` on detail and
+  form. The action group's `source` is the page name (`'Entity List Page'`).
+- **Writes use `concatMap`, reads `switchMap`.** A second save never cancels the first; a newer fetch cancels an older
+  one.
+- **Navigation after a write is an effect**, never page code: `navigateAfterSave$` goes to the detail page; on the
+  list, `fetchAfterDelete$` refetches and `stepBackPastLastPage$` moves off a page past the end.
+- **A page used by several routes registers its slice once,** on a shared componentless parent route (the form on
+  `new` and `:id/edit`), so its effects do not run twice.
+
+### 4.5 UI rules
+
+- **One file per component:** inline `template`, no `.html` / `.scss` siblings. Angular ESLint lints inline templates.
+- **Styling:** Tailwind utilities in the template, plus a `host` class for the host element. The only global
+  stylesheet is `src/styles.css`. Tailwind's preflight is on unless Fundamental NGX is installed, whose base styles it
+  would clobber.
+- **No component sets `changeDetection`:** `OnPush` is Angular 22's default.
+- **Templates:** the status-driven body is an `@switch (status())`; the error banner over it is an
+  `@if (status() === 'error')`. Bind a component's signal inputs with property syntax (`[title]="'Delete entity'"`).
+- **Forms and accessibility:** every input, select and textarea has a `name` and a label; free-text inputs that are
+  not personal data set `autocomplete="off"`. A select gets its own `<label for>` + `id` (a wrapping label folds the
+  option text into its accessible name), and each `<option>` reflects the current value with `[selected]`.
+- **Accessible names are a test contract.** Specs find elements by role and name (`getByRole('button', { name: 'Save' })`,
+  `getByLabelText('Sort')`), so renaming a heading, label or button is a change to its specs.
+- **Dates:** a date filter is a day in the viewer's time zone, sent as local midnight in ISO-8601; dates are shown
+  with `date: 'medium'`.
+- **Components are built in Storybook** (`@storybook/angular-vite`): each has a `*.stories.ts` beside it with one story
+  per meaningful state, `args` for its inputs and `fn()` for its outputs.
+
+## 5. Naming
+
+**Files**
+
+| what                     | pattern                                              | example                                         |
+| ------------------------ | ---------------------------------------------------- | ----------------------------------------------- |
+| API resource schema      | `db/schemas/<resource>.schema.ts`                    | `entity.schema.ts`                              |
+| API DAO                  | `daos/<resource>.dao.ts`                             | `entity.dao.ts`                                 |
+| API controller           | `controllers/<resource>.controller.ts`               | `entity.controller.ts`                          |
+| API middleware           | `middlewares/<name>.middleware.ts`                   | `error.middleware.ts`                           |
+| helper (API and web)     | `helpers/<name>.helper.ts`                           | `dao.helper.ts`, `entity-list-params.helper.ts` |
+| model (API and web)      | `models/<name>.model.ts`                             | `dao.model.ts`, `entity.model.ts`               |
+| web component / layout / page | `<name>.component.ts`, flat in its folder       | `pages/entity-list-page.component.ts`           |
+| web service              | `services/<resource>.service.ts`                     | `entity.service.ts`                             |
+| NgRx slice               | `store/<page-name>/<page-name>.{model,actions,reducer,selectors,effects}.ts` | `entity-list-page.effects.ts` |
+| story                    | `<name>.stories.ts`, beside the component            | `confirm-dialog.stories.ts`                     |
+| API unit test            | `tests/unit/<src path>/<file>.test.ts`               | `tests/unit/controllers/entity.controller.test.ts` |
+| API DAO / API test       | `tests/db/<resource>.dao.test.ts`, `tests/api/<resource>.api.test.ts` | `entity.api.test.ts`             |
+| web unit / browser spec  | `<file>.spec.ts` / `<file>.browser.spec.ts`, beside the file | `entity.service.spec.ts`                 |
+| e2e spec                 | `e2e/pages/<page>.spec.ts`                           | `entity-list-page.spec.ts`                      |
+
+Folders are plural (`controllers/`, `daos/`, `helpers/`, `middlewares/`, `models/`, `schemas/`); the file keeps the
+singular suffix. Angular files sit flat in their folder — `pages/entity-list-page.component.ts`, never
+`pages/entity-list/entity-list-page.component.ts` — and a slice lives under `store/`, not beside its page.
+
+**Identifiers**
+
+| what                    | pattern                                       | example                                                        |
+| ----------------------- | --------------------------------------------- | -------------------------------------------------------------- |
+| input type / schema     | `<Operation><Resource>Input` / `<operation><Resource>InputSchema` | `CreateEntityInput`, `listEntityInputSchema` |
+| resource list pieces    | `<resource><Kind>`                            | `entityFilterInputSchema`, `entitySortInputSchema`, `entityDefaultSort` |
+| schema builders         | `create<Thing>Schema`                         | `createFilterInputSchema`                                      |
+| controller handler      | verb + resource                               | `listEntities`, `getEntity`, `getHealth` — never `entityController` |
+| middleware              | `<name>Handler`                               | `errorHandler`, `notFoundHandler`                              |
+| DAO class               | `<Resource>Dao`                               | `EntityDao`                                                    |
+| NgRx action group       | `<Page>Actions`, `source` = page name         | `EntityListPageActions`, `'Entity List Page'`                  |
+| feature key / selectors | `<PAGE>_FEATURE_KEY`, `select<Thing>`          | `ENTITY_LIST_PAGE_FEATURE_KEY`, `selectListInput`              |
+| effect                  | `<what it does>$`                             | `fetchOnListInputChange$`, `navigateAfterSave$`                |
+| page / component class  | the name without a suffix                     | `EntityListPage`, `ConfirmDialog`, `MainLayout`                |
+
+"Dao", not "Repository": a class per table returning rows is DAO-shaped. `PaginatedResult`, not `Connection`, which
+names a cursor-paginated result.
+
+## 6. Code style
+
+- **API imports end in `.js`** (`'../models/error.model.js'`), as Node's ESM resolution requires; the web imports
+  without an extension.
+- **Type-only imports are inline:** `import { type Entity } from …` (`@typescript-eslint/consistent-type-imports`).
+- **Named exports only.** A default export appears only where a tool requires one: config files, a story's `meta`,
+  Playwright's global setup and teardown.
+- **Comments explain why, and only where the code cannot.** Declaration files — resource schemas,
+  `list-input.model.ts`, `dao.helper.ts`, DAOs, controllers — carry none; their names and structure carry the meaning,
+  and this file explains them.
+- **No non-null assertions (`!`), always braces (`curly`).** Unused variables are errors unless they start with `_`
+  (`_next`, `_req`).
+- **Size guardrails warn, they do not fail:** complexity 10, depth 4, 75 lines per function, 20 statements, 4 params,
+  400 lines per file, 3 nested callbacks. Reducers skip the complexity rule; tests skip the function-length rule (and,
+  on the web, the nesting rule).
+- `*.controller.ts` files turn off `@typescript-eslint/require-await`, because every handler is `async` for one shape.
+
+## 7. Testing
+
+### 7.1 The tiers
+
+| tier                         | answers                                                         | real                                     | stubbed                          | lives in                               | run                      |
+| ---------------------------- | --------------------------------------------------------------- | ---------------------------------------- | -------------------------------- | -------------------------------------- | ------------------------ |
+| API unit                     | does this function do the right thing with this input?           | the function                             | DAO, `req` / `res` / `next`, log | `api/tests/unit/` (mirrors `src/`)     | `pnpm test`              |
+| API DAO                      | does the DAO's SQL return the right rows from a real Postgres?   | DAO, Drizzle, Postgres                   | —                                | `api/tests/db/`                        | `pnpm test:integration`  |
+| API end to end               | does the API answer correctly over HTTP, all layers together?    | HTTP, Express, controllers, DAO, Postgres| —                                | `api/tests/api/`                       | `pnpm test:integration`  |
+| web unit                     | is this service / slice / effect / helper / route right?         | the unit, `TestBed`                      | HTTP, store, actions, services   | `*.spec.ts` beside the file            | `pnpm test`              |
+| web browser                  | does this component or page render and behave in a real browser? | the component, Chromium, Tailwind        | the store (mock), the router     | `*.browser.spec.ts` beside the file    | `pnpm test:browser`      |
+| e2e                          | does a user flow work against the real API and database?         | everything                               | —                                | `web/e2e/pages/`                       | `pnpm test:e2e`          |
+
+Storybook is not a test: it is where components are built and their states reviewed.
+
+### 7.2 What each tier is for
+
+**API unit — helpers and schemas** (`tests/unit/helpers/`, `tests/unit/db/schemas/`)
+- *Real / stubbed:* pure functions and zod schemas; no database. SQL builders are checked through the SQL they render
+  with `PgDialect`.
+- *Assert:* every exported function, a happy case and at least one edge case. The list builders are tested against an
+  ad-hoc field config (defaults, strictness, branch cap, allowlists), so a resource's schema test covers only its own
+  columns and sort fields.
+- *Not here:* anything that needs rows.
+- *Add one when:* you add or change a helper, an operator, a scalar kind, or a resource's filter / sort wiring.
+
+**API unit — controllers and middlewares** (`tests/unit/controllers/`, `tests/unit/middlewares/`)
+- *Real / stubbed:* the handler is real and called directly. `mockRequest({ context, params, query, body })` puts a
+  stub DAO from `createStubContext()` on `req.app.locals.context`; `mockResponse()` gives chainable `status` / `json` /
+  `send` spies; `mockNext()` a spy `next`; `mockLog()` a spy `req.log` — all in `tests/utils/http-mocks.ts`. No app,
+  no server.
+- *Assert:* the response (`res.status`, `res.json`, `res.send`), or the error passed to `next`
+  (`httpError(400)`), and what the DAO received. Every 400 also asserts the DAO was never called. The error handler's
+  test asserts the status, the body, whether the message is hidden and the log level.
+- *Not here:* body parsing, routing, real SQL — the API test and the DAO test own those.
+- *Add one when:* you add a handler, a validation rule, an error mapping or a middleware.
+
+**API DAO** (`tests/db/<resource>.dao.test.ts`)
+- *Real / stubbed:* the real DAO on a throwaway `postgres:17-alpine` from Testcontainers, migrated with the drizzle
+  migrator (the same `db/migrations/` and `__migrations__` table as drizzle-kit). One container per suite; each test
+  clears the table first and seeds what it needs through `tests/utils/<resource>-seed.ts`.
+- *Assert:* every method's happy path and edge cases (`NotFoundError`, `null` columns, partial updates); `list`
+  exhaustively — pagination, sort with the tie-breaker and the default sort, filters across the operators the columns
+  take, `and` / `or` / `not`, all combined — and that LIKE metacharacters and hostile input are treated as data.
+- *Not here:* HTTP status codes or validation.
+- *Add one when:* you add a DAO method, a column, an operator or a query path.
+
+**API end to end** (`tests/api/<resource>.api.test.ts`)
+- *Real / stubbed:* the real app from `createApp`, served by `serve(app)` from `tests/utils/test-server.ts` on the real
+  DAO and a Testcontainers Postgres, driven over `fetch`. Nothing is stubbed.
+- *Assert:* every route's happy path; the errors only the real stack produces (a missing row's 404 on get / update /
+  delete, a filter + sort + page sent as a real query string and answered from seeded rows, ISO-8601 dates in the
+  JSON); and what `app.ts` adds around the handlers (malformed JSON → 400, a body over 100 kB → 413, an unmatched path →
+  404 in the standard error shape).
+- *Not here:* each validation branch — the controller unit test owns those.
+- *Add one when:* you add a resource or a route, or change what `app.ts` mounts.
+
+**Web unit** (`*.spec.ts`, jsdom)
+- *Real / stubbed:* the unit under test inside `TestBed`. Services run against `provideHttpClientTesting` +
+  `HttpTestingController`; effects get `provideMockActions` and fake services; anything reading the store gets
+  `provideMockStore` with selector overrides.
+- *Assert:* services — method, URL, params and body of each call; reducers — every action's resulting state, as plain
+  function calls; selectors — `.projector(…)` for anything with logic; effects — the action each input maps to, plus
+  the RxJS operators that matter (`distinctUntilChanged`, `takeUntil(leave)`, `switchMap` cancellation, `concatMap`
+  ordering), driven by a `Subject` of actions and a mutable `MockStore`; routes — every path renders its page through
+  `RouterTestingHarness`; helpers — a happy case and an edge case each.
+- *Not here:* rendering details and styling — the browser spec owns those.
+- *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect,
+  a route or a helper. Every slice has its reducer, selectors and effects specs.
+
+**Web browser** (`*.browser.spec.ts`, Chromium)
+- *Real / stubbed:* the component or page rendered by Angular in real Chromium with Tailwind applied. Pages get
+  `provideMockStore` and `provideRouter([])`; a component is mounted by hand — `TestBed.createComponent`, `setInput`
+  for every required input, append to `document.body`, `autoDetectChanges()` — because `render()` (in
+  `src/testing/render.ts`) starts change detection before inputs are set.
+- *Assert:* through the `page` locators, by role and accessible name: each UI state of the status union, what a click
+  or input dispatches (spy on `MockStore.dispatch` before `createComponent`), `Load` on init and `Leave` on destroy, and
+  for a component the outputs it emits.
+- *Not here:* HTTP or effects — there is no backend; the e2e owns the full path.
+- *Add one when:* you add a page, a component, a UI state or a control.
+
+**e2e** (`web/e2e/pages/<page>.spec.ts`)
+- *Real / stubbed:* everything — `ng serve -c e2e` on `:4300`, the API on `:3100`, Postgres in its own `app_e2e`
+  database, created, migrated and emptied by the global setup. The dev database and any running dev or Compose stack
+  are never touched; teardown stops Postgres only if setup started it.
+- *Assert:* a user's flow end to end, seeding data through the API (`e2e/utils/api.ts`) and driving the UI: list,
+  filter (and the filter in the URL), delete and cancel, stepping back off an emptied page; create and edit; a detail
+  page and a missing one.
+- *Not here:* edge cases a unit or browser spec can cover faster.
+- *Add one when:* you add a page or a user-visible flow.
+
+### 7.3 Which test do I write?
+
+| change                                         | tests                                                                                   |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| new filter operator or scalar kind             | `unit/helpers/dao.helper.test.ts`, `unit/helpers/list-input.helper.test.ts`, a rejection case in the resource's schema test, a DAO test case |
+| new filterable / sortable column               | the resource's schema test, a DAO test case                                             |
+| new validation rule or error mapping           | the controller unit test                                                                |
+| new route                                      | the controller unit test, the resource's API test                                       |
+| new DAO method or query path                   | the DAO test, the API test for its route                                                |
+| change to `app.ts` (middleware, body limit)    | the API test                                                                            |
+| new service method                             | the service spec                                                                        |
+| new action / page state                        | reducer and selectors specs, the effects spec if it requests, the page's browser spec   |
+| new component                                  | its browser spec and its story                                                          |
+| new page or user flow                          | the slice specs, the page's browser spec, an e2e spec, a route in `app.routes.spec.ts`  |
+| new resource                                   | all of the above — see [Adding a resource](#8-adding-a-resource)                         |
+
+### 7.4 How tests are written
+
+- **One top-level `describe` per file, named for the file's module:** `describe('entity.controller')`,
+  `describe('error.middleware')`, `describe('entity.dao')`, `describe('entity.api')`,
+  `describe('entity-list-page.effects')`. Nested `describe`s group functions or behaviours; hooks sit inside the
+  top-level `describe`.
+- **Name a case for the behaviour,** in plain words: `'forwards a 400 for an unknown param without reaching the DAO'`,
+  not `'test list error'`.
+- **Arrange / Act / Assert,** with `// Arrange` / `// Act` / `// Assert` comments once a case has more than one line
+  in a phase.
+- **Import test functions from `vitest`** (`describe`, `it`, `expect`, `vi`); no globals.
+- **Find UI by role and accessible name**, never by CSS class or test id.
+- **Mocks and fixtures live in `tests/utils/`** on the API and in `src/testing/` / `e2e/utils/` on the web, not in
+  test files.
+- The API's `vitest.config.ts` defines the projects `unit`, `db` and `api`; the web's `vitest.config.mts` defines
+  `unit` and `browser`, run by `ng test` on Analog's Vitest builder. Every web spec and both setup files are in
+  `tsconfig.spec.json`, because Analog compiles only that program; a spec outside it loses Angular's compiler (signal
+  inputs stop working).
+
+## 8. Adding a resource
+
+For a resource `user`:
+
+**API**
+1. `db/schemas/user.schema.ts`: copy `entity.schema.ts` — the table, then every schema and type in the fixed order,
+   no comments.
+2. `db/schema.ts`: `export const schema = { entity, user }`.
+3. `daos/user.dao.ts`: copy `entity.dao.ts`, `implements Dao<User, ListUserInput, CreateUserInput, UpdateUserInput>`.
+4. `models/app-context.model.ts`: add `userDao: UserDao`; `server.ts`: `userDao: new UserDao(db)`.
+5. `controllers/user.controller.ts`: copy `entity.controller.ts`, swap the schemas and the DAO; mount the five
+   handlers in `app.ts`.
+6. Tests: `tests/unit/db/schemas/user.schema.test.ts`, `tests/unit/controllers/user.controller.test.ts` (add `userDao`
+   to `createStubContext`), `tests/db/user.dao.test.ts` with `tests/utils/user-seed.ts`, `tests/api/user.api.test.ts`.
+7. `pnpm --filter api db:generate --name add-user`, then `db:migrate`.
+
+**Web**
+1. `models/user.model.ts`: mirror `User`, its inputs, `UserFilterInput`, `UserSortInput`, `ListUserInput`.
+2. `services/user.service.ts` and `helpers/user-list-params.helper.ts` (+ a filter-form helper if the list has one).
+3. One slice per page under `store/user-<page>-page/`, registered on its route in `app.routes.ts`.
+4. The pages under `pages/`, following [the page contract](#44-the-page-contract).
+5. Tests: the service, helper and slice specs, a browser spec per page, e2e specs per page, the new routes in
+   `app.routes.spec.ts`.
+
+## 9. Formatting, lint and Docker
+
+- **Prettier formats, ESLint judges.** `eslint-config-prettier` is the last entry of each flat config and switches off
+  every formatting rule; `eslint-plugin-prettier` is not used. `pnpm lint` reports code problems, `pnpm format:check`
+  formatting; CI runs both. Each project owns its `.prettierrc` / `.prettierignore` (`singleQuote`, `printWidth: 140`,
+  `trailingComma: 'none'`); there is no root config.
+- ESLint runs type-checked (`recommendedTypeChecked`, `projectService`); the web adds angular-eslint (with inline
+  templates) and Storybook's rules.
+- **Docker:** both images build with the repo root as context (`catalog:` resolves only against the root
+  `pnpm-workspace.yaml` and lockfile), from one root `.dockerignore`. The API image runs `node:24-alpine`; the web image
+  builds with Node and serves the bundle from `nginx:1.27-alpine` with an SPA fallback and no `/api` proxy. Postgres is
+  `postgres:17-alpine`, its data bind-mounted at `api/db/data/`.
+
+## 10. Not done on purpose
+
+Each was tried or considered and rejected; the reason is the line after the dash.
+
+- **No `/api` reverse proxy, no runtime `config.json`** — the API URL is build-time config, and a proxy would couple the
+  web image to the API's address.
+- **No routers** — direct mounts on the app read clearer at this size.
+- **No context middleware** — the context does not vary per request; it is a singleton on `app.locals`.
+- **No `parseOr400` / `translateNotFound` helpers** — inlined validation shows every error a handler can produce.
+- **No Drizzle outside DAOs, no "Repository"** — DAOs keep SQL out of the HTTP edge; "Repository" promises a domain
+  layer that does not exist.
+- **No `checkDatabase()` helper** — the health probe is one `SELECT 1`.
+- **No `pino-pretty` import** — the logger always emits JSON; `dev` pipes it.
+- **No hand-written TypeScript mirrors of zod schemas** — every type is a `z.infer`, so the two cannot drift.
+- **No column maps for filters and sorts** — fields are named after the columns, and the compiler checks them.
+- **No cursor pagination** — admin tables need a total and random page access.
+- **No `db:push`, no shipped migrations, no `--env-file-if-exists`** — schema changes go through migrations, and a
+  missing `.env` fails loudly.
+- **No caret on TypeScript** — one exact 6.0.x for both projects, inside both peer ranges.
+- **No `eslint-plugin-prettier`** — formatting is `format:check`'s job.
+- **No per-project Docker build context** — `catalog:` needs the root lockfile.
+- **No `types/` folder** — `models/` holds shapes and errors; `express.d.ts` stays at `src/`.
+- **No list query in a reducer, no global per-resource slice** — the URL is the query; each page owns its slice.
+- **No `ActivatedRoute`, `Router` or `FormBuilder` in pages** — every route read and navigation is visible as state
+  and actions.
+- **No boolean `loading` / `saving` flags** — one status union cannot contradict itself.
+- **No SCSS or per-component CSS files** — Tailwind utilities in inline templates.
+- **No `@Input()` decorators** — components keep signal `input()` / `output()`, and their browser specs set them with
+  `setInput`.
 - **No `zone.js`** — the app, the tests and Storybook all run zoneless.
+- **No webpack Storybook, no `@angular/build:unit-test`** — Storybook and the tests share the app's Vite / Analog
+  toolchain.
+- **No HTTP server in API unit tests** — controllers and middlewares are functions, tested as functions.
+- **No stubbed web e2e, no e2e against the dev database** — the e2e proves the web↔API contract on its own stack.
 
-## Review checklist
+## 11. Before you merge
 
-Before considering the scaffold complete:
-
-- [ ] `pnpm install` succeeds at the root (no `ERR_PNPM_IGNORED_BUILDS`).
-- [ ] `pnpm -r build` succeeds (api → `dist/`; web → `dist/web/browser/`).
-- [ ] `pnpm -r typecheck` passes (api runs both tsconfigs, web runs app + spec + e2e).
-- [ ] `pnpm -r test`, `pnpm -r lint` and `pnpm -r format:check` pass.
-- [ ] `docker compose up --build` starts all three services.
-- [ ] `pnpm --filter api db:generate` emits one fresh migration file; `pnpm --filter api db:migrate` applies it.
-- [ ] `pnpm test:integration` passes (DAO and API tests on Testcontainers; needs Docker and the migration).
-- [ ] `curl http://localhost:3000/health` → `{status:'ok', db:'up', …}`.
-- [ ] `curl http://localhost:4200/` → 200 HTML; the entity list renders at `/entities`.
-- [ ] Entity CRUDL works end-to-end: `POST /entities`, `GET /entities?filter=<json>&sortField=…&sortDirection=…&page=&pageSize=`, `PATCH /entities/:id`, `DELETE /entities/:id` (404 on missing id).
-- [ ] `.env` is **not** committed; `.env.example` is.
-- [ ] `coding-conventions.md` is at the repo root.
-- [ ] `pnpm --filter web build-storybook` builds, and `pnpm --filter web storybook --smoke-test --ci` starts and exits 0.
-- [ ] `pnpm test:browser` passes (needs `playwright install chromium` once).
-- [ ] `pnpm test:e2e` passes (needs Docker and the root `.env`), and leaves the dev database and a running stack as they were.
+- [ ] `pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format:check` passes.
+- [ ] `pnpm test:integration` passes if you touched the API's DAOs, schemas, controllers or `app.ts`.
+- [ ] `pnpm test:browser` passes if you touched a component or page; `pnpm test:e2e` if you changed a user flow or the
+      web↔API contract.
+- [ ] A schema change comes with its migration (`db:generate`), committed.
+- [ ] An API type change is mirrored in the web's `models/`.
+- [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists; a new component has a story.
+- [ ] This file still describes the code: a change to a rule changes it here in the same commit.
