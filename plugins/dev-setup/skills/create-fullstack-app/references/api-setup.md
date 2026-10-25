@@ -68,12 +68,15 @@ api/
     │   ├── list-input.helper.test.ts
     │   ├── query-parser.helper.test.ts
     │   └── entity.schema.test.ts
-    ├── api/                 # routes via fetch + fake DAO, one per controller — api-entity.md
+    ├── controllers/         # controller unit tests: routes via fetch + fake DAO — api-entity.md
     │   ├── entity.controller.test.ts
     │   ├── home.controller.test.ts
-    │   └── health.controller.test.ts
-    ├── db/                  # Testcontainers Postgres + drizzle migrator — api-entity.md
+    │   ├── health.controller.test.ts
+    │   └── error.middleware.test.ts
+    ├── db/                  # the DAO vs a Testcontainers Postgres + drizzle migrator — api-entity.md
     │   └── entity.dao.test.ts
+    ├── api/                 # API tests, end to end: real HTTP → controller → DAO → Postgres — api-entity.md
+    │   └── entity.api.test.ts
     └── utils/               # test helpers, not tests — api-entity.md
         ├── pg-container.ts
         ├── fake-dao.ts
@@ -99,8 +102,8 @@ Scripts and metadata only. Dependencies are added with `pnpm add` (next section)
     "build": "tsc -p tsconfig.app.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json",
     "lint": "eslint .",
-    "test": "vitest run --project unit --project api",
-    "test:db": "vitest run --project db",
+    "test": "vitest run --project unit --project controllers",
+    "test:integration": "vitest run --project db --project api",
     "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "start": "node --env-file=../.env dist/server.js",
@@ -117,9 +120,9 @@ Rules:
 - `db:*` scripts run drizzle-kit's bin **under node with `--env-file`** because drizzle-kit does not load `.env`.
 - Only `db:generate` and `db:migrate`; there is no `db:push`.
 - `typecheck` runs **both** tsconfigs so the tests and config files are type-checked too.
-- `test` runs only the Docker-free vitest projects (`unit` + `api`); it needs no database. `test:db` runs the `db`
-  project, which spins up a Testcontainers Postgres and so needs a running Docker daemon and an existing
-  `db/migrations/` (run `db:generate` first). See the `vitest.config.ts` section.
+- `test` runs only the Docker-free vitest projects (`unit` + `controllers`); it needs no database.
+  `test:integration` runs the `db` and `api` projects, which spin up a Testcontainers Postgres and so need a running
+  Docker daemon and an existing `db/migrations/` (run `db:generate` first). See the `vitest.config.ts` section.
 
 ## Dependencies
 
@@ -128,13 +131,13 @@ Run from the repo root, after the web app exists, so the shared tooling lands in
 ```sh
 pnpm --filter api add cors drizzle-orm drizzle-zod express http-errors pg pino pino-http zod
 pnpm --filter api add -D @types/cors @types/express @types/http-errors @types/node@24 @types/pg \
-  @testcontainers/postgresql drizzle-kit pino-pretty tsx vitest
+  @testcontainers/postgresql drizzle-kit pino-pretty tsx
 ```
 
 `@types/node` follows the Node major the Dockerfile runs (24). `@testcontainers/postgresql` powers the DB-backed DAO
 tests (the `db` vitest project) and needs a running Docker daemon; its optional native sub-deps are marked
-non-building in `pnpm-workspace.yaml` (see `monorepo-root.md`). The shared tooling (ESLint, Prettier, TypeScript) is
-added by the root step in `monorepo-root.md`.
+non-building in `pnpm-workspace.yaml` (see `monorepo-root.md`). The shared tooling (ESLint, Prettier, TypeScript,
+`@types/node` and Vitest) is added by the root step in `monorepo-root.md`.
 
 ## TypeScript (3 files)
 
@@ -225,7 +228,7 @@ No fallback for `DATABASE_URL`: it throws loud and early. `schema` points at the
 
 ## `api/vitest.config.ts`
 
-One config, three named `projects` selected by test folder. Shared options (silent logs) live at the root and are
+One config, four named `projects`, one per test folder. Shared options (silent logs) live at the root and are
 inherited by each inline project.
 
 ```ts
@@ -245,14 +248,23 @@ export default defineConfig({
       },
       {
         test: {
-          name: { label: 'api', color: 'magenta' },
-          include: ['tests/api/**/*.test.ts']
+          name: { label: 'controllers', color: 'magenta' },
+          include: ['tests/controllers/**/*.test.ts']
         }
       },
       {
         test: {
           name: { label: 'db', color: 'green' },
           include: ['tests/db/**/*.test.ts'],
+          // A Testcontainers Postgres boots in beforeAll; allow for the first image pull.
+          hookTimeout: 120_000,
+          testTimeout: 30_000
+        }
+      },
+      {
+        test: {
+          name: { label: 'api', color: 'yellow' },
+          include: ['tests/api/**/*.test.ts'],
           // A Testcontainers Postgres boots in beforeAll; allow for the first image pull.
           hookTimeout: 120_000,
           testTimeout: 30_000
@@ -264,11 +276,12 @@ export default defineConfig({
 ```
 
 Tests import sources with the `.js` extension, as the sources do; Vite resolves them to the `.ts` files. The suites
-run at two tiers. The `unit` and `api` projects need **no database**: DAO-level SQL is tested through what it renders
-(`PgDialect`), and the routes through `createApp` with a fake DAO on the context, driven over `fetch`. The `db`
-project uses Testcontainers to run the **real** DAO against a throwaway Postgres (one container per suite, migrations
-applied by the drizzle migrator), so it needs Docker. `pnpm test` runs `--project unit --project api`; `pnpm test:db`
-runs `--project db`.
+run at two tiers. The `unit` and `controllers` projects need **no database**: DAO-level SQL is tested through what it
+renders (`PgDialect`), and each controller through `createApp` with a fake DAO on the context, driven over `fetch`.
+The `db` and `api` projects use Testcontainers (one container per suite, migrations applied by the drizzle migrator),
+so they need Docker: `db` runs the **real** DAO directly, and `api` serves the real app on the real DAO and drives it
+over HTTP, end to end. `pnpm test` runs `--project unit --project controllers`; `pnpm test:integration` runs
+`--project db --project api`.
 
 ## `api/src/express.d.ts`
 

@@ -37,47 +37,55 @@ Then **immediately** apply the conventions below.
 ## 2. Clean up CLI defaults
 
 ```sh
-rm web/.editorconfig web/src/app/app.ts web/src/app/app.html web/src/app/app.scss web/src/app/app.spec.ts
+rm web/.editorconfig web/README.md web/src/app/app.ts web/src/app/app.html web/src/app/app.scss web/src/app/app.spec.ts
 pnpm --filter web pkg delete packageManager devDependencies.prettier devDependencies.typescript
 ```
 
-- `.editorconfig` goes because Prettier handles indentation and the two can disagree.
+- `.editorconfig` goes because Prettier handles indentation and the two can disagree. The CLI's own `web/.prettierrc`
+  is overwritten by the one in [references/eslint-prettier.md](eslint-prettier.md). `README.md` goes because the
+  docs live at the repo root (`coding-conventions.md`). The CLI's `.vscode/` and `public/favicon.ico` stay.
 - The CLI's root component (`app.ts` + `app.html` + `app.scss`) and its spec are replaced by `app.component.ts` in
-  section 7 and the spec in section 11.
+  section 7 and `app.component.spec.ts` ([references/web-testing.md](web-testing.md#2-unit-tests)).
 - `packageManager` belongs to the root manifest. `prettier` and `typescript` are removed so the root shared-tooling
   step adds them back as `catalog:`; `pnpm add --save-catalog` leaves an existing direct `prettier` range in place.
+- In `web/src/index.html`, the CLI's `<title>Web</title>` becomes the app name (the repo name in Title Case, the same
+  value as `appName` in the environment files).
 
 ## 3. Scripts and dependencies
 
 Set the scripts:
 
 ```sh
-pnpm --filter web pkg set scripts.lint="eslint ." scripts.test="ng test --watch=false" \
+pnpm --filter web pkg set scripts.lint="eslint ." scripts.test="ng test" \
+  scripts.typecheck="tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit && tsc -p e2e/tsconfig.json --noEmit" \
   scripts.format="prettier --write \"**/*.{ts,js,mjs,html,css,json,md,yml,yaml}\"" \
   "scripts['format:check']=prettier --check \"**/*.{ts,js,mjs,html,css,json,md,yml,yaml}\""
 ```
 
-Keep the CLI's `ng`, `start`, `build` and `watch` scripts as generated. `--watch=false` makes `test` a one-shot check,
-like the API's `vitest run`.
+Keep the CLI's `ng`, `start`, `build` and `watch` scripts as generated. `test` runs on Analog's Vitest builder
+([references/web-testing.md](web-testing.md#1-setup-analogs-vitest-builder)), which runs once unless given `--watch`,
+like the API's `vitest run`. `typecheck` covers what `ng build` does not compile: the specs, the test setup, the e2e
+suite and the Playwright config. `ng build` stays the check for the templates.
 
 The `pages/*.component.ts` files are written from the patterns in section 10; the routes import all three, so the
 build fails until they exist.
 
-Add NgRx, Tailwind and angular-eslint, pinned to the Angular major (NgRx and angular-eslint track it):
+Add NgRx, Tailwind and angular-eslint, pinned to the Angular major (NgRx and angular-eslint track it). These run in
+SKILL step 5, with the other installs:
 
 ```sh
 pnpm --filter web add @ngrx/store@22 @ngrx/effects@22 @ngrx/router-store@22
 pnpm --filter web add -D @ngrx/store-devtools@22 angular-eslint@22 tailwindcss @tailwindcss/postcss postcss
 ```
 
-The CLI's own Angular, `vitest` and `jsdom` entries stay as generated. ESLint, Prettier and TypeScript are added by the
-root shared-tooling step in `monorepo-root.md`.
+The CLI's own Angular and `jsdom` entries stay as generated. ESLint, Prettier, TypeScript, `@types/node` and Vitest are
+added by the root shared-tooling step in `monorepo-root.md`, which turns the CLI's `vitest` entry into `catalog:`.
 
-**Storybook and the extra test layers** are added after the app is in place: Storybook for the components
-([references/web-storybook.md](web-storybook.md)), and the browser-mode + full-stack e2e test layers
-([references/web-testing.md](web-testing.md)). They add the `storybook`, `build-storybook`, `test:browser` and
-`test:e2e` scripts and their dev dependencies, and **pin `web` to Vitest 4** (the Angular `test` builder accepts
-`^4 || ^5`; Vitest 5's browser mode does not work in this workspace). `ng test` stays the required `test` check.
+**Storybook and the test layers** are added after the app is in place: Storybook for the components
+([references/web-storybook.md](web-storybook.md)), and the Analog test setup with the browser-mode and full-stack e2e
+layers ([references/web-testing.md](web-testing.md)). They replace the `test` target in `angular.json`, add the
+`storybook`, `build-storybook`, `test:browser` and `test:e2e` scripts and their dev dependencies. `ng test` stays the
+required `test` check.
 
 ## 4. Tailwind v4
 
@@ -151,8 +159,10 @@ export const environment = {
 };
 ```
 
-Only the `app-context` store slice imports `environment`. Everything else reads `apiBaseUrl` and `appName` from the
-store.
+`<App name>` is the repo name in Title Case (`my-app` → `My App`), the same in every environment file. Only the
+`app-context` store slice imports `environment`. Everything else reads `apiBaseUrl` and `appName` from the
+store. A third file, `environment.e2e.ts`, points the e2e run at its own API; it belongs to the e2e layer
+([references/web-testing.md](web-testing.md#4-full-stack-e2e)).
 
 ## 6. Folder structure
 
@@ -163,24 +173,26 @@ web/
 ├── e2e/                     # Playwright full-stack e2e — see references/web-testing.md
 │   ├── global-setup.ts / global-teardown.ts / tsconfig.json
 │   ├── pages/               #   one *.spec.ts per page
-│   └── utils/api.ts         #   seed via the real API
+│   └── utils/               #   env.ts (e2e ports + database), api.ts (seed via the real API)
 ├── playwright.config.ts     # e2e runner config (CommonJS: uses __dirname)
-├── vitest.browser.config.mts # browser-mode page tests (Vitest 4 + Playwright)
-├── tsconfig.browser.json    # scopes *.browser.spec.ts + src/testing for tooling
+├── vitest.config.mts        # Vitest projects `unit` (jsdom) + `browser` (Chromium), run by `ng test`
 └── src/
-    ├── testing/             # render() + browser-setup.ts for the browser-mode tests
+    ├── test-setup.ts        # setupTestBed() for the unit project
+    ├── testing/             # render() + browser-setup.ts for the browser project
+    ├── environments/        # environment.ts, environment.development.ts, environment.e2e.ts
     └── app/
         ├── app.component.ts         # root
         ├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
         ├── app.routes.ts            # routes; each page route registers its page slice
         ├── components/
         │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
+        │   ├── confirm-dialog.component.browser.spec.ts   # its browser-mode test
         │   └── confirm-dialog.stories.ts      # its Storybook story
         ├── layouts/
         │   └── main-layout.component.ts
         ├── pages/
         │   ├── entity-list-page.component.ts
-        │   ├── entity-list-page.component.browser.spec.ts   # browser-mode render test
+        │   ├── entity-list-page.component.browser.spec.ts   # browser-mode test
         │   ├── entity-detail-page.component.ts  (+ .browser.spec.ts)
         │   └── entity-form-page.component.ts  (+ .browser.spec.ts)  # reused for /entities/new + /entities/:id/edit
         ├── models/
@@ -204,7 +216,7 @@ web/
 
 Every page slice gets `*.reducer.spec.ts` / `*.selectors.spec.ts` / `*.effects.spec.ts` beside it; the global
 `app-context` slice gets reducer + selectors specs and `app-router` an effects spec. The service and helpers
-get a `*.spec.ts`, and each page gets a `*.component.browser.spec.ts`. The test layers are specified in
+get a `*.spec.ts`, and each page and component gets a `*.component.browser.spec.ts`. The test layers are specified in
 [references/web-testing.md](web-testing.md); Storybook in [references/web-storybook.md](web-storybook.md).
 
 **One slice per page.** Each page owns a slice at `store/<page-name>/`, named after the page component, and registers
@@ -226,8 +238,8 @@ while the detail and form pages fetch on `Load` and so report `Load Success` / `
 **Every page loads the same way.** The page dispatches `Load` in `ngOnInit` and `Leave` in `ngOnDestroy`. `Load`
 sets the slice's `status` to `'loading'` and an effect calls the service; success sets `'loaded'` (or `'ready'` for
 the form) with the data, failure sets `'error'` with a message. Each slice has one `status` field, a union of the
-page's states, instead of boolean flags such as `loading` / `saving` / `deleting`, and the template switches on it
-with `@switch (status())`.
+page's states, instead of boolean flags such as `loading` / `saving` / `deleting`, and the template switches its
+status-driven body on it with `@switch (status())`; the error banner over it is an `@if (status() === 'error')`.
 
 **Pages inject only the `Store`.** Route params come from the app-router selectors, navigation is
 `AppRouterActions.navigate`, and forms are built with `new FormGroup` / `new FormControl` instead of an injected
@@ -895,7 +907,7 @@ function isListUrl(url: string | undefined): boolean {
 
 #### `store/entity-list-page/entity-list-page.effects.ts`
 
-`fetchOnListInputChange$` runs from `Load` until `Leave`: it follows the list input in the URL and dispatches `Fetch({ input })` for the first value and for every change, so the page never fetches itself. `selectListInputOnListPage` is `null` while the URL belongs to another page, which keeps a navigation away from triggering a stray fetch before `Leave` arrives. `fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the current page. Route-level effects stay registered after the page is left, which is why the stream ends on `Leave`.
+`fetchOnListInputChange$` runs from `Load` until `Leave`: it follows the list input in the URL and dispatches `Fetch({ input })` for the first value and for every change, so the page never fetches itself. `selectListInputOnListPage` is `null` while the URL belongs to another page, which keeps a navigation away from triggering a stray fetch before `Leave` arrives. `fetchAfterDelete$` fetches again after a delete, because the totals change and later rows shift onto the current page. `stepBackPastLastPage$` handles the page that ends up past the end — a delete emptied the last page, or a deep link names a page that no longer exists: an empty result with a non-zero total on a page above 1 navigates to the last page, and the URL change fetches it. Route-level effects stay registered after the page is left, which is why the stream ends on `Leave`.
 
 ```ts
 import { inject } from '@angular/core';
@@ -903,9 +915,11 @@ import { type HttpErrorResponse } from '@angular/common/http';
 import { Store } from '@ngrx/store';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { catchError, concatMap, distinctUntilChanged, filter, map, of, switchMap, takeUntil, withLatestFrom } from 'rxjs';
+import { toParams } from '../../helpers/entity-list-params.helper';
 import { httpErrorMessage } from '../../helpers/http-error.helper';
 import { type ListEntityInput } from '../../models/entity.model';
 import { EntityService } from '../../services/entity.service';
+import { AppRouterActions } from '../app-router/app-router.actions';
 import { EntityListPageActions } from './entity-list-page.actions';
 import { selectListInput, selectListInputOnListPage } from './entity-list-page.selectors';
 
@@ -933,6 +947,20 @@ export const fetchAfterDelete$ = createEffect(
       ofType(EntityListPageActions.deleteSuccess),
       withLatestFrom(store.select(selectListInput)),
       map(([, input]) => EntityListPageActions.fetch({ input }))
+    ),
+  { functional: true }
+);
+
+// A page past the end (a delete emptied the last page, or a stale deep link) steps back to the last page.
+export const stepBackPastLastPage$ = createEffect(
+  (actions$ = inject(Actions), store = inject(Store)) =>
+    actions$.pipe(
+      ofType(EntityListPageActions.fetchSuccess),
+      withLatestFrom(store.select(selectListInput)),
+      filter(([{ items, total }, input]) => items.length === 0 && total > 0 && input.page > 1),
+      map(([{ total }, input]) =>
+        AppRouterActions.navigate({ commands: [], queryParams: toParams({ ...input, page: Math.ceil(total / input.pageSize) }) })
+      )
     ),
   { functional: true }
 );
@@ -1230,7 +1258,7 @@ The scaffold ships one, `ConfirmDialog` — a modal used by the list page's dele
 ([references/web-storybook.md](web-storybook.md)). It is the template for every later component.
 
 ```ts
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 export type ConfirmDialogTone = 'danger' | 'primary';
 
@@ -1242,7 +1270,6 @@ let nextId = 0;
 // the confirmed action is in flight.
 @Component({
   selector: 'app-confirm-dialog',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents', '(document:keydown.escape)': 'onEscape()' },
   template: `
     <div class="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
@@ -1299,7 +1326,8 @@ export class ConfirmDialog {
 ```
 
 A host binds its inputs with property syntax — `[title]="'Delete entity'"`, not a static `title="…"` — so the signal
-input is wired as an input rather than a plain attribute.
+input is wired as an input rather than a plain attribute. No component sets `changeDetection`: `OnPush` is Angular 22's
+default.
 
 ### Pages
 
@@ -1315,31 +1343,50 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
 - The filter strip has fixed inputs: _name contains_, _description contains_, _created on or after_, _created
   before_. Its pure functions live in `helpers/entity-filter-form.helper.ts` (`FilterForm`, `EMPTY_FILTER_FORM`,
   `formatRange`, `toFilterInput`, `toFilterForm`), kept out of the component so `ng test` covers them directly
-  (`entity-filter-form.helper.spec.ts`). A local `draft: FilterForm` signal holds the edits; `applyFilters()` maps it
+  (`entity-filter-form.helper.spec.ts`). The strip's edits live in
+  `draft = linkedSignal<FilterForm>(() => toFilterForm(listInput().filter))`, so it resyncs from the URL on every
+  change of the list input — back / forward, a deep link, _Clear_ — and holds local edits in between; `applyFilters()` maps it
   with `toFilterInput` to an `EntityFilterInput` (`name.contains`, `description.contains`, `createdAt.ge` /
-  `createdAt.lt`) and navigates with `page: 1`. Dates are days in the viewer's time zone: the helper's private
+  `createdAt.lt`) and navigates with `page: 1`; _Clear_ resets the draft and navigates without a filter on page 1,
+  keeping the sort and page size. Dates are days in the viewer's time zone: the helper's private
   `toIsoDate` sends local midnight as ISO-8601, and `toLocalDate` turns it back into the day when reading the URL.
   `toFilterForm` reads back only what the strip can express; other operators in a deep link are kept in the URL but
   not shown.
-- Sort is a select of `field:direction` pairs (default _Newest first_, `createdAt:DESC`); page size is a select of 10 /
-  20 / 50 / 100. Changing either resets to page 1.
+- Sort is a select of `field:direction` pairs, exactly these, in this order: _Newest first_ (`createdAt:DESC`, the
+  default), _Oldest first_ (`createdAt:ASC`), _Name A–Z_ (`name:ASC`), _Name Z–A_ (`name:DESC`), _Recently updated_
+  (`updatedAt:DESC`). Page size is a select of 10 / 20 / 50 / 100. Changing either resets to page 1.
+- Each select has its own `<label for>` and an `id` (`entity-list-sort` / `Sort`, `entity-list-page-size` /
+  `Per page`), not a wrapping `<label>`: a wrapping label folds the option text into the accessible name, and the
+  specs' `getByLabelText('Sort')` stops matching. Each `<option>` shows the URL's value with
+  `[selected]="option.value === sortValue()"` (and `size === listInput().pageSize`); a `[value]` on the `<select>` is
+  applied before the `@for` renders the options, so it does not take.
 - Pagination: _Previous_ / _Next_ navigate with `page ± 1`; the label shows `first–last of total · page X of Y` via the
-  helper's `formatRange`, with `totalPages` computed from `total` and `pageSize`. An `effect()` steps back to the last
-  page when a delete empties the current one.
+  helper's `formatRange`, with `totalPages` computed from `total` and `pageSize`. Stepping back from a page past the
+  end is the slice's `stepBackPastLastPage$` effect, not the page's.
 - Delete: an `<app-confirm-dialog>` (the `ConfirmDialog` component above), shown while a `pendingDelete` signal holds
   the row, dispatches `EntityListPageActions.delete` on `(confirmed)` and clears the signal on `(cancelled)`; it is
-  `[busy]` while `status() === 'deleting'`.
+  `[busy]` while `status() === 'deleting'`. `pendingDelete` is a `linkedSignal` over the items
+  (`linkedSignal<Entity[], Entity | null>({ source: items, computation: () => null })`), so the dialog stays open, busy,
+  until the refetch after the delete delivers a new page of items, and closes then. On a failed delete the items do
+  not change, so the dialog stays open, no longer busy, over the error banner. The row button and the dialog's
+  confirm are both named _Delete_, so specs scope to `page.getByRole('dialog')` or the row.
+- Rows show the name (a link to the detail page), the description and `createdAt | date: 'medium'`.
 - `status() === 'error'` shows `error()` in a banner. The empty row switches on the status: _Loading…_ while
   `'loading'`, otherwise _No entities match the filter._ when a filter is active, or _No entities yet._
 - Every input and select has a `name`; the free-text inputs also set `autocomplete="off"`, since they are not
   personal data.
+- The accessible names the specs drive: heading _Entities_; link _New entity_; labels _Name contains_, _Description
+  contains_, _Created on or after_, _Created before_, _Sort_, _Per page_; buttons _Apply_, _Clear_, _Previous_, _Next_,
+  and _Delete_ on each row (the row's name is a link to its detail page).
 
 ### `pages/entity-detail-page.component.ts`
 
-- Reads the `id` with `selectRouteParam('id')`, dispatches `EntityDetailPageActions.load({ id })` on init and
-  `leave()` on destroy.
+- Reads the `id` with `selectRouteParam('id')` (typed `string | undefined`), dispatches
+  `EntityDetailPageActions.load({ id })` on init when the id is present, and `leave()` on destroy.
+- Shows the description (`—` when it is `null`) and `createdAt` / `updatedAt` with `date: 'medium'`.
 - Renders with `@switch (status())`: _Loading…_, the error banner, or (on `'loaded'`) the entity with a link to the
   edit page.
+- Accessible names: the entity's name as the heading, link _Edit_, link _← Back to entities_.
 
 ### `pages/entity-form-page.component.ts`
 
@@ -1351,17 +1398,22 @@ Three pages: list, detail, and form (reused for create and edit). Each reads onl
   page itself never navigates.
 - `status() === 'error'` shows `error()` in a banner. The Save button is disabled while `'loading'` or `'saving'`
   and its label switches on the status (_Loading…_, _Saving…_, _Save_).
+- Validation mirrors the API's create schema: `name` is `Validators.required` + `Validators.maxLength(200)`,
+  `description` `Validators.maxLength(2000)`. Save sends both values trimmed and an empty description as `null`; a
+  name that is blank after trimming does not save. In `'error'` the form stays editable, so the user can retry.
 - Uses `Validators.required` + `Validators.maxLength` with an inline
   `// eslint-disable-next-line @typescript-eslint/unbound-method` on the first validator (Angular's static validator
   reference is a known false positive of the unbound-method rule).
 - The `name` input and `description` textarea carry `name` and `autocomplete="off"` attributes.
+- Accessible names: heading _New entity_ or _Edit entity_; labels _Name_, _Description_; button _Save_; link
+  _← Cancel_ back to the list.
 
 ## 11. Tests
 
-The web app has three test layers, specified in [references/web-testing.md](web-testing.md): **unit** (`ng test`,
-Vitest + jsdom, `*.spec.ts` beside the file — services, every slice, helpers), **browser-mode page tests** (Vitest 4
-browser mode + Playwright, `*.component.browser.spec.ts`), and **full-stack e2e** (Playwright Test against the real
-stack, `e2e/`). `ng test` is the required `test` check.
+The web app has three test layers, specified in [references/web-testing.md](web-testing.md): **unit** (`ng test` on
+Analog's Vitest builder, jsdom, `*.spec.ts` beside the file — services, every slice, helpers), **browser-mode tests**
+(`ng test -c browser`, Vitest browser mode + Playwright, `*.component.browser.spec.ts` for components and pages), and
+**full-stack e2e** (Playwright Test against its own stack, `e2e/`). `ng test` is the required `test` check.
 
 The URL (de)serializer the list page depends on is the clearest standalone example of the unit layer:
 
@@ -1372,7 +1424,7 @@ import { describe, expect, it } from 'vitest';
 import { type ListEntityInput } from '../models/entity.model';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, parseListInput, toParams } from './entity-list-params.helper';
 
-describe('entity list params', () => {
+describe('entity-list-params.helper', () => {
   it('falls back to the defaults for an empty URL', () => {
     // Act
     const input = parseListInput({});

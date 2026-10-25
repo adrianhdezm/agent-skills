@@ -59,27 +59,29 @@ my-app/
 │   │   └── middleware/       # error + not-found
 │   └── tests/                # grouped by kind, not mirroring src/:
 │       ├── unit/             #   helpers + schema, no database
-│       ├── api/              #   one *.controller.test.ts per controller (fetch + fake DAO)
+│       ├── controllers/      #   controller unit tests: one *.controller.test.ts each + error.middleware (fetch + fake DAO)
 │       ├── db/               #   <resource>.dao.test.ts (Testcontainers)
+│       ├── api/              #   API tests, end to end: <resource>.api.test.ts (real HTTP → DAO → Testcontainers)
 │       └── utils/            #   shared test helpers (pg-container, fake-dao, test-server, seeds)
 └── web/
     ├── Dockerfile            # multi-stage → Nginx, SPA fallback
     ├── nginx.conf
     ├── eslint.config.mjs
     ├── .storybook/           # Storybook (Vite/Analog) config
-    ├── vitest.browser.config.mts  # browser-mode page tests (Vitest 4 + Playwright)
+    ├── vitest.config.mts     # Vitest projects unit (jsdom) + browser (Chromium), run by ng test (Analog builder)
     ├── playwright.config.ts  # full-stack e2e runner
-    ├── e2e/                  # Playwright specs (pages/) + API-seeding helper (utils/) + global setup/teardown
+    ├── e2e/                  # Playwright specs (pages/) + e2e ports/DB + API seeding (utils/) + global setup/teardown
     └── src/
-        ├── testing/         # render() + setup for the browser-mode tests
+        ├── test-setup.ts / testing/   # setupTestBed() for unit; render() + setup for browser mode
+        ├── environments/    # production, development, e2e
         └── app/
-            ├── pages/ layouts/ components/   # flat *.component.ts; components/ has ConfirmDialog + its .stories.ts
+            ├── pages/ layouts/ components/   # flat *.component.ts; components/ has ConfirmDialog + its story + browser spec
             ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers; *.spec.ts beside
             └── store/        # app-context/ + app-router/ globally, one slice per page on its route; reducer/selectors/effects specs beside
 ```
 
-The web app has three test layers (`ng test` unit, `pnpm test:browser` Vitest browser mode, `pnpm test:e2e` Playwright
-full-stack) and Storybook for the components — see [references/web-testing.md](references/web-testing.md) and
+The web app has three test layers (`ng test` unit and `pnpm test:browser` browser mode, both on Analog's Vitest builder;
+`pnpm test:e2e` Playwright full-stack on its own database and ports) and Storybook for the components — see [references/web-testing.md](references/web-testing.md) and
 [references/web-storybook.md](references/web-storybook.md).
 
 ## Process
@@ -97,7 +99,8 @@ Copy this checklist and tick it off:
 ```
 
 1. **Confirm the inputs and check the toolchain.** Ask for the repo name, the DB name (default `app`) and whether to add
-   Fundamental NGX, unless the prompt already says. Node must be 24 or newer, pnpm 11 or newer (`allowBuilds` is a
+   Fundamental NGX, unless the prompt already says. The app name shown in the UI is the repo name in Title Case
+   (`my-app` → `My App`); it replaces every `<App name>` and the CLI's `<title>Web</title>` in `web/src/index.html`. Node must be 24 or newer, pnpm 11 or newer (`allowBuilds` is a
    pnpm 11 setting), and Docker must be running. Use pnpm for everything, never npm. Stop if the target directory
    already holds a `package.json`: follow [Adding to an existing repo](#adding-to-an-existing-repo) instead.
 
@@ -105,7 +108,11 @@ Copy this checklist and tick it off:
    node -e "process.exit(+process.versions.node.split('.')[0] >= 24 ? 0 : 1)" || echo "node 24+ required"
    pnpm --version   # 11 or newer
    docker info --format '{{.ServerVersion}}'
+   for p in 5432 3000 4200 3100 4300 6006; do lsof -iTCP:$p -sTCP:LISTEN -t >/dev/null && echo "port $p in use"; done
    ```
+
+   The ports are Postgres, the API and the web app (Compose and local dev), the e2e API and web server, and Storybook;
+   stop with the user if one is taken.
 
 2. **Create the repo and the root files** from [references/monorepo-root.md](references/monorepo-root.md):
    `package.json`, `pnpm-workspace.yaml` (packages + `allowBuilds`, no catalog yet), `.gitignore`, `.dockerignore`,
@@ -120,14 +127,16 @@ Copy this checklist and tick it off:
 3. **Write the API** from [references/api-setup.md](references/api-setup.md) (manifest, configs, app shell,
    Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary and builder helper,
    SQL translator, query parser, their `unit/` tests) and [references/api-entity.md](references/api-entity.md) (resource
-   schema, DAO and its Testcontainers `db/` test, the three controllers with one `api/` test file each, and the shared
-   `tests/utils/` helpers). Read the "How the layers fit" section of `api-dao.md` first. Add `api/.prettierrc`,
+   schema, DAO and its Testcontainers `db/` test, the three controllers with one `controllers/` test file each plus the
+   error-middleware test, the end-to-end `api/` test, and the shared `tests/utils/` helpers). Read the "How the layers
+   fit" section of `api-dao.md` first. Write files only: every `pnpm add` runs in step 5. Add `api/.prettierrc`,
    `api/.prettierignore` and `api/eslint.config.mjs` from [references/eslint-prettier.md](references/eslint-prettier.md).
    Do not create `db/migrations/`.
 
 4. **Scaffold the web app**, then immediately apply [references/web.md](references/web.md) in order: clean up the CLI
    output, set the scripts, add Tailwind, the environment files, the core files, the global slices, the shared model,
-   one slice per page, the three pages and the spec. Add `web/.prettierrc`, `web/.prettierignore` and
+   one slice per page, the three pages and the spec. As in step 3, write files and run the `pnpm pkg` commands, but
+   leave every `pnpm add` to step 5. Add `web/.prettierrc`, `web/.prettierignore` and
    `web/eslint.config.mjs` from [references/eslint-prettier.md](references/eslint-prettier.md).
 
    ```sh
@@ -137,15 +146,22 @@ Copy this checklist and tick it off:
 
    For the Fundamental NGX opt-in, layer [references/fundamental-ngx.md](references/fundamental-ngx.md) on top.
 
-   Then add **Storybook** ([references/web-storybook.md](references/web-storybook.md)) and the **browser-mode + e2e test
-   layers** ([references/web-testing.md](references/web-testing.md)): their dev dependencies, `.storybook/` + the browser
-   / Playwright configs, the `storybook` / `build-storybook` / `test:browser` / `test:e2e` scripts, and the **Vitest 4
-   pin** on `web`. The `ConfirmDialog` component in `components/` (from `web.md`) is the example these build on.
+   Then add **Storybook** ([references/web-storybook.md](references/web-storybook.md)) and the **test setup**
+   ([references/web-testing.md](references/web-testing.md)): the `test` target switched to
+   `@analogjs/vitest-angular:test`, `vitest.config.mts` with the `unit` and `browser` projects, the setup files, every
+   spec in the [spec inventory](references/web-testing.md#spec-inventory), the e2e environment, `angular.json`
+   configuration and Playwright files, and the `storybook` / `build-storybook` / `test:browser` / `test:e2e` scripts.
+   The `ConfirmDialog` component in `components/` (from `web.md`) is the example these build on.
 
-5. **Add the dependencies**: the API's (in `api-setup.md`), the web's (in `web.md`), then the shared tooling (in
-   `monorepo-root.md`). Before the shared step, check that the TypeScript peer ranges of typescript-eslint and
-   `@angular/compiler-cli@22` still overlap, and pin the newest version both accept, exactly, with
-   `pnpm add -E --save-catalog`.
+5. **Add the dependencies**, in this order, each package once:
+   1. the API's ([api-setup.md](references/api-setup.md#dependencies));
+   2. the web's NgRx, Tailwind and angular-eslint ([web.md §3](references/web.md#3-scripts-and-dependencies));
+   3. Storybook's ([web-storybook.md](references/web-storybook.md#dependencies));
+   4. the test layers' ([web-testing.md §1](references/web-testing.md#dependencies) and
+      [§4](references/web-testing.md#dependencies-and-script)), with the one-time `playwright install chromium`;
+   5. the shared tooling ([monorepo-root.md](references/monorepo-root.md#shared-tooling)). Before it, check that the
+      TypeScript peer ranges of typescript-eslint and `@angular/compiler-cli@22` still overlap, and pin the newest
+      version both accept, exactly, with `pnpm add -E --save-catalog`.
 
 6. **Copy the conventions, format and run the checks.** `<skill-dir>` is this skill's base directory.
 
@@ -164,12 +180,12 @@ Copy this checklist and tick it off:
    ```sh
    docker compose up --build -d
    pnpm --filter api db:generate --name init && pnpm --filter api db:migrate
-   pnpm --filter api test:db                     # DAO suite vs a Testcontainers Postgres (needs Docker + migrations)
+   pnpm test:integration                         # DAO + API tests vs a Testcontainers Postgres (needs Docker + migrations)
    curl -s http://localhost:3000/health
    ```
 
-   `test:db` runs only now, because the `db` project applies `db/migrations/` and those exist only after the first
-   `db:generate`. Then walk through the [Review Checklist](#review-checklist).
+   `test:integration` runs only now, because the `db` and `api` projects apply `db/migrations/` and those exist only
+   after the first `db:generate`. Then walk through the [Review Checklist](#review-checklist).
 
 ## Version constraints
 
@@ -183,10 +199,10 @@ Copy this checklist and tick it off:
 | `@angular/*`, `@ngrx/*`, angular-eslint | major 22                    | NgRx and angular-eslint release in step with Angular's major      |
 | `@fundamental-ngx/*`                    | exact 0.65.x                | the release whose peer range covers Angular 22                    |
 | Tailwind                                | major 4                     | the CSS-first `@import` layers and `@tailwindcss/postcss` plugin  |
-| Vitest (API)                            | major 5                     | the API's `vitest run` projects                                   |
-| Vitest (web)                            | exact 4.x (`@vitest/browser`, `@vitest/browser-playwright` to match) | Vitest 5's browser mode doesn't work in this workspace; `@angular/build` accepts `^4 \|\| ^5` so `ng test` is fine |
+| Vitest, `@vitest/browser*`              | major 5, in catalog         | one major for the API and web; the browser packages match it      |
 | Storybook / `@storybook/angular-vite`   | major 10                    | the Vite/Analog builder that fits the esbuild toolchain           |
-| `@analogjs/vite-plugin-angular`         | major 2                     | compiles Angular under Vite for Storybook + the browser tests     |
+| `@analogjs/vite-plugin-angular`         | major 2                     | compiles Angular under Vite for Storybook and the tests           |
+| `@analogjs/vitest-angular`              | major 2                     | the `ng test` builder and `setupTestBed`                          |
 | Playwright / `@playwright/test`         | major 1                     | full-stack e2e in a real browser                                  |
 | Postgres / Nginx images                 | `17-alpine` / `1.27-alpine` | pinned in `docker-compose.yml` and `web/Dockerfile`               |
 
@@ -205,7 +221,7 @@ These bite first when writing code in the project. The full set is in
 - API and web types and errors: `*.model.ts`
 - Web: `*.component.ts`, flat under `components/` / `layouts/` / `pages/` with no wrapping folder
 - NgRx slices: `*.model.ts`, `*.actions.ts`, `*.reducer.ts`, `*.selectors.ts`, `*.effects.ts`
-- Tests: API `tests/**/*.test.ts` grouped by kind (`unit/`, `api/`, `db/`, `utils/`), one top-level `describe` per file named for the module; web `*.spec.ts` beside the file
+- Tests: API `tests/**/*.test.ts` grouped by kind (`unit/`, `api/`, `db/`, `utils/`), one top-level `describe` per file named for the module; web `*.spec.ts` / `*.browser.spec.ts` beside the file, same `describe` rule; e2e `e2e/pages/*.spec.ts`
 
 ### API
 
@@ -228,18 +244,21 @@ These bite first when writing code in the project. The full set is in
   `createError(400, …)` on failure.
 - **Tests are grouped by kind under `tests/{unit,api,db,utils}/`**, not mirrored against `src/`, and each file wraps its
   suites in one top-level `describe` named for the module. A single `vitest.config.ts` defines three `projects`:
-  - `pnpm test` runs **`unit` + `api`** with no database — the filter / sort translator through the SQL it renders, the
-    list-input builders directly, and every route through `createApp` with a fake DAO on the context, driven over
-    `fetch` (not `supertest`), asserting status and body. One route-test file per controller.
-  - `pnpm test:db` runs the **`db`** project: the real DAO against a throwaway `postgres:17-alpine` via Testcontainers
-    (`@testcontainers/postgresql`), migrated with the drizzle migrator. `list` is covered exhaustively (filter, sort,
-    pagination, alone and combined). It needs Docker and an existing `db/migrations/`, so it runs after the first
-    `db:generate`. A new resource gets a controller test in `tests/api/`, a DAO test in `tests/db/`, and a schema test
-    in `tests/unit/`.
+  - `pnpm test` runs **`unit` + `controllers`** with no database — the filter / sort translator through the SQL it
+    renders, the list-input builders directly, and every controller through `createApp` with a fake DAO on the
+    context, driven over `fetch` (not `supertest`), asserting status and body. These are the **controller unit tests**:
+    one file per controller, every validation and error branch.
+  - `pnpm test:integration` runs **`db` + `api`** against a throwaway `postgres:17-alpine` via Testcontainers
+    (`@testcontainers/postgresql`), migrated with the drizzle migrator. `db` tests the real DAO directly, `list`
+    exhaustively (filter, sort, pagination, alone and combined). `api` is the **API tests, end to end**: the real app
+    on the real DAO, one `<resource>.api.test.ts` per resource covering every route and the errors only the real stack
+    produces. It needs Docker and an existing `db/migrations/`, so it runs after the first `db:generate`. A new resource
+    gets a controller test in `tests/controllers/`, a DAO test in `tests/db/`, an API test in `tests/api/`, and a
+    schema test in `tests/unit/`.
 - **`types: ["node"]` is explicit** in `tsconfig.app.json`: TypeScript 6 defaults `types` to `[]`. Every new config file
   goes into the `include` of `tsconfig.node.json`, or ESLint reports it as belonging to no project.
 - **Pino logs plain JSON.** `pino-pretty` is only a pipe in the `dev` script.
-- **`drizzle.config.ts` throws** when `DATABASE_URL` is missing.
+- **`drizzle.config.ts` and `db/client.ts` throw** when `DATABASE_URL` is missing; there is no fallback URL.
 
 ### The DAO layer
 
@@ -290,7 +309,7 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   Each method writes its URL explicitly and builds its params inline, with no private URL or params helper.
 - **Every page loads the same way:** `Load` on init, `Leave` on destroy; the slice goes `'loading'` → `'loaded'` (or
   `'error'`). Each slice has one `status` union and an `error` message, never `loading` / `saving` / `deleting`
-  booleans, and templates use `@switch (status())`.
+  booleans; the status-driven body is a `@switch (status())`, the error banner an `@if`.
 - **Global NgRx slices:**
   - `appContext` holds `apiBaseUrl` and `appName`, and is the only consumer of Angular `environment`.
   - `appRouter` (`store/app-router/app-router.selectors.ts`) holds the `@ngrx/router-store` state; its key is passed
@@ -307,11 +326,15 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   what makes back, forward, refresh and deep links work.
 - **Inline templates and Tailwind utilities.** There are no `.html` or `.scss` files.
 - **Components are developed in Storybook and tested in three layers.** `components/` holds store-free
-  `input()`/`output()` components (example: `ConfirmDialog`) with a `*.stories.ts` beside each. Tests: `ng test`
-  (unit, `*.spec.ts` beside the file — services, slices, helpers), `pnpm test:browser` (pages in real Chromium via
-  Vitest browser mode, `web` pinned to Vitest 4), and `pnpm test:e2e` (Playwright against the real app + API + Postgres).
-  A signal-input component can't be bound in browser mode (Analog drops the metadata), so it is covered by Storybook +
-  e2e. Details in [references/web-testing.md](references/web-testing.md) and [references/web-storybook.md](references/web-storybook.md).
+  `input()`/`output()` components (example: `ConfirmDialog`) with a `*.stories.ts` and a `*.component.browser.spec.ts`
+  beside each; none sets `changeDetection` (`OnPush` is Angular 22's default). `ng test` runs on Analog's Vitest builder
+  from one `vitest.config.mts`: project `unit` (jsdom, `*.spec.ts` — services, slices, helpers) and, with
+  `-c browser`, project `browser` (components and pages in real Chromium). Every spec is in `tsconfig.spec.json`,
+  because Analog compiles only that program. `pnpm test:e2e` runs Playwright against the real app + API + Postgres on
+  its own database (`app_e2e`) and ports (`:4300` / `:3100`), so the dev stack is never touched. Details in
+  [references/web-testing.md](references/web-testing.md) and [references/web-storybook.md](references/web-storybook.md).
+- **A page past the end steps back in the slice** (`stepBackPastLastPage$`), like every other navigation: pages hold no
+  navigation side effects.
 
 ### Infra
 
@@ -346,7 +369,7 @@ pnpm workspace, then:
   [references/api-entity.md](references/api-entity.md)
 - **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, components, pages, spec, Nginx): [references/web.md](references/web.md)
 - **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the `ConfirmDialog` story): [references/web-storybook.md](references/web-storybook.md)
-- **Web tests** (unit via `ng test`, browser-mode page tests on Vitest 4, full-stack Playwright e2e): [references/web-testing.md](references/web-testing.md)
+- **Web tests** (Analog's Vitest builder, the unit and browser projects, full-stack Playwright e2e on its own stack): [references/web-testing.md](references/web-testing.md)
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
 - **Coding conventions** (copied to the repo root): [references/coding-conventions.md](references/coding-conventions.md)
@@ -360,7 +383,7 @@ pnpm workspace, then:
 - [ ] `pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format:check` passes
 - [ ] `docker compose up --build` starts all three services and the `db` healthcheck passes
 - [ ] `pnpm --filter api db:generate --name init` produces exactly one migration, and `db:migrate` applies it
-- [ ] `pnpm --filter api test:db` passes (DAO suite against a Testcontainers Postgres; needs Docker and the migration above)
+- [ ] `pnpm test:integration` passes (DAO and API tests against a Testcontainers Postgres; needs Docker and the migration above)
 - [ ] `curl http://localhost:3000/health` returns `{status:'ok', db:'up', …}`
 - [ ] `curl http://localhost:4200/entities` returns 200
 - [ ] `POST /entities` creates; `GET /entities?filter=<json>&sortField=…&sortDirection=…&page=&pageSize=` returns
@@ -368,6 +391,8 @@ pnpm workspace, then:
       updates; `DELETE /entities/:id` returns 204, and 404 for a missing id
 - [ ] `.env` is not committed and `.env.example` is
 - [ ] `coding-conventions.md` is at the repo root
-- [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook` serves the `ConfirmDialog` stories
-- [ ] `pnpm --filter web test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
-- [ ] `pnpm --filter web test:e2e` passes (Playwright full-stack; needs Docker + the root `.env`)
+- [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook --smoke-test --ci` starts and exits 0, and
+      `storybook-static/index.json` lists the three `ConfirmDialog` stories
+- [ ] `pnpm test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
+- [ ] `pnpm test:e2e` passes (Playwright full-stack; needs Docker, the root `.env` and the migration above), and the dev
+      database and any running Compose services are as they were

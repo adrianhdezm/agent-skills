@@ -693,6 +693,6 @@ describe('list-input.helper', () => {
   picks the operator up by itself.
 - **A new scalar kind** (e.g. `jsonbFilterInputSchema`): a new strict schema in `list-input.model.ts` listing only the
   operators that make sense for it, added to the `ScalarFilterInputSchema` and `ScalarFilterInput` unions. If it needs
-  SQL the existing operators cannot express, add a branch to `fieldFilterToSql`.
+  SQL the existing operators cannot express, add a branch to `fieldToSql`.
 - **A new filterable or sortable column** is a resource change, not a vocabulary change: see
   [api-entity.md](api-entity.md#adding-another-resource).

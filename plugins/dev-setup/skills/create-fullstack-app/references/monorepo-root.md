@@ -38,8 +38,8 @@ allowBuilds:
 
 **Catalog rule**: only packages used in two or more manifests with the same version range belong in the catalog.
 Everything else is a direct dependency of the one manifest that uses it. TypeScript is in the catalog because both
-projects pin the same exact 6.0.x version; `@types/node` is in the catalog too, because api and web both depend on it at
-the same `^24.x` range. `vitest` stays out — api is on `^5` and web is pinned to `4.1.12`, different ranges.
+projects pin the same exact 6.0.x version; `@types/node` and `vitest` are in the catalog too, because api and web both
+depend on them at the same range (`^24.x`, `^5.x`).
 
 ## Root `package.json`
 
@@ -56,7 +56,10 @@ the same `^24.x` range. `vitest` stays out — api is on `^5` and web is pinned 
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "test:db": "pnpm --filter api test:db",
+    "test:integration": "pnpm --filter api test:integration",
+    "test:browser": "pnpm --filter web test:browser",
+    "test:e2e": "pnpm --filter web test:e2e",
+    "storybook": "pnpm --filter web storybook",
     "format": "pnpm -r format",
     "format:check": "pnpm -r format:check",
     "up": "docker compose up --build",
@@ -87,13 +90,14 @@ Pick the newest TypeScript that satisfies both, which is the latest 6.0.x while 
 
 ```sh
 pnpm --filter api --filter web add -D --save-catalog \
-  eslint @eslint/js typescript-eslint eslint-config-prettier globals prettier @types/node
+  eslint @eslint/js typescript-eslint eslint-config-prettier globals prettier @types/node@24 vitest@5
 pnpm --filter api --filter web add -D -E --save-catalog "typescript@$(pnpm view 'typescript@~6.0.0' version)"
 ```
 
-This writes the `catalog:` block and replaces the Angular CLI's own `typescript` entry in `web/package.json` with
-`catalog:`. `@types/node` is cataloged the same way, because both projects use it. Check the result: `typescript` in the
-catalog is an exact version with no `^` or `~`.
+This writes the `catalog:` block, adds back `typescript` and `prettier` (removed from `web/package.json` in the
+`web.md` cleanup) as `catalog:`, and replaces the Angular CLI's own `vitest` entry with `catalog:`. `@types/node` and `vitest` carry their majors explicitly, so the catalog never
+picks up a newer major than the Dockerfiles' Node (24) or the one the test configs are written for (5). Check the
+result: `typescript` in the catalog is an exact version with no `^` or `~`.
 
 ## `.gitignore`
 
@@ -121,7 +125,14 @@ Both images build with the repo root as context, so one ignore file serves both.
 .git
 .env
 api/db
+web/storybook-static
+web/test-results
+web/playwright-report
+web/.vitest
 ```
+
+The last four are Storybook, Playwright and Vitest output: never part of an image, and they would bust the build
+cache.
 
 ## `.env.example`
 
