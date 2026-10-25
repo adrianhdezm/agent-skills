@@ -339,8 +339,10 @@ describe('operator details', () => {
     const sub = TestBed.runInInjectionContext(() => fetchOnListInputChange$()).subscribe((a) => emitted.push(a));
 
     actions.next(EntityListPageActions.load()); // inner subscribes, emits inputA -> fetch
-    store.overrideSelector(selectListInputOnListPage, inputA);
-    store.refreshState(); // identical -> dropped
+    // Equal but a new object: the same reference would be dropped by NgRx's own select before
+    // the effect's distinctUntilChanged ever saw it, and the case would pass without the operator.
+    store.overrideSelector(selectListInputOnListPage, { ...inputA });
+    store.refreshState(); // equal -> dropped by distinctUntilChanged
     store.overrideSelector(selectListInputOnListPage, inputB);
     store.refreshState(); // changed -> fetch
     sub.unsubscribe();

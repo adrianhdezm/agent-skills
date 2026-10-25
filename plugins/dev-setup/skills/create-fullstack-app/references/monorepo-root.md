@@ -108,6 +108,7 @@ dist/
 *.log
 *.tsbuildinfo
 .angular/
+.vitest/
 .DS_Store
 
 # Postgres data (bind-mounted by docker-compose)

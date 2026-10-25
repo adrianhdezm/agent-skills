@@ -17,8 +17,8 @@ example in `api-entity.md`.
 - [`api/src/db/client.ts`](#apisrcdbclientts)
 - [`api/src/server.ts`](#apisrcserverts)
 - [`api/src/app.ts`](#apisrcappts)
-- [`api/src/middleware/error.middleware.ts`](#apisrcmiddlewareerrormiddlewarets)
-- [`api/src/middleware/not-found.middleware.ts`](#apisrcmiddlewarenot-foundmiddlewarets)
+- [`api/src/middlewares/error.middleware.ts`](#apisrcmiddlewareserrormiddlewarets)
+- [`api/src/middlewares/not-found.middleware.ts`](#apisrcmiddlewaresnot-foundmiddlewarets)
 - [`api/Dockerfile`](#apidockerfile)
 - [`api/db/scripts/init.sql`](#apidbscriptsinitsql)
 - [First-run migration](#first-run-migration)
@@ -59,28 +59,32 @@ api/
 │   │   └── query-parser.helper.ts  # api-dao.md
 │   ├── daos/                # entity.dao.ts, api-entity.md
 │   ├── controllers/         # api-entity.md
-│   └── middleware/
+│   └── middlewares/
 │       ├── error.middleware.ts
 │       └── not-found.middleware.ts
-└── tests/                   # grouped by kind (not mirrored to src), one *.test.ts per module
-    ├── unit/                # fast, no DB — api-dao.md, api-entity.md
-    │   ├── dao.helper.test.ts
-    │   ├── list-input.helper.test.ts
-    │   ├── query-parser.helper.test.ts
-    │   └── entity.schema.test.ts
-    ├── controllers/         # controller unit tests: routes via fetch + fake DAO — api-entity.md
-    │   ├── entity.controller.test.ts
-    │   ├── home.controller.test.ts
-    │   ├── health.controller.test.ts
-    │   └── error.middleware.test.ts
+└── tests/                   # grouped by kind; unit/ mirrors src/, one *.test.ts per module
+    ├── unit/                # functions called directly, stub DAO, no DB — api-dao.md, api-entity.md
+    │   ├── helpers/
+    │   │   ├── dao.helper.test.ts
+    │   │   ├── list-input.helper.test.ts
+    │   │   └── query-parser.helper.test.ts
+    │   ├── db/schemas/
+    │   │   └── entity.schema.test.ts
+    │   ├── controllers/
+    │   │   ├── entity.controller.test.ts
+    │   │   ├── home.controller.test.ts
+    │   │   └── health.controller.test.ts
+    │   └── middlewares/
+    │       ├── error.middleware.test.ts
+    │       └── not-found.middleware.test.ts
     ├── db/                  # the DAO vs a Testcontainers Postgres + drizzle migrator — api-entity.md
     │   └── entity.dao.test.ts
     ├── api/                 # API tests, end to end: real HTTP → controller → DAO → Postgres — api-entity.md
     │   └── entity.api.test.ts
     └── utils/               # test helpers, not tests — api-entity.md
+        ├── http-mocks.ts    # stub context, mock req / res / next for the unit tests
         ├── pg-container.ts
-        ├── fake-dao.ts
-        ├── test-server.ts
+        ├── test-server.ts   # serve(app) for the API tests
         └── entity-seed.ts
 ```
 
@@ -102,7 +106,7 @@ Scripts and metadata only. Dependencies are added with `pnpm add` (next section)
     "build": "tsc -p tsconfig.app.json",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json",
     "lint": "eslint .",
-    "test": "vitest run --project unit --project controllers",
+    "test": "vitest run --project unit",
     "test:integration": "vitest run --project db --project api",
     "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
@@ -120,7 +124,7 @@ Rules:
 - `db:*` scripts run drizzle-kit's bin **under node with `--env-file`** because drizzle-kit does not load `.env`.
 - Only `db:generate` and `db:migrate`; there is no `db:push`.
 - `typecheck` runs **both** tsconfigs so the tests and config files are type-checked too.
-- `test` runs only the Docker-free vitest projects (`unit` + `controllers`); it needs no database.
+- `test` runs only the Docker-free `unit` project; it needs no database.
   `test:integration` runs the `db` and `api` projects, which spin up a Testcontainers Postgres and so need a running
   Docker daemon and an existing `db/migrations/` (run `db:generate` first). See the `vitest.config.ts` section.
 
@@ -130,11 +134,11 @@ Run from the repo root, after the web app exists, so the shared tooling lands in
 
 ```sh
 pnpm --filter api add cors drizzle-orm drizzle-zod express http-errors pg pino pino-http zod
-pnpm --filter api add -D @types/cors @types/express @types/http-errors @types/node@24 @types/pg \
+pnpm --filter api add -D @types/cors @types/express @types/http-errors @types/pg \
   @testcontainers/postgresql drizzle-kit pino-pretty tsx
 ```
 
-`@types/node` follows the Node major the Dockerfile runs (24). `@testcontainers/postgresql` powers the DB-backed DAO
+`@testcontainers/postgresql` powers the DB-backed DAO
 tests (the `db` vitest project) and needs a running Docker daemon; its optional native sub-deps are marked
 non-building in `pnpm-workspace.yaml` (see `monorepo-root.md`). The shared tooling (ESLint, Prettier, TypeScript,
 `@types/node` and Vitest) is added by the root step in `monorepo-root.md`.
@@ -228,31 +232,27 @@ No fallback for `DATABASE_URL`: it throws loud and early. `schema` points at the
 
 ## `api/vitest.config.ts`
 
-One config, four named `projects`, one per test folder. Shared options (silent logs) live at the root and are
-inherited by each inline project.
+One config, three named `projects`, one per test folder. Shared options (silent logs) live at the root, and each
+inline project sets `extends: true` to inherit them, as the web's `vitest.config.mts` does.
 
 ```ts
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Shared by every project (inline projects inherit this config by default).
+    // Shared by every project: each inline project sets `extends: true` to inherit it.
     // pino-http logs every request; keep test output readable.
     env: { LOG_LEVEL: 'silent' },
     projects: [
       {
+        extends: true,
         test: {
           name: { label: 'unit', color: 'cyan' },
           include: ['tests/unit/**/*.test.ts']
         }
       },
       {
-        test: {
-          name: { label: 'controllers', color: 'magenta' },
-          include: ['tests/controllers/**/*.test.ts']
-        }
-      },
-      {
+        extends: true,
         test: {
           name: { label: 'db', color: 'green' },
           include: ['tests/db/**/*.test.ts'],
@@ -262,6 +262,7 @@ export default defineConfig({
         }
       },
       {
+        extends: true,
         test: {
           name: { label: 'api', color: 'yellow' },
           include: ['tests/api/**/*.test.ts'],
@@ -276,12 +277,11 @@ export default defineConfig({
 ```
 
 Tests import sources with the `.js` extension, as the sources do; Vite resolves them to the `.ts` files. The suites
-run at two tiers. The `unit` and `controllers` projects need **no database**: DAO-level SQL is tested through what it
-renders (`PgDialect`), and each controller through `createApp` with a fake DAO on the context, driven over `fetch`.
-The `db` and `api` projects use Testcontainers (one container per suite, migrations applied by the drizzle migrator),
+run at two tiers. The `unit` project needs **no database**: DAO-level SQL is tested through what it renders
+(`PgDialect`), and each controller and middleware is called directly as a function, with a mock `req` carrying a stub
+DAO on `req.app.locals.context`. The `db` and `api` projects use Testcontainers (one container per suite, migrations applied by the drizzle migrator),
 so they need Docker: `db` runs the **real** DAO directly, and `api` serves the real app on the real DAO and drives it
-over HTTP, end to end. `pnpm test` runs `--project unit --project controllers`; `pnpm test:integration` runs
-`--project db --project api`.
+over HTTP, end to end. `pnpm test` runs `--project unit`; `pnpm test:integration` runs `--project db --project api`.
 
 ## `api/src/express.d.ts`
 
@@ -412,8 +412,8 @@ import cors from 'cors';
 import { pinoHttp } from 'pino-http';
 import { logger } from './logger.js';
 import type { AppContext } from './models/app-context.model.js';
-import { errorHandler } from './middleware/error.middleware.js';
-import { notFoundHandler } from './middleware/not-found.middleware.js';
+import { errorHandler } from './middlewares/error.middleware.js';
+import { notFoundHandler } from './middlewares/not-found.middleware.js';
 import { getHealth } from './controllers/health.controller.js';
 import { getHome } from './controllers/home.controller.js';
 import { createEntity, deleteEntity, getEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
@@ -445,7 +445,7 @@ export function createApp(context: AppContext): Express {
 
 No `routes/` module. No context middleware. Controllers wire directly on `app`.
 
-## `api/src/middleware/error.middleware.ts`
+## `api/src/middlewares/error.middleware.ts`
 
 ```ts
 import type { NextFunction, Request, Response } from 'express';
@@ -476,7 +476,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
 }
 ```
 
-## `api/src/middleware/not-found.middleware.ts`
+## `api/src/middlewares/not-found.middleware.ts`
 
 ```ts
 import type { NextFunction, Request, Response } from 'express';
