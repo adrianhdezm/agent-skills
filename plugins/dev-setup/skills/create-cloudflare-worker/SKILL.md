@@ -28,6 +28,9 @@ that break a plain Worker. The tools' own CLIs create what they can (`git init`,
 `pnpm add`, `pnpm approve-builds`, `wrangler types`); every other file is written from the specification in
 [references/tooling.md](references/tooling.md).
 
+**Done means:** the four checks pass, nothing was emitted into the tree, and every item on the
+[Review Checklist](#review-checklist) holds.
+
 ## What gets created
 
 ```
@@ -65,6 +68,9 @@ Copy this checklist and tick it off:
 - [ ] 5. App and its test written
 - [ ] 6. Formatted and checked
 ```
+
+Once the description is settled, run every step to the end without asking. Stop only when the toolchain is missing,
+the target already holds a `package.json`, or a check still fails after you have found its cause.
 
 1. **Check the toolchain.** `node --version` must be 24 or newer, `pnpm --version` 11 or newer (`allowBuilds` is a pnpm
    11 setting). Use pnpm for everything, never npm. Stop if the target directory already holds a `package.json`: follow
@@ -135,6 +141,12 @@ Copy this checklist and tick it off:
 
    All four pass. Then confirm what the checks miss: `private` is `true` (a boolean), `typescript` has an exact version
    with no `^`, and the repository root holds no emitted `*.js`, `*.d.ts` or `*.tsbuildinfo` next to the sources.
+
+## End of the run
+
+End with three headings: **Blocked on me** (a check that still fails), **Changed** (the project path and what was
+created) and **Found** (anything that differed from the spec, such as a moved peer range). When another skill called
+this one, such as `design-solution`, hand these back to it instead.
 
 ## Rules the tooling enforces
 

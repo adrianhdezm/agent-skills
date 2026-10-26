@@ -141,6 +141,12 @@ Applies to every slice, on top of its acceptance criteria.
 dependencies nothing at high or above; accessibility zero critical or serious; LCP ≤ 2500 ms and CLS ≤ 0.1; an
 exception lives 90 days at most.
 
+## End of the run
+
+End with three headings: **Blocked on me** (a check that fails today and needs the user's call), **Changed**
+(`CONSTRAINTS.md`, the scripts, the tools installed, the `CLAUDE.md` line) and **Found** (what the trial run showed).
+When another skill called this one, such as `design-solution`, hand these back to it instead.
+
 ## Red flags
 
 - The interview went past four questions, or the user cannot explain the result

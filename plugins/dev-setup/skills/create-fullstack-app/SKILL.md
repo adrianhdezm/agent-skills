@@ -31,6 +31,9 @@ The Angular CLI creates `web/` and the tools' own CLIs create what they can (`gi
 every other file is written from the specifications under `references/`. `coding-conventions.md` is copied to the new
 repo's root so future sessions follow the same rules.
 
+**Done means:** the five checks pass, Compose is up with the first migration applied, and every item on the
+[Review Checklist](#review-checklist) holds.
+
 ## What gets created
 
 ```
@@ -99,6 +102,9 @@ Copy this checklist and tick it off:
 - [ ] 6. Conventions copied, formatted and checked
 - [ ] 7. Compose up, first migration, smoke test
 ```
+
+Once the inputs are confirmed, run every step to the end without asking. Stop only when the toolchain is missing, a
+port is taken, the target already holds a `package.json`, or a check still fails after you have found its cause.
 
 1. **Confirm the inputs and check the toolchain.** Ask for the repo name, the DB name (default `app`) and whether to add
    Fundamental NGX, unless the prompt already says. The app name shown in the UI is the repo name in Title Case
@@ -188,6 +194,12 @@ Copy this checklist and tick it off:
 
    `test:integration` runs only now, because the `db` and `api` projects apply `db/migrations/` and those exist only
    after the first `db:generate`. Then walk through the [Review Checklist](#review-checklist).
+
+## End of the run
+
+End with three headings: **Blocked on me** (a check that still fails, a port to free), **Changed** (the project path
+and what was created) and **Found** (anything that differed from the spec, such as a moved peer range). When another
+skill called this one, such as `design-solution`, hand these back to it instead.
 
 ## Version constraints
 

@@ -66,6 +66,12 @@ Never touch a block between `simplify-ignore-start` and `simplify-ignore-end` co
 Keep simplifications in their own commit, separate from feature or fix work, when the user wants commits. In an
 initiative, record what you changed under the slice's notes in `04-progress.md`.
 
+## End of the run
+
+End with three headings: **Blocked on me** (anything that needs the user to widen the scope), **Changed** (each
+simplification kept, in a line, and each one reverted) and **Found** (the Noticed list). When another skill called
+this one, such as `implement-design`, hand these back to it instead.
+
 ## Red flags
 
 - A test had to change for a simplification to pass
