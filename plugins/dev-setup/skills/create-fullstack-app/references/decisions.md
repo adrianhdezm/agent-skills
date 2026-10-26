@@ -306,8 +306,8 @@ build wiring at this size; keeping the names identical makes a drift easy to spo
 
 Each page route declares its state in `data: { state }`, typed by `AppState`, and each page's `status` union names
 what the page is doing. Naming the states makes the app's shape readable from `app.routes.ts` alone, gives page
-reducers one string to match a navigation on, and makes a missing or misspelled state a compile error and an
-`app.routes.spec.ts` failure, instead of a path comparison (`url === '/entities'`) repeated in selectors.
+reducers one string to match a navigation on, and makes a misspelled state a compile error and a wrong one an e2e
+failure (the page opened by its URL never loads), instead of a path comparison (`url === '/entities'`) repeated in selectors.
 
 This was called a statechart, and a review showed the name promised more than the code does: reducers apply any action
 in any status, and nothing rejected a completion that belonged to a page already left. Making it a real statechart
@@ -322,7 +322,8 @@ or query it needs (the list input, the detail id, the form target). A list query
 
 Two alternatives were tried or weighed:
 
-- **List input derived from `appRouter` by a selector** (the URL as the store's only copy). Pages read router state,
+- **List input derived from a router slice by a selector** (router-store's `routerReducer` state as the store's
+  only copy of the URL). Pages read router state,
   so the store moved to the next URL while the old page was still mounted (`ROUTER_NAVIGATION` precedes the old page's
   destruction), which needed a `selectListInputOnListPage` guard returning `null` off the list URL; and the detail
   page, reading its id once on init, did not reload when Angular reused it for another id.
@@ -342,7 +343,7 @@ almost only its own fields (only the current entity was shared), and the cross-p
 create, patch on update) were redundant once the list fetches fresh data on every visit and after a delete. Per-page
 slices keep each page's actions and state together. The cost is that detail and form each load the entity, one extra
 request when going from detail to edit. Resource types shared by the slices live in `models/`, and only `appContext`
-and the router state (`appRouter`) stay global.
+stays global.
 
 ### Pages inject only the Store; templates link with `routerLink`
 
@@ -398,12 +399,42 @@ asks for. The page asks for data with `Load` (detail, form) or `Fetch` (one list
 When the router lands on the same state with another id, the reducer replaces the slice with its initial state plus
 the new id. Keeping the previous entity until the new one loads showed entity 42 under the URL for 43.
 
-### Router actions fire after activation
+### A custom serializer flattens the route
 
-`provideRouterStore` uses `navigationActionTiming: PostActivation`. With the default timing, `ROUTER_NAVIGATION`
-lands at `RoutesRecognized`, so `appRouter` holds the target URL while guards run and rolls it back on
-`ROUTER_CANCEL`; after activation, the store only ever holds a URL the router committed. Page reducers react to
-`routerNavigatedAction`, which fires at `NavigationEnd` either way.
+`provideRouterStore` gets `AppRouterSerializer` instead of router-store's default. The default puts the route on each
+router action as a tree (`root → 'entities' → '' → ':id/edit'`, each node with its own `params` and `data`), and the two
+things a page reducer checks — the deepest route's `data.state` and the `:id` param — sit at the bottom of it. The
+serializer walks the tree once per navigation and writes a flat `NavigatedRoute`, `{ url, state, params, queryParams }`,
+so each reducer is one comparison (`route.state === 'entity-detail' ? route.params['id'] : null`), no reducer depends on
+how the routes nest (the form's componentless parent route is invisible to them), and the action payload stays four
+plain fields in the devtools. It is also the one place that reads route `data`: `data: { state }` in `app.routes.ts`
+means something only because the serializer lifts it out.
+
+The alternative is the default serializer with the walk inside `navigatedRoute(action)`: it saves the class but walks
+the tree once per reducer instead of once per navigation and puts the whole tree in every router action. The serializer
+lives in `store/app-router/` with its model, its action and its effect: together they are the router ↔ store bridge,
+the one store folder without a slice, and its model sits beside it as every slice's model does. `models/` keeps only
+resource types that several slices share.
+
+### No router slice
+
+`provideRouterStore` runs without `routerReducer`. A global `appRouter` slice was kept for a while, with its own key,
+selectors and `navigationActionTiming: PostActivation` (so it never held a URL a guard could still cancel), but once
+every page took its route state from `routerNavigatedAction` into its own slice, nothing read it: only the devtools,
+for URL time-travel, and a route spec. router-store dispatches its actions without the slice (it skips its
+store-to-router sync when the state is missing), so dropping it removed a feature key, a selectors file, the timing
+option, which then affects only `ROUTER_NAVIGATION`, an action nothing handles, and a second copy of the URL that
+code could be tempted to read. The serialized route keeps `url`, which router-store's serializer contract requires.
+
+### No spec for the route table
+
+`app.routes.ts` is a mapping — path, page, `data.state`, the slice registered on the route — and gets no spec of its
+own. An `app.routes.spec.ts` on `RouterTestingHarness` was kept for a while: one case per route, plus four
+"late response" sequences (a read or a save that returns after its page was left). Every one of those repeated a
+cheaper test — the effects specs cover cancelled reads, `EMPTY` for the new form and the `navigationId` checks; the
+page browser specs cover `Leave` on destroy — and the per-route cases repeated the e2e suite, whose page specs each
+open their page by URL in a real browser. The route table is now proven there, with the real router, API and
+database; the cost is that a routing mistake fails `pnpm test:e2e` rather than `pnpm test`.
 
 ### Requests belong to the page that started them
 
@@ -430,7 +461,7 @@ The rules that close them:
 
 A delete stays a plain write: its only follow-up refetches, and after `Leave` the sampled input is `null`, so it does
 nothing. The cost is a `navigationId` field and two props on the form slice, and a `takeUntil` on each read. The
-sequences are unit cases in each effects spec and, on the real router and store, in `app.routes.spec.ts`.
+sequences are unit cases in each effects spec, and each page's browser spec proves it dispatches `Leave` on destroy.
 
 ### A page on several routes registers its slice once
 
@@ -472,7 +503,7 @@ until it turned out to be an optional peer: the builder runs zoneless by default
 ### Web tests run on Analog's Vitest builder, one config with two projects
 
 `ng test` runs on `@analogjs/vitest-angular:test`, not the CLI's `@angular/build:unit-test`. One `vitest.config.mts`
-holds two projects: `unit` (jsdom — services, every slice, helpers, routes; the required `test` check) and `browser`
+holds two projects: `unit` (jsdom — services, every slice, helpers; the required `test` check) and `browser`
 (real Chromium through Playwright — components and pages with a mock store; `ng test -c browser`). The angular.json
 target's `project` option picks which one runs. On top, **full-stack e2e** (`pnpm test:e2e`, Playwright Test) drives
 the real app → API → Postgres. The jsdom layer is kept fast and Docker-free; the real browser and the backend only

@@ -321,18 +321,34 @@ data         page ◄── selectors ◄── page slice ◄── page reduce
   actions; its template links with `routerLink`; effects call the service and map results to actions; `navigate$` is
   the only code that calls the Angular `Router`.
 - **Each page owns one slice, registered on its route** (`provideState` + `provideEffects` in `app.routes.ts`). Only
-  `appContext` and `appRouter` are global, in `app.config.ts`. Route-level slices and effects stay registered after the
+  `appContext` is global, in `app.config.ts`; the route has no slice of its own. Route-level slices and effects stay registered after the
   page is left, which is why every page resets its slice on `Leave` and every read ends on it.
 
 ### 4.2 Store and router
 
-The URL enters the store in one direction only, and components read only their page slice: to them, the store is the
-single source of truth.
+The URL enters the store in one direction only, and only as far as a page needs it: there is no router slice, so
+each page's reducer keeps the part of the URL its page uses. Components read only their page slice: to them, the store
+is the single source of truth.
+
+**One navigation, end to end** — the user opens a row, `/entities/e1`:
+
+```
+1. routerLink ['/entities', id]                      the Angular Router matches app.routes.ts:
+                                                     { path: ':id', data: { state: 'entity-detail' }, providers: [slice] }
+2. NavigationEnd → AppRouterSerializer.serialize()   flattens the route tree into a NavigatedRoute, never stored:
+                                                     { url, state: 'entity-detail', params: { id: 'e1' }, queryParams: {} }
+3. routerNavigatedAction (@ngrx/router-store)        carries it to every reducer
+4. each page reducer: navigatedRoute(action)         list and form: not their state → unchanged
+                                                     detail: its state → entityDetailPage.id = 'e1'
+5. EntityDetailPage.ngOnInit watch on selectId       dispatches EntityDetailPageActions.load({ id: 'e1' })
+6. load$ → EntityService.get → loadSuccess           the reducer stores the entity; the page renders it
+```
+
+Steps 1–4 are the whole router ↔ store integration (`store/app-router/`); from step 5 on it is an ordinary NgRx loop.
 
 | state                                 | written by                                                   | read by                                 |
 | ------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
-| the URL                               | the Angular `Router`, through `routerLink` or `navigate$`    | `@ngrx/router-store`                    |
-| `appRouter` (`{ url, state, params, queryParams }`) | `routerReducer`, through `AppRouterSerializer`  | devtools; no page, no page slice        |
+| the URL                               | the Angular `Router`, through `routerLink` or `navigate$`    | `@ngrx/router-store`, which serializes it onto `routerNavigatedAction` (`AppRouterSerializer`) |
 | a page's route state (list input, detail id, form target) | its page reducer, on `routerNavigatedAction` for its own state | that page, through its selectors |
 | server data and `status`              | its page reducer, on `Fetch` / `Load` results                | that page                               |
 
@@ -373,9 +389,9 @@ State that does not belong in the URL — a filter draft, a row pending delete, 
   `routerNavigatedAction` and runs `ngOnInit` after it.
 - **A new id or target starts the slice over.** The reducer drops the previous entity with the new id, or the page
   shows entity 42 under the URL for 43 until the request returns.
-- **Read the route with `navigatedRoute(action)`**, the one cast from router-store's payload type to `AppRouterState`.
-- **`navigationActionTiming: PostActivation`** keeps `appRouter` from holding a URL the router never commits (a guard
-  can cancel before activation).
+- **Read the route with `navigatedRoute(action)`**, the one cast from router-store's payload type to `NavigatedRoute`.
+- **Do not add a router slice.** Registering `routerReducer` gives every page a second, global copy of the URL to read;
+  a page that needs part of the URL gets it into its own slice through its reducer.
 - **The watch's `distinctUntilChanged` is the only dedupe.** A navigation that lands on an equal input fetches nothing;
   reducers never compare to avoid an update.
 - **A response can outlive its page.** Route-level effects keep running after `Leave`. A read without
@@ -405,10 +421,10 @@ an `effect()`.
 | ---------------- | ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
 | component        | `components/<name>.component.ts`           | a store-free UI piece: signal `input()` / `output()`            | other components                                           | inject the `Store`, a service or the `Router`                  |
 | layout           | `layouts/<name>-layout.component.ts`       | the shell around the pages                                      | the `Store` (read)                                         | inject services                                                |
-| page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), `RouterLink`, components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder`; select from `appRouter` |
+| page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), `RouterLink`, components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder` |
 | slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's route state, data and status | resource models, helpers, `navigatedRoute`         | hold another page's data, read another state's route           |
 | effects          | `store/<page-name>/<page-name>.effects.ts` | functional effects (`{ functional: true }`)                     | services, `Store`, `AppRouterActions.navigate`              | call the `Router` or `HttpClient` directly; react to `routerNavigatedAction`; let a read outlive `Leave` |
-| app-router slice | `store/app-router/`                        | `AppState`, the serializer, `navigatedRoute`, `Navigate` + `navigate$` | the Angular `Router` (`navigate$` only)             | —                                                              |
+| app router       | `store/app-router/`                        | the router ↔ store bridge, and the one store folder without a slice: `AppState` + `NavigatedRoute` (model), the serializer + `navigatedRoute`, `Navigate` + `navigate$` | the Angular `Router` (`navigate$` only) | keep the route in the store (`routerReducer`)                  |
 | app-context slice| `store/app-context/`                       | `apiBaseUrl` + `appName`, seeded from `environment`             | `environment`                                              | change after start                                             |
 | service          | `services/<resource>.service.ts`           | every HTTP call for one resource (`providedIn: 'root'`)          | `HttpClient`, `selectApiBaseUrl`, helpers                  | be injected outside effects, keep state                        |
 | helper           | `helpers/<name>.helper.ts`                 | pure functions (URL params, filter form mapping, error message) | models                                                     | inject anything                                                |
@@ -540,7 +556,7 @@ names a cursor-paginated result.
 | API unit                     | does this function do the right thing with this input?           | the function                             | DAO, `req` / `res` / `next`, log | `api/tests/unit/` (mirrors `src/`)     | `pnpm test`              |
 | API DAO                      | does the DAO's SQL return the right rows from a real Postgres?   | DAO, Drizzle, Postgres                   | —                                | `api/tests/db/`                        | `pnpm test:integration`  |
 | API end to end               | does the API answer correctly over HTTP, all layers together?    | HTTP, Express, controllers, DAO, Postgres| —                                | `api/tests/api/`                       | `pnpm test:integration`  |
-| web unit                     | is this service / slice / effect / helper / route right?         | the unit, `TestBed`                      | HTTP, store, actions, services   | `*.spec.ts` beside the file            | `pnpm test`              |
+| web unit                     | is this service / slice / effect / helper right?                 | the unit, `TestBed`                      | HTTP, store, actions, services   | `*.spec.ts` beside the file            | `pnpm test`              |
 | web browser                  | does this component or page render and behave in a real browser? | the component, Chromium, Tailwind        | the store (mock), the router     | `*.browser.spec.ts` beside the file    | `pnpm test:browser`      |
 | e2e                          | does a user flow work against the real API and database?         | everything                               | —                                | `web/e2e/pages/`                       | `pnpm test:e2e`          |
 
@@ -598,12 +614,11 @@ Storybook is not a test: it is where components are built and their states revie
   function calls, with each navigation a `navigated({ state, params, queryParams })` fixture (into the page's own state
   and into another); selectors — `.projector(…)` for anything with logic; effects — the action each input maps to,
   plus the RxJS operators that matter (`switchMap` cancellation, `concatMap` ordering, `takeUntil` on `Leave`), driven
-  by a `Subject` of actions; routes — every path renders its page and lands its `data.state` through
-  `RouterTestingHarness`, and a response that returns after its page was left changes nothing, on the real router; the
-  serializer — the deepest state and the merged params; helpers — a happy case and an edge case each.
+  by a `Subject` of actions; the serializer — the deepest state and the merged params; helpers — a happy case and an
+  edge case each.
 - *Not here:* rendering details and styling — the browser spec owns those.
-- *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect,
-  a route or a helper. Every slice has its reducer and effects specs; selectors get a spec only once one has logic.
+- *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect
+  or a helper. Every slice has its reducer and effects specs; selectors get a spec only once one has logic.
 
 **Web browser** (`*.browser.spec.ts`, Chromium)
 - *Real / stubbed:* the component or page rendered by Angular in real Chromium with Tailwind applied. Pages get
@@ -623,7 +638,9 @@ Storybook is not a test: it is where components are built and their states revie
   are never touched; teardown stops Postgres only if setup started it.
 - *Assert:* a user's flow end to end, seeding data through the API (`e2e/utils/api.ts`) and driving the UI: list,
   filter (and the filter in the URL), a deep link to a later page, back after _Next_, delete, stepping back off an
-  emptied page; create and edit; a detail page and a missing one.
+  emptied page; create and edit; a detail page and a missing one. Each page's spec opens its page by its URL
+  (`page.goto`), which is what proves the route table: the path, the `data.state` its reducer matches, and the slice
+  registered on the route.
 - *Not here:* edge cases a unit or browser spec can cover faster.
 - *Add one when:* you add a page or a user-visible flow.
 
@@ -641,7 +658,7 @@ Storybook is not a test: it is where components are built and their states revie
 | new action / page state                        | the reducer spec, the effects spec if it requests, the page's browser spec               |
 | new effect that requests                       | the effects spec, including a response after `Leave` (read) or after the page changed (write) |
 | new component                                  | its browser spec and its story                                                          |
-| new page or user flow                          | the slice specs, the page's browser spec, an e2e spec, a route in `app.routes.spec.ts`  |
+| new page or user flow                          | the slice specs, the page's browser spec, an e2e spec that opens the page by its URL    |
 | new resource                                   | all of the above — see [Adding a resource](#8-adding-a-resource)                         |
 
 ### 7.4 How tests are written
@@ -670,10 +687,11 @@ A test is code to maintain: it earns its place by catching a bug no other test c
 - **Name the bug first.** Before adding a test, name the failure only it would catch. If a lower tier, another test or
   the compiler already catches it, do not add it.
 - **Test a behaviour once, at the cheapest tier that can see it.** Go up a tier only for what the lower one cannot see:
-  real SQL (the DAO test), real HTTP and `app.ts` (the API test), the real router with route-level effects
-  (`app.routes.spec.ts`), a real browser (browser specs), the whole stack (e2e). The higher tier covers that addition,
+  real SQL (the DAO test), real HTTP and `app.ts` (the API test), a real browser (browser specs), the whole stack with
+  the real router (e2e). The higher tier covers that addition,
   not the lower tier's cases again.
-- **No specs for wiring without logic:** the root component, layouts, a `createReducer(initial)` with no `on`, a
+- **No specs for wiring without logic:** the route table (`app.routes.ts` is a mapping; each route is proven by its
+  page's e2e spec opening it by URL), the root component, layouts, a `createReducer(initial)` with no `on`, a
   one-line cast (`navigatedRoute`), an effect that only forwards to an Angular API (`navigate$`), a handler that returns
   a literal (`GET /`), a middleware the API test already drives (`notFoundHandler`). The tests that run through them
   prove them.
@@ -708,8 +726,8 @@ For a resource `user`:
 4. One slice per page under `store/user-<page>-page/`, registered on its route, its reducer writing its route state on
    `routerNavigatedAction` for its own state.
 5. The pages under `pages/`, following [the page contract](#45-the-page-contract), each with its watch.
-6. Tests: the service, helper and slice specs, a browser spec per page, e2e specs per page, the new routes and states
-   in `app.routes.spec.ts`.
+6. Tests: the service, helper and slice specs, a browser spec per page, and an e2e spec per page that opens it by its
+   URL.
 
 ## 9. Formatting, lint and Docker
 
@@ -747,6 +765,9 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - **No per-project Docker build context** — `catalog:` needs the root lockfile.
 - **No `types/` folder** — `models/` holds shapes and errors; `express.d.ts` stays at `src/`.
 - **No global per-resource slice** — each page owns its slice, with the route state it needs.
+- **No router slice (`routerReducer`)** — no page reads it, since each page's reducer keeps the part of the URL it needs;
+  replaying URLs from the devtools is not worth a global copy of the URL, and the devtools still show every router
+  action.
 - **No `ActivatedRoute`, `Router`, router selectors or `FormBuilder` in pages** — every route read reaches a page through
   its slice; links are `routerLink`, and every other navigation is an action.
 - **No "statechart" claim** — routes name states, but reducers do not guard transitions; the request rules keep late
