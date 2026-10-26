@@ -79,7 +79,7 @@ my-app/
         └── app/
             ├── pages/ layouts/ components/   # flat *.component.ts; components/ has ConfirmDialog + its story + browser spec
             ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers; *.spec.ts beside
-            └── store/        # app-context/ + app-router/ globally, one slice per page on its route; reducer/selectors/effects specs beside
+            └── store/        # app-context/ + app-router/ globally, one slice per page on its route; reducer/effects specs beside
 ```
 
 The web app has three test layers (`ng test` unit and `pnpm test:browser` browser mode, both on Analog's Vitest builder;

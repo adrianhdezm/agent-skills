@@ -47,8 +47,9 @@ pnpm --filter web pkg delete packageManager devDependencies.prettier devDependen
 - `.editorconfig` goes because Prettier handles indentation and the two can disagree. The CLI's own `web/.prettierrc`
   is overwritten by the one in [references/eslint-prettier.md](eslint-prettier.md). `README.md` goes because the
   docs live at the repo root (`coding-conventions.md`). The CLI's `.vscode/` and `public/favicon.ico` stay.
-- The CLI's root component (`app.ts` + `app.html` + `app.scss`) and its spec are replaced by `app.component.ts` in
-  section 7 and `app.component.spec.ts` ([references/web-testing.md](web-testing.md#2-unit-tests)).
+- The CLI's root component (`app.ts` + `app.html` + `app.scss`) is replaced by `app.component.ts` in section 7. Its
+  spec goes with no replacement: the root component is wiring, and every e2e test renders it
+  ([coding-conventions.md §7.5](coding-conventions.md#75-what-not-to-test)).
 - `packageManager` belongs to the root manifest. `prettier` and `typescript` are removed so the root shared-tooling
   step adds them back as `catalog:`; `pnpm add --save-catalog` leaves an existing direct `prettier` range in place.
 - In `web/src/index.html`, the CLI's `<title>Web</title>` becomes the app name (the repo name in Title Case, the same
@@ -208,17 +209,18 @@ web/
         │   ├── entity-filter-form.helper.ts  (+ .spec.ts)  # list page's filter strip ↔ EntityFilterInput + range label
         │   └── http-error.helper.ts  (+ .spec.ts)          # httpErrorMessage, shared by the page effects
         └── store/
-            ├── app-context/          # global slice: apiBaseUrl + appName (+ reducer/selectors specs)
-            ├── app-router/           # global slice: AppState, serializer, navigatedRoute(), Navigate action + effect (+ specs)
+            ├── app-context/          # global slice: apiBaseUrl + appName (no spec: no logic)
+            ├── app-router/           # global slice: AppState, serializer, navigatedRoute(), Navigate action + effect (+ serializer spec)
             ├── entity-list-page/     # page slice, registered on the list route
             │   ├── entity-list-page.{model,actions,reducer,selectors,effects}.ts
-            │   └── entity-list-page.{reducer,selectors,effects}.spec.ts
-            ├── entity-detail-page/   # page slice (+ reducer/selectors/effects specs), registered on the detail route
-            └── entity-form-page/     # page slice (+ reducer/selectors/effects specs), registered on the new + edit routes
+            │   └── entity-list-page.{reducer,effects}.spec.ts
+            ├── entity-detail-page/   # page slice (+ reducer/effects specs), registered on the detail route
+            └── entity-form-page/     # page slice (+ reducer/effects specs), registered on the new + edit routes
 ```
 
-Every page slice gets `*.reducer.spec.ts` / `*.selectors.spec.ts` / `*.effects.spec.ts` beside it; the global
-`app-context` slice gets reducer + selectors specs and `app-router` serializer, helper and effects specs. The service and helpers
+Every page slice gets `*.reducer.spec.ts` / `*.effects.spec.ts` beside it, and a `*.selectors.spec.ts` only once a
+selector has logic (the scaffold's all pick one field). Of the global slices only the `app-router` serializer has a
+spec: `app-context`, `navigatedRoute` and `navigate$` hold no logic of their own. The service and helpers
 get a `*.spec.ts`, and each page and component gets a `*.component.browser.spec.ts`. The test layers are specified in
 [references/web-testing.md](web-testing.md); Storybook in [references/web-storybook.md](web-storybook.md).
 

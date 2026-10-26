@@ -72,11 +72,9 @@ api/
     │   │   └── entity.schema.test.ts
     │   ├── controllers/
     │   │   ├── entity.controller.test.ts
-    │   │   ├── home.controller.test.ts
     │   │   └── health.controller.test.ts
     │   └── middlewares/
-    │       ├── error.middleware.test.ts
-    │       └── not-found.middleware.test.ts
+    │       └── error.middleware.test.ts
     ├── db/                  # the DAO vs a Testcontainers Postgres + drizzle migrator — api-entity.md
     │   └── entity.dao.test.ts
     ├── api/                 # API tests, end to end: real HTTP → controller → DAO → Postgres — api-entity.md

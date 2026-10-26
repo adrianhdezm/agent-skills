@@ -565,18 +565,20 @@ Storybook is not a test: it is where components are built and their states revie
 - *Assert:* the response (`res.status`, `res.json`, `res.send`), or the error passed to `next`
   (`httpError(400)`), and what the DAO received. Every 400 also asserts the DAO was never called. The error handler's
   test asserts the status, the body, whether the message is hidden and the log level.
-- *Not here:* body parsing, routing, real SQL — the API test and the DAO test own those.
+- *Not here:* body parsing, routing, real SQL — the API test and the DAO test own those; each rule of a list schema —
+  the schema and builder tests own those, so a list handler needs one schema rejection, not one per rule.
 - *Add one when:* you add a handler, a validation rule, an error mapping or a middleware.
 
 **API DAO** (`tests/db/<resource>.dao.test.ts`)
 - *Real / stubbed:* the real DAO on a throwaway `postgres:17-alpine` from Testcontainers, migrated with the drizzle
   migrator (the same `db/migrations/` and `__migrations__` table as drizzle-kit). One container per suite; each test
   clears the table first and seeds what it needs through `tests/utils/<resource>-seed.ts`.
-- *Assert:* every method's happy path and edge cases (`NotFoundError`, `null` columns, partial updates); `list`
-  exhaustively — pagination, sort with the tie-breaker and the default sort, filters across the operators the columns
-  take, `and` / `or` / `not`, all combined — and that LIKE metacharacters and hostile input are treated as data.
-- *Not here:* HTTP status codes or validation.
-- *Add one when:* you add a DAO method, a column, an operator or a query path.
+- *Assert:* every method's happy path and edge cases (`NotFoundError`, `null` columns, partial updates); `list` for
+  what only real rows show — pagination, sort with the tie-breaker and the default sort, the filters whose result
+  depends on Postgres (case-insensitive matches, dates, an empty `in`), `and` / `or` / `not`, all combined — and that
+  LIKE metacharacters and hostile input are treated as data.
+- *Not here:* HTTP status codes or validation; the SQL each operator renders — the `dao.helper` test owns that.
+- *Add one when:* you add a DAO method or a query path, or an operator whose result depends on Postgres.
 
 **API end to end** (`tests/api/<resource>.api.test.ts`)
 - *Real / stubbed:* the real app from `createApp`, served by `serve(app)` from `tests/utils/test-server.ts` on the real
@@ -601,7 +603,7 @@ Storybook is not a test: it is where components are built and their states revie
   serializer — the deepest state and the merged params; helpers — a happy case and an edge case each.
 - *Not here:* rendering details and styling — the browser spec owns those.
 - *Add one when:* you add or change a service method, an action, a reducer branch, a selector with logic, an effect,
-  a route or a helper. Every slice has its reducer, selectors and effects specs.
+  a route or a helper. Every slice has its reducer and effects specs; selectors get a spec only once one has logic.
 
 **Web browser** (`*.browser.spec.ts`, Chromium)
 - *Real / stubbed:* the component or page rendered by Angular in real Chromium with Tailwind applied. Pages get
@@ -620,8 +622,8 @@ Storybook is not a test: it is where components are built and their states revie
   database, created, migrated and emptied by the global setup. The dev database and any running dev or Compose stack
   are never touched; teardown stops Postgres only if setup started it.
 - *Assert:* a user's flow end to end, seeding data through the API (`e2e/utils/api.ts`) and driving the UI: list,
-  filter (and the filter in the URL), a deep link to a later page, back after _Next_, delete and cancel, stepping back
-  off an emptied page; create and edit; a detail page and a missing one.
+  filter (and the filter in the URL), a deep link to a later page, back after _Next_, delete, stepping back off an
+  emptied page; create and edit; a detail page and a missing one.
 - *Not here:* edge cases a unit or browser spec can cover faster.
 - *Add one when:* you add a page or a user-visible flow.
 
@@ -629,14 +631,14 @@ Storybook is not a test: it is where components are built and their states revie
 
 | change                                         | tests                                                                                   |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
-| new filter operator or scalar kind             | `unit/helpers/dao.helper.test.ts`, `unit/helpers/list-input.helper.test.ts`, a rejection case in the resource's schema test, a DAO test case |
-| new filterable / sortable column               | the resource's schema test, a DAO test case                                             |
+| new filter operator or scalar kind             | `unit/helpers/dao.helper.test.ts`, `unit/helpers/list-input.helper.test.ts`; a DAO test case only when its result depends on Postgres |
+| new filterable / sortable column               | the resource's schema test                                                              |
 | new validation rule or error mapping           | the controller unit test                                                                |
 | new route                                      | the controller unit test, the resource's API test                                       |
 | new DAO method or query path                   | the DAO test, the API test for its route                                                |
 | change to `app.ts` (middleware, body limit)    | the API test                                                                            |
 | new service method                             | the service spec                                                                        |
-| new action / page state                        | reducer and selectors specs, the effects spec if it requests, the page's browser spec   |
+| new action / page state                        | the reducer spec, the effects spec if it requests, the page's browser spec               |
 | new effect that requests                       | the effects spec, including a response after `Leave` (read) or after the page changed (write) |
 | new component                                  | its browser spec and its story                                                          |
 | new page or user flow                          | the slice specs, the page's browser spec, an e2e spec, a route in `app.routes.spec.ts`  |
@@ -660,6 +662,27 @@ Storybook is not a test: it is where components are built and their states revie
   `unit` and `browser`, run by `ng test` on Analog's Vitest builder. Every web spec and both setup files are in
   `tsconfig.spec.json`, because Analog compiles only that program; a spec outside it loses Angular's compiler (signal
   inputs stop working).
+
+### 7.5 What not to test
+
+A test is code to maintain: it earns its place by catching a bug no other test catches.
+
+- **Name the bug first.** Before adding a test, name the failure only it would catch. If a lower tier, another test or
+  the compiler already catches it, do not add it.
+- **Test a behaviour once, at the cheapest tier that can see it.** Go up a tier only for what the lower one cannot see:
+  real SQL (the DAO test), real HTTP and `app.ts` (the API test), the real router with route-level effects
+  (`app.routes.spec.ts`), a real browser (browser specs), the whole stack (e2e). The higher tier covers that addition,
+  not the lower tier's cases again.
+- **No specs for wiring without logic:** the root component, layouts, a `createReducer(initial)` with no `on`, a
+  one-line cast (`navigatedRoute`), an effect that only forwards to an Angular API (`navigate$`), a handler that returns
+  a literal (`GET /`), a middleware the API test already drives (`notFoundHandler`). The tests that run through them
+  prove them.
+- **No specs for selectors that only pick a field,** and no case asserting that an action changes nothing because no
+  reducer handles it.
+- **Nothing the compiler enforces:** a filter or sort field naming a real column, a union type, a required input.
+- **A caller tests its own branches, not its callee's rules.** A controller test needs one schema rejection, not every
+  rule of the schema; a service spec checks method, URL, params and body, not how `toParams` drops defaults.
+- **One behaviour per case.** Cases that differ only in data are one `it.each`; a case another one already implies goes.
 
 ## 8. Adding a resource
 
@@ -752,5 +775,6 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - [ ] A new read effect ends on its page's `Leave`; a write's follow-up acts only for the page that started it.
 - [ ] A schema change comes with its migration (`db:generate`), committed.
 - [ ] An API type change is mirrored in the web's `models/`.
-- [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists; a new component has a story.
+- [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists, and none [7.5](#75-what-not-to-test)
+      rules out; a new component has a story.
 - [ ] This file still describes the code: a change to a rule changes it here in the same commit.
