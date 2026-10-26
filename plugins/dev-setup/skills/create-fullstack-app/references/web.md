@@ -186,7 +186,7 @@ web/
     ├── environments/        # environment.ts, environment.development.ts, environment.e2e.ts
     └── app/
         ├── app.component.ts         # root
-        ├── app.config.ts            # global slices (appContext, appRouter), provideRouterStore, app-router effects
+        ├── app.config.ts            # global slice (appContext), provideRouterStore, app-router effects
         ├── app.routes.ts            # one route per state (data.state), each registering its page slice
         ├── components/
         │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
@@ -210,7 +210,7 @@ web/
         │   └── http-error.helper.ts  (+ .spec.ts)          # httpErrorMessage, shared by the page effects
         └── store/
             ├── app-context/          # global slice: apiBaseUrl + appName (no spec: no logic)
-            ├── app-router/           # global slice: AppState, serializer, navigatedRoute(), Navigate action + effect (+ serializer spec)
+            ├── app-router/           # router ↔ store bridge, no slice: AppState, serializer + navigatedRoute(), Navigate action + effect (+ serializer spec)
             ├── entity-list-page/     # page slice, registered on the list route
             │   ├── entity-list-page.{model,actions,reducer,selectors,effects}.ts
             │   └── entity-list-page.{reducer,effects}.spec.ts
@@ -219,14 +219,14 @@ web/
 ```
 
 Every page slice gets `*.reducer.spec.ts` / `*.effects.spec.ts` beside it, and a `*.selectors.spec.ts` only once a
-selector has logic (the scaffold's all pick one field). Of the global slices only the `app-router` serializer has a
-spec: `app-context`, `navigatedRoute` and `navigate$` hold no logic of their own. The service and helpers
+selector has logic (the scaffold's all pick one field). Of the global store files only the `app-router` serializer has
+a spec: `app-context`, `navigatedRoute` and `navigate$` hold no logic of their own. The service and helpers
 get a `*.spec.ts`, and each page and component gets a `*.component.browser.spec.ts`. The test layers are specified in
 [references/web-testing.md](web-testing.md); Storybook in [references/web-storybook.md](web-storybook.md).
 
 **One slice per page.** Each page owns a slice at `store/<page-name>/`, named after the page component, and registers
-it on its own route with `provideState` + `provideEffects`. Only `appContext` and the router state
-(`appRouter`) are global, in `app.config.ts`. Pages never read another page's slice: what two pages both need (the entity) each loads for itself,
+it on its own route with `provideState` + `provideEffects`. Only `appContext` is global, in `app.config.ts`; the route
+itself is not kept in the store. Pages never read another page's slice: what two pages both need (the entity) each loads for itself,
 and the list fetches fresh data whenever it is shown. Resource types that several slices use live in `models/`,
 not in a slice.
 
@@ -335,7 +335,7 @@ export class MainLayout {
 
 ### `web/src/app/app.config.ts`
 
-Only the global slices are registered here, with the app-router effects; the route-level `provideEffects(...)` calls join the same effects runtime.
+Only the global slice is registered here, with router-store and the app-router effects; the route-level `provideEffects(...)` calls join the same effects runtime.
 
 ```ts
 import { type ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners } from '@angular/core';
@@ -344,36 +344,25 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideStore } from '@ngrx/store';
 import { provideEffects } from '@ngrx/effects';
 import { provideStoreDevtools } from '@ngrx/store-devtools';
-import { NavigationActionTiming, provideRouterStore, routerReducer } from '@ngrx/router-store';
+import { provideRouterStore } from '@ngrx/router-store';
 import { routes } from './app.routes';
 import { APP_CONTEXT_FEATURE_KEY } from './store/app-context/app-context.selectors';
 import { appContextReducer } from './store/app-context/app-context.reducer';
 import * as appRouterEffects from './store/app-router/app-router.effects';
 import { AppRouterSerializer } from './store/app-router/app-router.serializer';
-import { ROUTER_FEATURE_KEY } from './store/app-router/app-router.selectors';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideHttpClient(),
-    // Global stores:
-    //   - application context (api base URL, app name)
-    //   - router (@ngrx/router-store turns every navigation into actions; page reducers copy
-    //     what their state needs from routerNavigatedAction, so pages read only their slice)
-    // Page slices are registered on their routes (see app.routes.ts). Templates navigate
-    // with routerLink; everything else dispatches AppRouterActions.navigate, and the
-    // app-router effects are the only code that calls the Angular Router.
-    provideStore({
-      [APP_CONTEXT_FEATURE_KEY]: appContextReducer,
-      [ROUTER_FEATURE_KEY]: routerReducer
-    }),
-    // PostActivation: the store never holds a URL the router has not committed (a guard can still cancel before).
-    provideRouterStore({
-      stateKey: ROUTER_FEATURE_KEY,
-      serializer: AppRouterSerializer,
-      navigationActionTiming: NavigationActionTiming.PostActivation
-    }),
+    // The one global slice is the application context (api base URL, app name); page slices are
+    // registered on their routes (see app.routes.ts). The route is not kept in the store:
+    // router-store turns every navigation into actions, and each page reducer copies what its
+    // state needs from routerNavigatedAction. Templates navigate with routerLink; everything else
+    // dispatches AppRouterActions.navigate, and navigate$ is the only code that calls the Router.
+    provideStore({ [APP_CONTEXT_FEATURE_KEY]: appContextReducer }),
+    provideRouterStore({ serializer: AppRouterSerializer }),
     provideEffects(appRouterEffects),
     provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode() })
   ]
@@ -443,7 +432,8 @@ export const routes: Routes = [
 
 ## 8. Global slices
 
-Two slices are global, because every page and layout may need them.
+One slice is global, `appContext`, because every page and layout may need it. The router glue sits beside it in
+`store/app-router/`, but keeps nothing in the store.
 
 ### App-context slice
 
@@ -486,14 +476,18 @@ export const selectApiBaseUrl = createSelector(selectAppContext, (s) => s.apiBas
 export const selectAppName = createSelector(selectAppContext, (s) => s.appName);
 ```
 
-### App-router slice
+### App router (no slice)
 
-The router side of the store. `@ngrx/router-store` turns every navigation into actions and keeps the last
-route under the `appRouter` key (not router-store's default `router`, so the key is passed to `provideRouterStore`).
-`AppRouterSerializer` reduces each snapshot to `{ url, state, params, queryParams }`, where `state` is the deepest
-route's `data.state`. The URL enters the store one way only: page reducers handle `routerNavigatedAction`, read it
-with `navigatedRoute(action)`, and copy what their own state needs when `state` is theirs. Pages and page effects
-never select from `appRouter`.
+The router side of the app, without a slice of its own. `@ngrx/router-store` turns every navigation into actions, and
+`AppRouterSerializer` reduces each snapshot to a `NavigatedRoute`, `{ url, state, params, queryParams }`, where `state`
+is the deepest route's `data.state` (`url` is required by router-store's serializer contract). The URL enters the
+store one way only: page reducers handle `routerNavigatedAction`, read it with `navigatedRoute(action)`, and copy what
+their own state needs when `state` is theirs.
+
+router-store's `routerReducer` is not registered, so no slice holds the last route: no page or effect would read it,
+and its one use, replaying URLs from the devtools, is not worth a global copy of the URL. The devtools still list every
+router action with its payload. Without that slice, `navigationActionTiming` changes only when `ROUTER_NAVIGATION`
+fires, which nothing handles, so the default stays.
 
 Templates navigate with `routerLink` (open a row, _Edit_, _New entity_, _Back_, _Cancel_). A navigation computed in
 code is an action: the list page dispatches `AppRouterActions.navigate` for a new query, and page effects dispatch it
@@ -508,8 +502,11 @@ import { type Params } from '@angular/router';
 /** The app's states: one per page route, declared on the route as `data: { state }`. */
 export type AppState = 'entity-list' | 'entity-detail' | 'entity-new' | 'entity-edit';
 
-/** What the serializer keeps of a router snapshot: plain, serializable data. */
-export interface AppRouterState {
+/**
+ * The payload of `routerNavigatedAction`, as `AppRouterSerializer` writes it: plain data, never stored. Each page
+ * reducer reads it with `navigatedRoute(action)` and copies what its own state needs into its slice.
+ */
+export interface NavigatedRoute {
   url: string;
   /** The deepest route's `data.state`; `null` on a route that declares none (the root redirect). */
   state: AppState | null;
@@ -523,11 +520,11 @@ export interface AppRouterState {
 
 ```ts
 import { type Params, type RouterStateSnapshot } from '@angular/router';
-import { type RouterStateSerializer } from '@ngrx/router-store';
-import { type AppRouterState, type AppState } from './app-router.model';
+import { type RouterNavigatedAction, type RouterStateSerializer } from '@ngrx/router-store';
+import { type AppState, type NavigatedRoute } from './app-router.model';
 
-export class AppRouterSerializer implements RouterStateSerializer<AppRouterState> {
-  serialize(snapshot: RouterStateSnapshot): AppRouterState {
+export class AppRouterSerializer implements RouterStateSerializer<NavigatedRoute> {
+  serialize(snapshot: RouterStateSnapshot): NavigatedRoute {
     let route = snapshot.root;
     let params: Params = {};
     let state: AppState | null = null;
@@ -539,34 +536,14 @@ export class AppRouterSerializer implements RouterStateSerializer<AppRouterState
     return { url: snapshot.url, state, params, queryParams: snapshot.root.queryParams };
   }
 }
-```
 
-#### `store/app-router/app-router.helper.ts`
-
-The one place that knows `routerNavigatedAction` carries an `AppRouterState`: router-store types its payload with its
-default serializer's shape.
-
-```ts
-import { type RouterNavigatedAction } from '@ngrx/router-store';
-import { type AppRouterState } from './app-router.model';
-
-/** The route a navigation landed on, as `AppRouterSerializer` wrote it. */
-export function navigatedRoute(action: RouterNavigatedAction): AppRouterState {
-  return action.payload.routerState as unknown as AppRouterState;
+/**
+ * The route a navigation landed on, as `AppRouterSerializer` wrote it. router-store types the payload with its
+ * default serializer's shape, so this is the one cast to ours.
+ */
+export function navigatedRoute(action: RouterNavigatedAction): NavigatedRoute {
+  return action.payload.routerState as unknown as NavigatedRoute;
 }
-```
-
-#### `store/app-router/app-router.selectors.ts`
-
-```ts
-import { createFeatureSelector } from '@ngrx/store';
-import { type RouterReducerState } from '@ngrx/router-store';
-import { type AppRouterState } from './app-router.model';
-
-export const ROUTER_FEATURE_KEY = 'appRouter';
-
-// For devtools and debugging only: pages and page slices get the route from routerNavigatedAction.
-export const selectRouterState = createFeatureSelector<RouterReducerState<AppRouterState>>(ROUTER_FEATURE_KEY);
 ```
 
 #### `store/app-router/app-router.actions.ts`
@@ -981,7 +958,7 @@ export const EntityListPageActions = createActionGroup({
 import { createReducer, on } from '@ngrx/store';
 import { routerNavigatedAction } from '@ngrx/router-store';
 import { parseListInput } from '../../helpers/entity-list-params.helper';
-import { navigatedRoute } from '../app-router/app-router.helper';
+import { navigatedRoute } from '../app-router/app-router.serializer';
 import { EntityListPageActions } from './entity-list-page.actions';
 import { type EntityListPageState } from './entity-list-page.model';
 
@@ -1161,7 +1138,7 @@ export const EntityDetailPageActions = createActionGroup({
 ```ts
 import { createReducer, on } from '@ngrx/store';
 import { routerNavigatedAction } from '@ngrx/router-store';
-import { navigatedRoute } from '../app-router/app-router.helper';
+import { navigatedRoute } from '../app-router/app-router.serializer';
 import { EntityDetailPageActions } from './entity-detail-page.actions';
 import { type EntityDetailPageState } from './entity-detail-page.model';
 
@@ -1303,8 +1280,8 @@ export const EntityFormPageActions = createActionGroup({
 ```ts
 import { createReducer, on } from '@ngrx/store';
 import { routerNavigatedAction } from '@ngrx/router-store';
-import { type AppRouterState } from '../app-router/app-router.model';
-import { navigatedRoute } from '../app-router/app-router.helper';
+import { type NavigatedRoute } from '../app-router/app-router.model';
+import { navigatedRoute } from '../app-router/app-router.serializer';
 import { EntityFormPageActions } from './entity-form-page.actions';
 import { type EntityFormPageState, type EntityFormTarget } from './entity-form-page.model';
 
@@ -1346,7 +1323,7 @@ export const entityFormPageReducer = createReducer(
   on(EntityFormPageActions.leave, () => initialEntityFormPageState)
 );
 
-function formTarget(route: AppRouterState): EntityFormTarget | null {
+function formTarget(route: NavigatedRoute): EntityFormTarget | null {
   if (route.state === 'entity-new') {
     return { id: null };
   }

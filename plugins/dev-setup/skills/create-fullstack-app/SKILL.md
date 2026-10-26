@@ -308,8 +308,8 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   is doing. Reducers do not guard transitions, so do not call it a statechart.
 - **The router only writes state.** `AppRouterSerializer` reduces each navigation to `{ url, state, params,
   queryParams }`; on `routerNavigatedAction` the page reducer whose state matches copies its route state (the list
-  input, the detail id, the form target), read with `navigatedRoute(action)`. No effect reacts to a navigation.
-  Router actions fire after activation (`navigationActionTiming: PostActivation`).
+  input, the detail id, the form target), read with `navigatedRoute(action)`. No effect reacts to a navigation, and
+  no slice keeps the route: `routerReducer` is not registered.
 - **Components never use the store**; they take `input()` / `output()`. Pages and layouts may read it.
 - **Pages inject only the `Store` and read only their slice.** Route params and the list query come from the page's
   own selectors, never from router selectors. Plain links are `routerLink` in the template; a navigation computed in
@@ -323,10 +323,9 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
   `ngOnDestroy` dispatches `Leave`; the slice goes `'loading'` → `'loaded'` (or `'error'`). A reused page (list page
   2 → 3, detail 42 → 43) reloads through its running watch. Each slice has one `status` union and an `error` message, never `loading` / `saving` / `deleting`
   booleans; the status-driven body is a `@switch (status())`, the error banner an `@if`.
-- **Global NgRx slices:**
-  - `appContext` holds `apiBaseUrl` and `appName`, and is the only consumer of Angular `environment`.
-  - `appRouter` holds the serialized router state; its key is passed to `provideRouterStore({ stateKey })`. Only
-    devtools read it: pages and page slices get the route from `routerNavigatedAction`.
+- **One global NgRx slice:** `appContext` holds `apiBaseUrl` and `appName`, and is the only consumer of Angular
+  `environment`. `store/app-router/` holds the router glue (`AppState`, the serializer and `navigatedRoute`, the
+  `Navigate` action and `navigate$`), not a slice: pages and page slices get the route from `routerNavigatedAction`.
 - **One slice per page.** Each page owns `store/<page-name>/` (model, actions, reducer, selectors, effects) and
   registers it on its route with `provideState` + `provideEffects`; a page reads only its own slice. Detail and form
   each load the entity themselves. The form serves two states, so it registers its slice once on a shared parent
@@ -416,7 +415,7 @@ pnpm workspace, then:
 - [ ] Every page route in `app.routes.ts` declares its `data: { state }`, and no file outside `store/app-router/`
       imports a router-store selector or reacts to `routerNavigatedAction` in an effect
 - [ ] Every read effect's request ends on its page's `Leave`, and `navigateAfterSave$` checks the form's
-      `navigationId`; the late-response cases in `app.routes.spec.ts` pass
+      `navigationId`; the effects specs' after-`Leave` cases pass
 - [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook --smoke-test --ci` starts and exits 0, and
       `storybook-static/index.json` lists the three `ConfirmDialog` stories
 - [ ] `pnpm test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
