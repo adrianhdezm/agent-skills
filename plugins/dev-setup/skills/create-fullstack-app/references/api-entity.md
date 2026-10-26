@@ -15,10 +15,8 @@ real resource, and the template for every later one. The resource-agnostic piece
 - [Test layout](#test-layout)
 - [`api/tests/utils/`](#apitestsutils)
 - [`api/tests/unit/controllers/entity.controller.test.ts`](#apitestsunitcontrollersentitycontrollertestts)
-- [`api/tests/unit/controllers/home.controller.test.ts`](#apitestsunitcontrollershomecontrollertestts)
 - [`api/tests/unit/controllers/health.controller.test.ts`](#apitestsunitcontrollershealthcontrollertestts)
 - [`api/tests/unit/middlewares/error.middleware.test.ts`](#apitestsunitmiddlewareserrormiddlewaretestts)
-- [`api/tests/unit/middlewares/not-found.middleware.test.ts`](#apitestsunitmiddlewaresnot-foundmiddlewaretestts)
 - [`api/tests/unit/db/schemas/entity.schema.test.ts`](#apitestsunitdbschemasentityschematestts)
 - [`api/tests/db/entity.dao.test.ts`](#apitestsdbentitydaotestts)
 - [`api/tests/api/entity.api.test.ts`](#apitestsapientityapitestts)
@@ -570,9 +568,9 @@ export function seedCanonical(db: DbClient): Promise<Entity[]> {
 Every handler called as a function. Each case builds a stub context, programs the DAO stub, calls the handler with
 `mockRequest` / `mockResponse` / `mockNext`, and asserts either the response (`res.status`, `res.json`, `res.send`) or
 the `http-errors` error passed to `next`, plus what the DAO received. Covered: the list input decoded from the query
-(numbers, the `ASC` default, the first value of a repeated param) and each rejected query (bad JSON, an unknown param,
-a non-numeric page, a sort field outside the allowlist, a pageSize over the max, an operator the field does not take);
-an unexpected DAO error forwarded unchanged; `get` (row, 404 on `null`, 400 on a non-uuid id); `create` (201 + row,
+(numbers, the `ASC` default, the first value of a repeated param) and each way the handler itself rejects a query (bad
+JSON, an unknown param, and one input the list schema rejects — the schema's own rules belong to the schema and builder
+tests); an unexpected DAO error forwarded unchanged; `get` (row, 404 on `null`, 400 on a non-uuid id); `create` (201 + row,
 400 for an empty or over-long name or no body); `update` (the id inside the input, 400 for no updatable field, an
 invalid field or a non-uuid id, the DAO's `NotFoundError` → 404); `delete` (204 with no body, `NotFoundError` → 404).
 Every 400 also asserts the DAO was never called.
@@ -630,10 +628,7 @@ describe('entity.controller', () => {
     it.each([
       ['a filter that is not JSON', { filter: '{' }],
       ['an unknown param', { nme: 'a' }],
-      ['a page that is not a number', { page: 'abc' }],
-      ['a sort field outside the allowlist', { sortField: 'description' }],
-      ['a pageSize over the max', { pageSize: '101' }],
-      ['an operator the field does not take', { filter: JSON.stringify({ name: { gt: 1 } }) }]
+      ['a query the list schema rejects', { page: 'abc' }]
     ])('forwards a 400 for %s without reaching the DAO', async (_label, query) => {
       // Arrange
       const { context, entityDao } = createStubContext();
@@ -820,29 +815,6 @@ describe('entity.controller', () => {
 });
 ```
 
-## `api/tests/unit/controllers/home.controller.test.ts`
-
-```ts
-import { describe, expect, it } from 'vitest';
-import { getHome } from '../../../src/controllers/home.controller.js';
-import { mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
-
-describe('home.controller', () => {
-  it('responds with the service descriptor', async () => {
-    // Arrange
-    const res = mockResponse();
-    const next = mockNext();
-
-    // Act
-    await getHome(mockRequest(), res, next);
-
-    // Assert
-    expect(res.json).toHaveBeenCalledWith({ service: 'api', status: 'running' });
-    expect(next).not.toHaveBeenCalled();
-  });
-});
-```
-
 ## `api/tests/unit/controllers/health.controller.test.ts`
 
 The probe's two outcomes: `ok` with a numeric latency when `db.execute` resolves, and an exposed 503 carrying the
@@ -963,32 +935,10 @@ describe('error.middleware', () => {
 });
 ```
 
-## `api/tests/unit/middlewares/not-found.middleware.test.ts`
-
-```ts
-import { describe, expect, it } from 'vitest';
-import { notFoundHandler } from '../../../src/middlewares/not-found.middleware.js';
-import { httpError, mockNext, mockRequest, mockResponse } from '../../utils/http-mocks.js';
-
-describe('not-found.middleware', () => {
-  it('forwards a 404 naming the method and path', () => {
-    // Arrange
-    const next = mockNext();
-
-    // Act
-    notFoundHandler(mockRequest({ method: 'POST', originalUrl: '/nope?x=1' }), mockResponse(), next);
-
-    // Assert
-    expect(next).toHaveBeenCalledWith(httpError(404));
-    expect(next.mock.calls[0]?.[0]).toHaveProperty('message', 'Not Found: POST /nope?x=1');
-  });
-});
-```
-
 ## `api/tests/unit/db/schemas/entity.schema.test.ts`
 
 Covers only the entity's own column/sort wiring on `listEntityInputSchema` — a nested filter over the real columns with
-date coercion, and the rejections specific to this resource (a column the entity lacks, a bad uuid, a sort field outside
+date-time and date-only coercion, and the rejections specific to this resource (a column the entity lacks, a bad uuid, a sort field outside
 its allowlist). The generic builder behaviour (defaults, strictness, the logical-branch cap) is covered once in
 `tests/unit/helpers/list-input.helper.test.ts` ([api-dao.md](api-dao.md)), so it is not repeated here. No URL strings appear;
 the controller test covers decoding.
@@ -998,10 +948,10 @@ import { describe, expect, it } from 'vitest';
 import { listEntityInputSchema } from '../../../../src/db/schemas/entity.schema.js';
 
 describe('entity.schema', () => {
-  it('accepts a nested filter over the entity columns and coerces date strings', () => {
+  it('accepts a nested filter over the entity columns and coerces date-time and date-only strings', () => {
     // Arrange
     const raw = {
-      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }] },
+      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: '2026-01-01T00:00:00Z' } }, { updatedAt: { lt: '2026-02-01' } }] },
       sort: { field: 'name', direction: 'DESC' },
       page: 2,
       pageSize: 5
@@ -1012,19 +962,17 @@ describe('entity.schema', () => {
 
     // Assert
     expect(input).toEqual({
-      filter: { or: [{ name: { contains: 'a' } }, { createdAt: { ge: new Date('2026-01-01T00:00:00Z') } }] },
+      filter: {
+        or: [
+          { name: { contains: 'a' } },
+          { createdAt: { ge: new Date('2026-01-01T00:00:00Z') } },
+          { updatedAt: { lt: new Date('2026-02-01') } }
+        ]
+      },
       sort: { field: 'name', direction: 'DESC' },
       page: 2,
       pageSize: 5
     });
-  });
-
-  it('accepts a date-only value in a date filter', () => {
-    // Act
-    const input = listEntityInputSchema.parse({ filter: { createdAt: { ge: '2026-01-01' } } });
-
-    // Assert
-    expect(input.filter).toEqual({ createdAt: { ge: new Date('2026-01-01') } });
   });
 
   it.each([
@@ -1044,9 +992,9 @@ Exercises the real DAO against a throwaway `postgres:17-alpine` (via `startTestD
 `db/migrations/` applied by the drizzle migrator. One container per suite (`beforeAll` / `afterAll`), and `beforeEach`
 clears rows (a delete) so each test is isolated. `create` / `get` / `update` / `delete` cover the happy path and the edge
 cases (`NotFoundError` on a missing id, null description, a partial patch leaving omitted fields untouched vs. clearing a
-field with `null`); `list` is exhaustive — pagination, sort (with the `id`
-tie-breaker and the default sort), filter (most operators the entity's columns take — strings `eq ne lt between in contains notContains beginsWith`, dates `eq between ge le lt`, ids `eq in` — a second string and a
-second date column, `and` / `or` / `not`, empty `in`), the three combined, and a dedicated
+field with `null`); `list` covers what only real rows can show — pagination, sort (with the `id` tie-breaker and the
+default sort), filter (ids `eq in`, the case-insensitive `contains` / `notContains` / `beginsWith`, dates `eq ge le
+between`, `and` / `or` / `not`, an empty `in`), the three combined, and a dedicated
 `list: filter escaping and injection safety` block proving `escapeLike` treats `%` / `_` as literals and that a hostile
 value is parameterized, not executed.
 
@@ -1212,14 +1160,6 @@ describe('entity.dao', () => {
       expect(result).toMatchObject({ total: 5, page: 1, pageSize: 2, totalPages: 3 });
     });
 
-    it('returns the last partial page', async () => {
-      // Act
-      const result = await runList({ sort: { field: 'name', direction: 'ASC' }, page: 3, pageSize: 2 });
-
-      // Assert
-      expect(names(result)).toEqual(['echo']);
-    });
-
     it('returns no items for a page past the end but keeps the real total', async () => {
       // Act
       const result = await runList({ page: 4, pageSize: 2 });
@@ -1237,10 +1177,6 @@ describe('entity.dao', () => {
 
     it('sorts by name ascending', async () => {
       expect(names(await runList({ sort: { field: 'name', direction: 'ASC' } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta', 'echo']);
-    });
-
-    it('sorts by name descending', async () => {
-      expect(names(await runList({ sort: { field: 'name', direction: 'DESC' } }))).toEqual(['echo', 'delta', 'charlie', 'bravo', 'alpha']);
     });
 
     it('falls back to the default sort (createdAt DESC) when none is given', async () => {
@@ -1285,22 +1221,11 @@ describe('entity.dao', () => {
       expect(result.total).toBe(0);
     });
 
-    it('filters strings by eq and ne', async () => {
-      expect(names(await sortedByName({ name: { eq: 'bravo' } }))).toEqual(['bravo']);
-      expect(names(await sortedByName({ name: { ne: 'alpha' } }))).toEqual(['bravo', 'charlie', 'delta', 'echo']);
-    });
-
     it('matches contains / notContains / beginsWith case-insensitively', async () => {
       expect(names(await sortedByName({ name: { contains: 'ALPHA' } }))).toEqual(['alpha']);
       expect(names(await sortedByName({ name: { contains: 'a' } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
       expect(names(await sortedByName({ name: { notContains: 'a' } }))).toEqual(['echo']);
       expect(names(await sortedByName({ name: { beginsWith: 'A' } }))).toEqual(['alpha']);
-    });
-
-    it('filters strings by comparison, between and in', async () => {
-      expect(names(await sortedByName({ name: { lt: 'charlie' } }))).toEqual(['alpha', 'bravo']);
-      expect(names(await sortedByName({ name: { between: ['bravo', 'delta'] } }))).toEqual(['bravo', 'charlie', 'delta']);
-      expect(names(await sortedByName({ name: { in: ['alpha', 'echo'] } }))).toEqual(['alpha', 'echo']);
     });
 
     it('filters dates by ge, le, between and eq', async () => {
@@ -1310,28 +1235,10 @@ describe('entity.dao', () => {
       expect(names(await sortedByName({ createdAt: { eq: day(1) } }))).toEqual(['alpha']);
     });
 
-    it('filters by description (a second string column)', async () => {
-      // 'fourth' and 'fifth' both contain 'th'; charlie's description is null.
-      expect(names(await sortedByName({ description: { contains: 'th' } }))).toEqual(['delta', 'echo']);
-      expect(names(await sortedByName({ description: { eq: 'first' } }))).toEqual(['alpha']);
-    });
-
-    it('filters by updatedAt (a second date column)', async () => {
-      // Seeded rows take the default updatedAt (insertion time), which is after every day() fixture.
-      expect(names(await sortedByName({ updatedAt: { ge: day(1) } }))).toEqual(['alpha', 'bravo', 'charlie', 'delta', 'echo']);
-      expect(await sortedByName({ updatedAt: { lt: day(1) } })).toMatchObject({ total: 0 });
-    });
-
     it('combines fields with and / or / not', async () => {
       expect(names(await sortedByName({ and: [{ name: { contains: 'a' } }, { createdAt: { le: day(2) } }] }))).toEqual(['alpha', 'bravo']);
       expect(names(await sortedByName({ or: [{ name: { eq: 'alpha' } }, { name: { eq: 'echo' } }] }))).toEqual(['alpha', 'echo']);
       expect(names(await sortedByName({ not: { name: { eq: 'alpha' } } }))).toEqual(['bravo', 'charlie', 'delta', 'echo']);
-    });
-
-    it('returns an empty result when nothing matches', async () => {
-      const result = await sortedByName({ name: { eq: 'zzz' } });
-      expect(result.items).toEqual([]);
-      expect(result).toMatchObject({ total: 0, totalPages: 0 });
     });
   });
 
@@ -1390,7 +1297,7 @@ stack can show:
 
 - `POST` creates a row, and the response carries ISO-8601 `createdAt` / `updatedAt` strings.
 - `GET /entities` answers a `filter` (with `or`), `sortField` / `sortDirection` and `page` / `pageSize` sent as a real
-  query string from seeded rows, with the right `total` and `totalPages`; an unknown filter field is a 400.
+  query string from seeded rows, with the right `total` and `totalPages`.
 - `GET` / `PATCH` / `DELETE /entities/:id` read, update and delete a stored row, and a deleted row then 404s.
 - A row that does not exist is a 404 on `GET`, `PATCH` and `DELETE` — the `NotFoundError` the real DAO throws.
 - What `app.ts` adds around the handlers: a malformed JSON body is a 400 and a body over `express.json()`'s 100 kB
@@ -1468,11 +1375,6 @@ describe('entity.api', () => {
       const body = (await res.json()) as { items: { name: string }[]; total: number; page: number; pageSize: number; totalPages: number };
       expect(body.items).toEqual([expect.objectContaining({ name: 'alpha' })]);
       expect(body).toMatchObject({ total: 3, page: 2, pageSize: 2, totalPages: 2 });
-    });
-
-    it('rejects an unknown filter field with 400', async () => {
-      const res = await request(`/entities?filter=${encodeURIComponent(JSON.stringify({ title: { eq: 'x' } }))}`);
-      expect(res.status).toBe(400);
     });
   });
 

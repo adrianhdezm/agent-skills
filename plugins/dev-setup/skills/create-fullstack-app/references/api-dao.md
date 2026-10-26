@@ -426,22 +426,26 @@ describe('dao.helper', () => {
       expect(translate({ name: {} })).toBeUndefined();
     });
 
-    it('translates contains / beginsWith into escaped, case-insensitive patterns', () => {
-      // Act
-      const query = translate({ name: { contains: '50%', beginsWith: 'a_' } });
-
-      // Assert
-      expect(query?.sql).toBe('("t"."name" ilike $1 and "t"."name" ilike $2)');
-      expect(query?.params).toEqual(['%50\\%%', 'a\\_%']);
+    it.each([
+      [{ eq: 1 }, '"t"."score" = $1'],
+      [{ ne: 1 }, '"t"."score" <> $1'],
+      [{ lt: 1 }, '"t"."score" < $1'],
+      [{ le: 1 }, '"t"."score" <= $1'],
+      [{ gt: 1 }, '"t"."score" > $1'],
+      [{ ge: 1 }, '"t"."score" >= $1'],
+      [{ between: [0, 10] }, '"t"."score" between $1 and $2']
+    ] satisfies [NumberFilterInput, string][])('translates the comparison %o', (score, sql) => {
+      // Act + Assert
+      expect(translate({ score })?.sql).toBe(sql);
     });
 
-    it('translates comparisons and between', () => {
+    it('translates contains / notContains / beginsWith into escaped, case-insensitive patterns', () => {
       // Act
-      const query = translate({ score: { gt: 1.5, between: [0, 10] } });
+      const query = translate({ name: { contains: '50%', notContains: 'x', beginsWith: 'a_' } });
 
       // Assert
-      expect(query?.sql).toBe('("t"."score" > $1 and "t"."score" between $2 and $3)');
-      expect(query?.params).toEqual([1.5, 0, 10]);
+      expect(query?.sql).toBe('("t"."name" ilike $1 and "t"."name" not ilike $2 and "t"."name" ilike $3)');
+      expect(query?.params).toEqual(['%50\\%%', '%x%', 'a\\_%']);
     });
 
     it('translates in, and turns an empty in list into false', () => {
@@ -456,38 +460,10 @@ describe('dao.helper', () => {
       expect(translate({ createdAt: { ge: new Date('2026-01-01') } })?.sql).toBe('"t"."created_at" >= $1');
     });
 
-    it('translates each comparison operator', () => {
+    it('ANDs several fields, and the branches of a top-level and', () => {
       // Act + Assert
-      expect(translate({ score: { eq: 1 } })?.sql).toBe('"t"."score" = $1');
-      expect(translate({ score: { ne: 1 } })?.sql).toBe('"t"."score" <> $1');
-      expect(translate({ score: { lt: 1 } })?.sql).toBe('"t"."score" < $1');
-      expect(translate({ score: { le: 1 } })?.sql).toBe('"t"."score" <= $1');
-      expect(translate({ score: { ge: 1 } })?.sql).toBe('"t"."score" >= $1');
-    });
-
-    it('translates notContains into an escaped, case-insensitive negative match', () => {
-      // Act
-      const query = translate({ name: { notContains: '50%' } });
-
-      // Assert
-      expect(query?.sql).toBe('"t"."name" not ilike $1');
-      expect(query?.params).toEqual(['%50\\%%']);
-    });
-
-    it('ANDs the branches of a top-level and', () => {
-      // Act
-      const query = translate({ and: [{ name: { eq: 'a' } }, { score: { gt: 1 } }] });
-
-      // Assert
-      expect(query?.sql).toBe('("t"."name" = $1 and "t"."score" > $2)');
-    });
-
-    it('ANDs several fields', () => {
-      // Act
-      const query = translate({ name: { eq: 'a' }, score: { lt: 3 } });
-
-      // Assert
-      expect(query?.sql).toBe('("t"."name" = $1 and "t"."score" < $2)');
+      expect(translate({ name: { eq: 'a' }, score: { lt: 3 } })?.sql).toBe('("t"."name" = $1 and "t"."score" < $2)');
+      expect(translate({ and: [{ name: { eq: 'a' } }, { score: { gt: 1 } }] })?.sql).toBe('("t"."name" = $1 and "t"."score" > $2)');
     });
   });
 
@@ -512,20 +488,10 @@ describe('dao.helper', () => {
   });
 
   describe('sortToSql', () => {
-    it('sorts by the requested column with an id tie-breaker', () => {
-      // Act
-      const clauses = sqlOf(sortToSql({ field: 'createdAt', direction: 'DESC' }, table));
-
-      // Assert
-      expect(clauses).toEqual(['"t"."created_at" desc', '"t"."id" asc']);
-    });
-
-    it('sorts ascending when the direction is ASC', () => {
-      // Act
-      const clauses = sqlOf(sortToSql({ field: 'name', direction: 'ASC' }, table));
-
-      // Assert
-      expect(clauses).toEqual(['"t"."name" asc', '"t"."id" asc']);
+    it('sorts by the requested column and direction with an id tie-breaker', () => {
+      // Act + Assert
+      expect(sqlOf(sortToSql({ field: 'createdAt', direction: 'DESC' }, table))).toEqual(['"t"."created_at" desc', '"t"."id" asc']);
+      expect(sqlOf(sortToSql({ field: 'name', direction: 'ASC' }, table))).toEqual(['"t"."name" asc', '"t"."id" asc']);
     });
   });
 
@@ -535,7 +501,7 @@ describe('dao.helper', () => {
       expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\');
     });
 
-    it('derives totalPages from total and pageSize', () => {
+    it('derives totalPages from total and pageSize, zero for an empty result', () => {
       // Act + Assert
       expect(toPaginatedResult(['x'], 21, { page: 2, pageSize: 10 })).toEqual({
         items: ['x'],
@@ -544,17 +510,7 @@ describe('dao.helper', () => {
         pageSize: 10,
         totalPages: 3
       });
-    });
-
-    it('yields zero pages for an empty result', () => {
-      // Act + Assert
-      expect(toPaginatedResult([], 0, { page: 1, pageSize: 10 })).toEqual({
-        items: [],
-        total: 0,
-        page: 1,
-        pageSize: 10,
-        totalPages: 0
-      });
+      expect(toPaginatedResult([], 0, { page: 1, pageSize: 10 })).toMatchObject({ totalPages: 0 });
     });
   });
 });
@@ -689,8 +645,8 @@ describe('list-input.helper', () => {
 
 - **A new operator** (e.g. `notBeginsWith`): one line in the matching scalar schema in `list-input.model.ts`, one
   line in `comparisonsToSql` or `textMatchesToSql` in `dao.helper.ts`, a `filterToSql` case in
-  `tests/unit/helpers/dao.helper.test.ts`, and a rejection case in `tests/unit/db/schemas/entity.schema.test.ts`. `FieldFilterInput`
-  picks the operator up by itself.
+  `tests/unit/helpers/dao.helper.test.ts`, and a rejection case in `tests/unit/helpers/list-input.helper.test.ts`; a DAO
+  test case only when its result depends on Postgres. `FieldFilterInput` picks the operator up by itself.
 - **A new scalar kind** (e.g. `jsonbFilterInputSchema`): a new strict schema in `list-input.model.ts` listing only the
   operators that make sense for it, added to the `ScalarFilterInputSchema` and `ScalarFilterInput` unions. If it needs
   SQL the existing operators cannot express, add a branch to `fieldToSql`.

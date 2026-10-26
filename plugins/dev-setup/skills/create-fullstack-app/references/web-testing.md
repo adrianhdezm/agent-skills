@@ -5,7 +5,7 @@ third is Playwright Test:
 
 | layer                    | runner                                                    | what it covers                                                   | command             |
 | ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- |
-| unit                     | `ng test` → Vitest project `unit` (jsdom)                 | services, every NgRx slice, helpers, routes, the app shell       | `pnpm test`         |
+| unit                     | `ng test` → Vitest project `unit` (jsdom)                 | services, every NgRx slice, helpers, routes                      | `pnpm test`         |
 | component / page browser | `ng test -c browser` → Vitest project `browser` (Chromium) | components and pages rendered in real Chromium with a mock store | `pnpm test:browser` |
 | full-stack e2e           | **Playwright Test**                                       | the real app → real API → real Postgres, in its own database     | `pnpm test:e2e`     |
 
@@ -24,27 +24,23 @@ named for the file's module (`entity.service`, `entity-list-page.effects`, `conf
 
 ## Spec inventory
 
-The scaffold ships exactly these specs; each must cover at least the cases listed. Code blocks further down show the
-patterns; the cases come from here. Names follow the `describe` rule above.
+The scaffold ships exactly these specs, each covering the cases listed and no more: a spec or case not listed here
+needs a bug only it would catch ([coding-conventions.md §7.5](coding-conventions.md#75-what-not-to-test)). The root
+component, the layout, the `app-context` slice, `navigatedRoute`, `navigate$` and the field-picking selectors have no
+spec: they hold no logic, and the specs that run through them prove them. Code blocks further down show the patterns;
+the cases come from here. Names follow the `describe` rule above.
 
 **Unit (`ng test`, `src/**/*.spec.ts`)**
 
 | file | cases |
 | --- | --- |
-| `app.component.spec.ts` | renders the main layout with its router outlet |
-| `app.routes.spec.ts` | `''` redirects to `/entities`; `/entities`, `/entities/:id`, `/entities/new` and `/entities/:id/edit` render their pages; each of the four lands its state (`entity-list`, `entity-detail`, `entity-new`, `entity-edit`) and its params in the app-router slice; **late responses**, on the real router and store: an edit form's GET that returns after moving to `/entities/new` leaves the new form empty; a save that succeeds after _Cancel_ does not redirect, and one that succeeds on the form does; a list response past the end that returns after moving to a detail page leaves its URL alone |
-| `layouts/main-layout.component.spec.ts` | shows the app name from the store and a router outlet |
-| `services/entity.service.spec.ts` | `list` drops default `page` / `pageSize`; `list` sends the list input as the shared URL params; `get`, `create`, `update`, `delete` each send the right method, URL and body |
+| `app.routes.spec.ts` | one `it.each` row per route: `/entities`, `/entities/:id`, `/entities/new` and `/entities/:id/edit` each render their page and land its state (`entity-list`, `entity-detail`, `entity-new`, `entity-edit`) and its params in the app-router slice; **late responses**, on the real router and store: an edit form's GET that returns after moving to `/entities/new` leaves the new form empty; a save that succeeds after _Cancel_ does not redirect, and one that succeeds on the form does; a list response past the end that returns after moving to a detail page leaves its URL alone |
+| `services/entity.service.spec.ts` | `list` sends the list input as the shared URL params; `get`, `create`, `update`, `delete` each send the right method, URL and body |
 | `helpers/entity-list-params.helper.spec.ts` | the five cases in `web.md` §11 |
 | `helpers/entity-filter-form.helper.spec.ts` | `toFilterInput`: empty form → `undefined`, trimmed `contains` filters, the date range as local midnight; `toFilterForm`: no filter → empty form, round trip, unsupported operators and invalid dates ignored; `formatRange`: `0 of 0`, the row range with total and page |
 | `helpers/http-error.helper.spec.ts` | uses the API's message; falls back to the response's |
-| `store/app-context/app-context.reducer.spec.ts` | seeds the initial state from `environment`; an unknown action returns it unchanged |
-| `store/app-context/app-context.selectors.spec.ts` | picks `apiBaseUrl` and `appName` |
 | `store/app-router/app-router.serializer.spec.ts` | the deepest route's `data.state`; params merged along the branch; the query params and URL; `state` is `null` when no route declares one |
-| `store/app-router/app-router.helper.spec.ts` | `navigatedRoute` returns the payload's router state as written by the serializer |
-| `store/app-router/app-router.effects.spec.ts` | `navigate$` calls the `Router` with the commands, query params and `replaceUrl` |
 | `store/<page>/<page>.reducer.spec.ts` (×3) | `routerNavigatedAction` into the page's own state writes its route state (list: the parsed input; detail: the id, and a new id drops the previous entity; form: `{ id: null }` on `entity-new`, `{ id }` on `entity-edit`, each with the navigation's `navigationId`), into another state leaves the slice unchanged; `Leave` resets; each request → its loading status; each success and failure; form: a save result with another `navigationId` (after `Leave`, or from an earlier visit) leaves the slice unchanged |
-| `store/<page>/<page>.selectors.spec.ts` (×3) | the slice fields, including the route state (`selectListInput`, `selectId`, `selectTarget`) and the form's `selectNavigationId` |
 | `store/entity-list-page/entity-list-page.effects.spec.ts` | `fetchAfterDelete$` (fetches the slice's input; fetches nothing once the input is `null` after `Leave`, even if it was set before), `fetch$` (success carries the input it was made for; failure) and `delete$` success / failure, `stepBackPastLastPage$` (steps back with `replaceUrl`, from the result's input; stays on a page with rows; stays on an empty first page), and the operator details below, including `fetch$` emitting nothing for a response after `Leave` |
 | `store/entity-detail-page/entity-detail-page.effects.spec.ts` | `load$` success and failure; a response after `Leave` emits nothing |
 | `store/entity-form-page/entity-form-page.effects.spec.ts` | `load$` (loads an id, makes no request for a new form, failure; a new form cancels an edit form's request in flight; a response after `Leave` emits nothing), `create$` and `update$` success / failure carrying the `navigationId` current when the save started, saves run one after the other (`concatMap`), `navigateAfterSave$` (navigates for the current `navigationId`; not for another, nor after `Leave`) |
@@ -62,7 +58,7 @@ patterns; the cases come from here. Names follow the `describe` rule above.
 
 | file | cases |
 | --- | --- |
-| `entity-list-page.spec.ts` | lists entities seeded through the API; filters by name through the strip, and the filter lands in the URL; a deep link to page 2 shows page 2; _Next_ then the browser's back shows the first page again; deletes through the dialog; cancel keeps the row; steps back a page when a delete empties the last one |
+| `entity-list-page.spec.ts` | filters by name through the strip, and the filter lands in the URL; a deep link to page 2 shows page 2; _Next_ then the browser's back shows the first page again; deletes through the dialog; steps back a page when a delete empties the last one |
 | `entity-detail-page.spec.ts` | the spec below |
 | `entity-form-page.spec.ts` | creates an entity and lands on its detail page; edits a seeded entity and sees the change |
 
@@ -234,11 +230,12 @@ describe('entity.service', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('drops page and pageSize when they are the defaults', () => {
-    service.list({ page: 1, pageSize: 20 }).subscribe();
+  it('list sends the list input as the shared URL params', () => {
+    service.list({ sort: { field: 'name', direction: 'DESC' }, page: 2, pageSize: 50 }).subscribe();
     const req = httpMock.expectOne((r) => r.url === `${API}/entities`);
-    expect(req.request.params.has('page')).toBe(false);
-    req.flush({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
+    expect(req.request.params.get('sortField')).toBe('name');
+    expect(req.request.params.get('page')).toBe('2');
+    req.flush({ items: [], total: 0, page: 2, pageSize: 50, totalPages: 0 });
   });
 
   it('delete issues a DELETE at the id URL', () => {
@@ -304,9 +301,9 @@ describe('entity-detail-page.effects', () => {
   is a `routerNavigatedAction` built by `navigated()` from `src/testing/navigated.ts`, so each navigation reads as
   one line: `reducer(initialState, navigated({ state: 'entity-detail', params: { id: 'e1' } }))`; pass a second
   argument for the navigation's id when a case needs two navigations told apart (the form's `navigationId`).
-- **Selector specs** call `selector.projector(input)` directly. Each page slice and the `app-context` slice ships a
-  `*.selectors.spec.ts` for parallelism across slices, even where the selectors are trivial field pickers. URL parsing
-  is the params helper's spec and the list reducer's, not the selectors'.
+- **Selector specs** call `selector.projector(input)` directly, and exist only for a selector with logic (a derived
+  value, a combination of slices). The scaffold's selectors all pick one field, so it ships no selector spec. URL
+  parsing is the params helper's spec and the list reducer's, not the selectors'.
 - **Store effects** that read the store (the list page's `fetchAfterDelete$`, the form's `create$` / `update$` /
   `navigateAfterSave$`) add a `provideMockStore` with the selector overridden (`selectListInput`,
   `selectNavigationId`). To show the value *after* `Leave` wins, override it with a value, then with `null`, and
@@ -407,12 +404,13 @@ emit one `fetchSuccess` and collect with `toArray()` — an empty page past the 
 real `routes`, a root store (`appContext` + `appRouter` reducers) with `provideRouterStore` configured as in
 `app.config.ts` (the serializer and post-activation timing), the app-router effects, and a **fake `EntityService`**
 (every method a `vi.fn()` returning `of(...)` by default) so the page loads never touch HTTP. `navigateByUrl(url,
-Component)` asserts the activated component's type; read `Router.url` to assert the redirect, and `selectRouterState`
-to assert the state the route declares — the route table lists the app's states, so this spec is where a missing or
-wrong `data.state` fails. The block is an excerpt: its imports and the `entity` fixture are the same as in the other
+Component)` asserts the activated component's type and `selectRouterState` the state the route declares, in one
+`it.each` row per route, since both come from the same navigation. The route table lists the app's states, so this
+spec is where a missing or wrong `data.state` fails. The block is an excerpt: its imports and the `entity` fixture are the same as in the other
 specs, and the full spec covers every route listed in the [spec inventory](#spec-inventory).
 
 ```ts
+import { type Type } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
@@ -441,27 +439,22 @@ describe('app.routes', () => {
     });
   });
 
-  it("redirects '' to the entity list", async () => {
-    const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/', EntityListPage);
-    expect(TestBed.inject(Router).url).toBe('/entities');
-  });
-
-  it('renders the form page at /entities/:id/edit (the edit and new routes share one form slice)', async () => {
-    const harness = await RouterTestingHarness.create();
-    expect(await harness.navigateByUrl('/entities/e1/edit', EntityFormPage)).toBeInstanceOf(EntityFormPage);
-  });
-
-  it('lands the entity-edit state with its id', async () => {
+  it.each<[string, Type<unknown>, Partial<AppRouterState>]>([
+    ['/entities?page=2', EntityListPage, { state: 'entity-list', params: {}, queryParams: { page: '2' } }],
+    ['/entities/e1', EntityDetailPage, { state: 'entity-detail', params: { id: 'e1' } }],
+    ['/entities/new', EntityFormPage, { state: 'entity-new', params: {} }],
+    ['/entities/e1/edit', EntityFormPage, { state: 'entity-edit', params: { id: 'e1' } }]
+  ])('renders the page at %s and lands its state', async (url, page, expected) => {
     // Arrange
     const harness = await RouterTestingHarness.create();
 
     // Act
-    await harness.navigateByUrl('/entities/e1/edit', EntityFormPage);
+    const component = await harness.navigateByUrl(url, page);
 
     // Assert
+    expect(component).toBeInstanceOf(page);
     const router = await firstValueFrom(TestBed.inject(Store).select(selectRouterState));
-    expect(router.state).toMatchObject({ state: 'entity-edit', params: { id: 'e1' } });
+    expect(router.state).toMatchObject({ url, ...expected });
   });
 });
 ```
@@ -950,7 +943,7 @@ The list page e2e covers the router → store path and the delete flows against 
   row and _page 2 of 3_;
 - **back after Next** — on page 1, click _Next_, see page 2, then `page.goBack()` and see page 1 again, with no _Next_
   click repeated: the browser's own navigation reaches the slice through the router;
-- delete-via-dialog, cancel-keeps-the-row, and **step-back-on-empty-page** — seed two rows under one filter, land on
+- delete-via-dialog and **step-back-on-empty-page** — seed two rows under one filter, land on
   `?pageSize=1&page=2` by deep link, delete the only row, and assert the URL drops `page=2` as the page steps back to
   page 1.
 
