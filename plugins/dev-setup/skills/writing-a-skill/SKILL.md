@@ -30,7 +30,7 @@ skill-name/
 
 ```md
 ---
-name: skill-name # gerund form, lowercase, hyphens, max 64 chars
+name: skill-name # verb-object form, lowercase, hyphens, max 64 chars
 description: One sentence what it does. Use when [specific triggers/keywords].
 ---
 
@@ -38,9 +38,15 @@ description: One sentence what it does. Use when [specific triggers/keywords].
 
 [Minimal quick-start example inline]
 
+**Done means:** [the finish line, checkable: files written, checks passing, the user's explicit yes]
+
 ## Workflows
 
 [Step-by-step process. Add a checkbox checklist for complex multi-step tasks.]
+
+## End of the run
+
+End with three headings: **Blocked on me**, **Changed** and **Found**.
 
 ## References
 
@@ -56,9 +62,11 @@ Omit any section that doesn't apply — don't leave empty placeholders.
 
 ## Naming
 
-Prefer gerund form: `processing-pdfs`, `analyzing-spreadsheets`, `setting-up-npm-block`. Lowercase letters, numbers, and hyphens only, max 64 chars.
+Use verb-object form, the command the user would type: `verify-build`, `debug-failure`, `confirm-my-goal`. Lowercase letters, numbers, and hyphens only, max 64 chars. The H1 title matches the name (`# Verify Build`).
 
-Exception: a skill that scaffolds a new project is named `create-<thing>`, after the `pnpm create` / `npm init` convention users already search for: `create-node-project`, `create-cloudflare-worker`, `create-fullstack-app`.
+A skill that scaffolds a new project is named `create-<thing>`, after the `pnpm create` / `npm init` convention users already search for: `create-node-project`, `create-cloudflare-worker`, `create-fullstack-app`.
+
+Older skills keep their gerund names (`setting-up-npm-block`, `writing-a-skill`). Do not use that form for new ones.
 
 ## Description
 
@@ -71,6 +79,17 @@ Extract text and tables from PDF files, fill forms, merge documents. Use when wo
 # Bad
 Helps with documents.
 ```
+
+## Writing for the model
+
+- **Say what done looks like**, in one line near the top. The model works toward the finish line it is given.
+- **Say when to keep going and when to stop**, for any skill that runs more than a few steps: keep going while the next step needs nothing from the user; stop only for input only the user can give, or before anything destructive or outside the repo (deleting data, force-pushing, changing infrastructure).
+- **Keep the task list in a file** when a run can outlive its context (several slices, several sessions). The user reads the file instead of the scrollback.
+- **End with Blocked on me, Changed and Found**, in that order, so the user sees first what needs them.
+- **No "think carefully" or "think step by step" lines.** The model already thinks before it answers; depth is set by effort, not by the prompt.
+- **Do not ask it to write out its reasoning.** Ask for the reason in a sentence or two.
+- **Research steps mark what they could not confirm**, and say where they looked.
+- **Review steps list only what blocks**, each with `file:line`, why it is wrong and how to show that it fails.
 
 ## Progressive Disclosure
 
@@ -115,8 +134,11 @@ For reference files longer than 100 lines, add a table of contents at the top so
 
 ## Review Checklist
 
-- [ ] Name uses gerund form, or `create-<thing>` for a project scaffolder
+- [ ] Name uses verb-object form, or `create-<thing>` for a project scaffolder
 - [ ] Description includes "Use when..." with specific triggers
+- [ ] A **Done means** line, and an End of the run with Blocked on me / Changed / Found
+- [ ] A skill that runs long says when to keep going and when to stop
+- [ ] No "think carefully" or "step by step" lines
 - [ ] SKILL.md body under 500 lines
 - [ ] No time-sensitive information
 - [ ] Consistent terminology throughout

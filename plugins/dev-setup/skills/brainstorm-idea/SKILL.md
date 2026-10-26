@@ -38,7 +38,7 @@ Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names
 
 1. **Settle the folder and the slug** as above.
 
-2. **Collect.** Ask the user to dump everything: the idea in their own words, who has the problem, what they do today, and references (products, links, screenshots, repos, half-remembered "like X but for Y"). Read or fetch every reference they give. Quote the user's own words in the file. Do not reword them. Then interview:
+2. **Collect.** Ask the user to dump everything: the idea in their own words, who has the problem, what they do today, and references (products, links, screenshots, repos, half-remembered "like X but for Y"). Read or fetch every reference they give. If one will not open, say so and ask for another way in: never describe a reference from its name alone. Quote the user's own words in the file. Do not reword them. Then interview:
    - Ask one question at a time, about the problem or the people, not the build. Attach your guess and why: the user corrects a wrong guess faster than they answer a blank question.
    - Listen for what the user thinks they should want: "scalable", "modern", "the way most apps do it". Then ask: "If you did not have to justify this to anyone, what would you want?"
    - Stop when you can predict their answer to your next three questions.

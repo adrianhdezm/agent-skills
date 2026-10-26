@@ -76,7 +76,8 @@ It is grounded in the real code and the project's conventions, not in a framewor
    - **Security:** for each behaviour that takes input, files, URLs or identities, who may do it and what an attacker
      could send. Write the answer as a rule ("only the owner can delete a slot").
    - **Sources:** for any framework or library API you are not sure of, read the official docs for the version the
-     project installs, and list the link under **Sources**. Do not design from memory.
+     project installs, and list the link under **Sources**. Do not design from memory. If you find no source, say so in
+     the decision, mark it _unconfirmed_ and name where you looked.
 
 4. **Find the forks.** A fork is a choice the conventions do not settle and that changes what gets built: a uniqueness
    rule, an ID shape, where a check runs, a retention period. Keep 2 to 5. Give each one a default you would build and

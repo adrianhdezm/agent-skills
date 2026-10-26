@@ -22,6 +22,9 @@ There are no templates. The tools' own CLIs create what they can (`git init`, `p
 [references/tooling.md](references/tooling.md), so it can fit the project (its name, its first module, files that
 already exist) instead of being copied verbatim.
 
+**Done means:** the three checks pass with zero warnings, `pnpm start` runs, and every item on the
+[Review Checklist](#review-checklist) holds.
+
 ## What gets created
 
 ```
@@ -56,6 +59,9 @@ Copy this checklist and tick it off:
 - [ ] 5. First module, its test and main.ts written
 - [ ] 6. Formatted and checked
 ```
+
+Once the description is settled, run every step to the end without asking. Stop only when the toolchain is missing,
+the target already holds a `package.json`, or a check still fails after you have found its cause.
 
 1. **Check the toolchain.** `node --version` must be 24 or newer, `pnpm --version` 11 or newer (`allowBuilds` is a
    pnpm 11 setting). Stop if the target directory already holds a `package.json`: follow
@@ -116,6 +122,12 @@ Copy this checklist and tick it off:
    All three checks pass with zero warnings and `pnpm start` runs `main.ts`. The checks do not catch a wrong
    `package.json`, so also confirm that `private` is `true` (a boolean, not `"true"`) and that `typescript` has an
    exact version with no `^`.
+
+## End of the run
+
+End with three headings: **Blocked on me** (a check that still fails), **Changed** (the project path and what was
+created) and **Found** (anything that differed from the spec). When another skill called this one, such as
+`design-solution`, hand these back to it instead.
 
 ## Rules the tooling enforces
 
