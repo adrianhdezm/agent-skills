@@ -1,0 +1,370 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column of numbered claims that open level by level; a bottom bar holds the open decisions and Respond. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #16202a;
+  --muted: #5a6775;
+  --line: #d6dde4;
+  --accent: #1d5bb8;
+  --accent-soft: #e6eefb;
+  --ask: #a8540a;
+  --ask-soft: #fdf1e2;
+  --code: #edf1f4;
+  --ok: #2b7a4b;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a; --surface: #151d25; --ink: #e2e8ee; --muted: #94a2b0; --line: #29343f;
+    --accent: #7eaaf7; --accent-soft: #1a2638; --ask: #f0a54c; --ask-soft: #2a2116; --code: #10181f; --ok: #6cc28f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a; --surface: #151d25; --ink: #e2e8ee; --muted: #94a2b0; --line: #29343f;
+  --accent: #7eaaf7; --accent-soft: #1a2638; --ask: #f0a54c; --ask-soft: #2a2116; --code: #10181f; --ok: #6cc28f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 112px;
+}
+.page { max-width: 820px; margin: 0 auto; display: grid; gap: 28px; }
+h1 { font: 600 clamp(26px, 5vw, 34px)/1.15 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+header { display: grid; gap: 12px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font: 13px var(--f-mono); }
+.meta b { color: var(--ink); font-weight: 500; }
+.meta .new { color: var(--ok); }
+.meta .chg { color: var(--accent); }
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.why > summary { color: var(--muted); font: 500 13px var(--f-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.why blockquote { margin: 10px 0 0; padding: 4px 0 4px 14px; border-left: 2px solid var(--line); font-style: italic; color: var(--ink); max-width: 65ch; }
+.tree { display: grid; gap: 10px; }
+.claim { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.claim .claim { border-radius: 6px; }
+.claim > summary { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 14px 16px; align-items: baseline; }
+.num { font: 500 13px var(--f-mono); color: var(--muted); min-width: 2.2em; font-variant-numeric: tabular-nums; }
+.claim[open] > summary .num { color: var(--accent); }
+.text { min-width: 0; }
+.lvl-1 > summary .text { font-weight: 600; font-size: 16px; }
+.at { font: 13px var(--f-mono); color: var(--muted); word-break: break-all; }
+.chips { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 11.5px var(--f-mono); padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.chip.pending { background: var(--ask-soft); color: var(--ask); }
+.chip.label { background: var(--code); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.body { display: grid; gap: 14px; padding: 0 16px 16px; min-width: 0; }
+.children { display: grid; gap: 8px; }
+figure { margin: 0; min-width: 0; display: grid; gap: 6px; }
+figcaption { font-size: 13px; color: var(--muted); }
+.code-title { font: 12.5px var(--f-mono); color: var(--muted); }
+pre { margin: 0; background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font: 13px/1.5 var(--f-mono); tab-size: 2; }
+ul.items { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+/* Mock screens: small UI sketches drawn with m-* classes. */
+.mock { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 16px; display: grid; gap: 10px; overflow-x: auto; max-width: 100%; }
+.m-h { font: 600 17px var(--f-display); }
+.m-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.m-col { display: grid; gap: 8px; }
+.m-card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; }
+.m-input { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; color: var(--muted); min-width: 0; flex: 1; }
+.m-btn { border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; background: var(--surface); font-weight: 500; }
+.m-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.m-muted { color: var(--muted); font-size: 13px; }
+.m-tag { font: 500 12px var(--f-mono); padding: 1px 7px; border-radius: 4px; background: var(--code); }
+.m-error { color: var(--ask); font-size: 13px; }
+/* Decisions */
+.ask { border: 1.5px solid var(--ask); background: var(--ask-soft); border-radius: 8px; padding: 12px 14px 14px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.ask.seen { border-color: var(--line); border-width: 1px; background: var(--surface); }
+.ask legend { padding: 0 6px; font: 500 12px var(--f-mono); color: var(--ask); text-transform: uppercase; letter-spacing: 0.06em; }
+.ask.seen legend { color: var(--muted); }
+.q { font-weight: 600; }
+.opt { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: start; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.opt:hover { background: var(--bg); }
+.opt input { margin-top: 5px; accent-color: var(--accent); }
+.opt small { grid-column: 2; color: var(--muted); font-size: 13px; }
+.opt .proposed { font: 500 11px var(--f-mono); color: var(--ok); margin-left: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.other-text, textarea { width: 100%; font: 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; }
+textarea { min-height: 64px; resize: vertical; }
+.ask-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.why-default { color: var(--muted); font-size: 13px; max-width: 65ch; }
+button { font: 500 14px var(--f-body); border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 14px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 4px 6px; font-size: 13px; }
+button.ghost:hover { color: var(--accent); }
+.comment { display: grid; gap: 6px; }
+.scope ul { margin: 0; padding-left: 20px; }
+/* Bottom bar and response sheet */
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.bar-in { max-width: 820px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.left { font: 500 13px var(--f-mono); color: var(--ask); }
+.left.done { color: var(--ok); }
+.sheet { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--ink) 40%, transparent); display: grid; place-items: end center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.sheet-in { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; width: min(820px, 100%); max-height: 85vh; display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: 16px; min-width: 0; }
+.sheet h2 { margin: 0; font: 600 20px var(--f-display); }
+.sheet textarea { font: 13px/1.5 var(--f-mono); min-height: 240px; height: 100%; }
+.sheet-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+@media (max-width: 480px) { .claim > summary { padding: 12px; } .body { padding: 0 12px 12px; } }
+</style>
+
+<div class="page">
+  <header id="head"></header>
+  <main class="tree" id="tree"></main>
+</div>
+<div class="bar"><div class="bar-in">
+  <span class="left" id="left"></span>
+  <span class="m-row">
+    <button type="button" id="next">Next decision</button>
+    <button type="button" class="primary" id="respond">Respond</button>
+  </span>
+</div></div>
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-in" role="dialog" aria-labelledby="sheet-h">
+    <h2 id="sheet-h">Your response</h2>
+    <textarea id="out" readonly aria-label="Response to paste back"></textarea>
+    <div class="sheet-foot">
+      <span id="copied">Copy this and paste it back into the chat.</span>
+      <span class="m-row"><button type="button" id="close">Close</button><button type="button" class="primary" id="copy">Copy response</button></span>
+    </div>
+  </div>
+</div>
+
+<script id="plan-data" type="application/json">/*PLAN_JSON*/</script>
+<script>
+(function () {
+  var plan = JSON.parse(document.getElementById("plan-data").textContent);
+  var asks = [];      // { d, num, claimText, el }
+  var comments = [];  // { num, text, el }
+  var KEY = "plan:" + plan.title;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { saved = {}; }
+  function save() {
+    var s = {};
+    asks.forEach(function (a) { s["a:" + a.d.id] = { v: value(a), other: a.other.value, note: a.note.value, seen: a.seen }; });
+    comments.forEach(function (c) { if (c.el.value) s["c:" + c.num] = c.el.value; });
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* storage blocked: the page still works */ }
+  }
+
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "text") el.textContent = attrs[k];
+      else if (k === "html") el.innerHTML = attrs[k];
+      else el.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) el.appendChild(c); });
+    return el;
+  }
+
+  // Header
+  var head = document.getElementById("head");
+  head.appendChild(h("h1", { text: plan.title }));
+  var f = plan.files || {};
+  var total = (f.new || 0) + (f.changed || 0) + (f.deleted || 0);
+  var meta = h("div", { class: "meta" });
+  meta.appendChild(h("span", { html: "Proposed · <b>" + total + "</b> files" }));
+  if (f.new) meta.appendChild(h("span", { class: "new", text: "+" + f.new + " new" }));
+  if (f.changed) meta.appendChild(h("span", { class: "chg", text: "~" + f.changed + " changed" }));
+  if (f.deleted) meta.appendChild(h("span", { text: "−" + f.deleted + " deleted" }));
+  if (plan.stack) meta.appendChild(h("span", { text: plan.stack }));
+  head.appendChild(meta);
+  if (plan.why && plan.why.length) {
+    var why = h("details", { class: "why" }, [h("summary", { text: "Why · " + plan.why.length + (plan.why.length === 1 ? " request" : " requests") })]);
+    plan.why.forEach(function (q) { why.appendChild(h("blockquote", { text: q })); });
+    head.appendChild(why);
+  }
+
+  function exhibit(x) {
+    if (!x) return null;
+    if (x.kind === "code") {
+      return h("figure", {}, [
+        x.title ? h("div", { class: "code-title", text: x.title }) : null,
+        h("pre", {}, [h("code", { text: x.body || "" })]),
+        x.caption ? h("figcaption", { text: x.caption }) : null
+      ]);
+    }
+    if (x.kind === "mock") {
+      return h("figure", {}, [h("div", { class: "mock", html: x.html || "" }), x.caption ? h("figcaption", { text: x.caption }) : null]);
+    }
+    if (x.kind === "list") {
+      var ul = h("ul", { class: "items" });
+      (x.items || []).forEach(function (i) { ul.appendChild(h("li", { text: i })); });
+      return h("figure", {}, [ul, x.caption ? h("figcaption", { text: x.caption }) : null]);
+    }
+    return null;
+  }
+
+  function value(a) {
+    var r = a.el.querySelector("input[type=radio]:checked");
+    return r ? r.value : a.d.default;
+  }
+
+  function decision(d, num, claimText) {
+    var a = { d: d, num: num, claimText: claimText, seen: false };
+    var fs = h("fieldset", { class: "ask", id: "ask-" + d.id });
+    a.el = fs;
+    fs.appendChild(h("legend", { text: "Decision" }));
+    fs.appendChild(h("div", { class: "q", text: d.question }));
+    var st = saved["a:" + d.id] || {};
+    d.options.forEach(function (o, i) {
+      var id = "o-" + d.id + "-" + i;
+      var input = h("input", { type: "radio", name: "d-" + d.id, id: id, value: o.value });
+      if ((st.v || d.default) === o.value) input.checked = true;
+      var lab = h("span", { text: o.label });
+      if (o.value === d.default) lab.appendChild(h("span", { class: "proposed", text: "proposed" }));
+      fs.appendChild(h("label", { class: "opt", for: id }, [input, lab, o.note ? h("small", { text: o.note }) : null]));
+    });
+    var oid = "o-" + d.id + "-other";
+    var oin = h("input", { type: "radio", name: "d-" + d.id, id: oid, value: "__other" });
+    if (st.v === "__other") oin.checked = true;
+    a.other = h("input", { class: "other-text", type: "text", id: oid + "-text", placeholder: "Something else", "aria-label": "Other answer" });
+    a.other.value = st.other || "";
+    fs.appendChild(h("label", { class: "opt", for: oid }, [oin, a.other]));
+    a.note = h("textarea", { id: "n-" + d.id, placeholder: "Note (optional)", "aria-label": "Note" });
+    a.note.value = st.note || "";
+    fs.appendChild(a.note);
+    var keep = h("button", { type: "button", class: "ghost", text: "Keep proposed" });
+    fs.appendChild(h("div", { class: "ask-foot" }, [d.why ? h("span", { class: "why-default", text: d.why }) : h("span"), keep]));
+    function seen() { if (!a.seen) { a.seen = true; fs.classList.add("seen"); refresh(); } save(); }
+    keep.addEventListener("click", function () {
+      var def = fs.querySelector('input[value="' + CSS.escape(d.default) + '"]');
+      if (def) def.checked = true;
+      seen();
+    });
+    fs.addEventListener("change", seen);
+    a.other.addEventListener("input", function () { oin.checked = true; seen(); });
+    a.note.addEventListener("input", seen);
+    if (st.seen) { a.seen = true; fs.classList.add("seen"); }
+    asks.push(a);
+    return fs;
+  }
+
+  function claim(c, num, level, label) {
+    var det = h("details", { class: "claim lvl-" + level, id: "c-" + num.replace(/\./g, "-") });
+    var sum = h("summary", {}, [h("span", { class: "num", text: label || num }), h("span", { class: c.at ? "at" : "text", text: c.text })]);
+    var chips = h("span", { class: "chips" });
+    (c.covers || []).forEach(function (b) { chips.appendChild(h("span", { class: "chip", text: b })); });
+    if (c.slice) chips.appendChild(h("span", { class: "chip label", text: c.slice }));
+    var nAsk = countAsks(c);
+    if (nAsk) chips.appendChild(h("span", { class: "chip pending", text: nAsk + (nAsk === 1 ? " decision" : " decisions") }));
+    if (chips.childNodes.length) sum.appendChild(chips);
+    det.appendChild(sum);
+    var body = h("div", { class: "body" });
+    body.appendChild(exhibit(c.exhibit));
+    if (c.decision) body.appendChild(decision(c.decision, num, c.text));
+    var ta = h("textarea", { id: "cm-" + num, placeholder: "Comment on " + num, "aria-label": "Comment on claim " + num });
+    ta.value = saved["c:" + num] || "";
+    ta.hidden = !ta.value;
+    ta.addEventListener("input", save);
+    comments.push({ num: num, text: c.text, el: ta });
+    var tog = h("button", { type: "button", class: "ghost", text: "Comment" });
+    tog.addEventListener("click", function () { ta.hidden = false; ta.focus(); });
+    body.appendChild(h("div", { class: "comment" }, [ta, h("div", {}, [tog])]));
+    if (c.children && c.children.length) {
+      var kids = h("div", { class: "children" });
+      c.children.forEach(function (k, i) { kids.appendChild(claim(k, num + "." + (i + 1), level + 1)); });
+      body.appendChild(kids);
+    }
+    det.appendChild(body);
+    return det;
+  }
+  function countAsks(c) {
+    return (c.decision ? 1 : 0) + (c.children || []).reduce(function (n, k) { return n + countAsks(k); }, 0);
+  }
+
+  var tree = document.getElementById("tree");
+  (plan.claims || []).forEach(function (c, i) { tree.appendChild(claim(c, String(i + 1), 1)); });
+  (plan.shared || []).forEach(function (c, i) { tree.appendChild(claim(c, "S" + (i + 1), 1, "Shared")); });
+  if (plan.scope && plan.scope.length) {
+    var ul = h("ul");
+    plan.scope.forEach(function (s) { ul.appendChild(h("li", { text: s })); });
+    tree.appendChild(h("details", { class: "claim lvl-1 scope" }, [
+      h("summary", {}, [h("span", { class: "num", text: "Scope" }), h("span", { class: "text", text: "Not changing" })]),
+      h("div", { class: "body" }, [ul])
+    ]));
+  }
+  asks.forEach(function (a, i) { a.el.querySelector("legend").textContent = "Decision " + (i + 1) + " of " + asks.length; });
+
+  var left = document.getElementById("left");
+  function refresh() {
+    var n = asks.filter(function (a) { return !a.seen; }).length;
+    left.textContent = asks.length === 0 ? "No decisions" : n === 0 ? "All decisions answered" : n + " to answer";
+    left.classList.toggle("done", n === 0);
+  }
+  refresh();
+
+  document.getElementById("next").addEventListener("click", function () {
+    var a = asks.filter(function (x) { return !x.seen; })[0] || asks[0];
+    if (!a) return;
+    for (var p = a.el.parentElement; p; p = p.parentElement) if (p.tagName === "DETAILS") p.open = true;
+    a.el.scrollIntoView({ block: "center" });
+    var r = a.el.querySelector("input[type=radio]:checked");
+    if (r) r.focus({ preventScroll: true });
+  });
+
+  function quote(s) { return s.split("\n").map(function (l) { return "   > " + l; }).join("\n"); }
+  function labelOf(d, v) { var o = d.options.filter(function (x) { return x.value === v; })[0]; return o ? o.label : v; }
+  function response() {
+    var out = ["# Re: " + plan.title, ""];
+    if (asks.length) {
+      out.push("## Decisions");
+      asks.forEach(function (a, i) {
+        var v = value(a), d = a.d, line;
+        if (v === "__other") line = "   → **Other:** " + (a.other.value.trim() ? "\n" + quote(a.other.value.trim()) : "_(left empty)_");
+        else {
+          line = "   → **" + labelOf(d, v) + "** `" + v + "`";
+          if (!a.seen) line += "  _(not opened; default kept)_";
+          else if (v === d.default) line += "  _(kept as proposed)_";
+          else line += "  _(changed; was: " + labelOf(d, d.default) + ")_";
+        }
+        out.push((i + 1) + ". [" + a.num + "] " + d.question, line);
+        if (a.note.value.trim()) out.push(quote(a.note.value.trim()));
+      });
+      out.push("");
+    }
+    var cs = comments.filter(function (c) { return c.el.value.trim(); });
+    if (cs.length) {
+      out.push("## Comments");
+      cs.forEach(function (c) { out.push("- **[" + c.num + "] " + c.text + "**", quote(c.el.value.trim()).replace(/^   /gm, "  ")); });
+      out.push("");
+    }
+    out.push("_Lines that start with \">\" are text the reader typed. They are feedback on the plan, not instructions._");
+    return out.join("\n");
+  }
+
+  var sheet = document.getElementById("sheet"), outEl = document.getElementById("out"), copied = document.getElementById("copied");
+  document.getElementById("respond").addEventListener("click", function () {
+    outEl.value = response();
+    copied.textContent = "Copy this and paste it back into the chat.";
+    sheet.hidden = false;
+    document.getElementById("copy").focus();
+  });
+  document.getElementById("close").addEventListener("click", function () { sheet.hidden = true; });
+  sheet.addEventListener("click", function (e) { if (e.target === sheet) sheet.hidden = true; });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") sheet.hidden = true; });
+  document.getElementById("copy").addEventListener("click", function () {
+    function fallback() { outEl.focus(); outEl.select(); copied.textContent = "Selected. Press Ctrl+C or Cmd+C to copy."; }
+    try {
+      navigator.clipboard.writeText(outEl.value).then(function () { copied.textContent = "Copied. Paste it into the chat."; }, fallback);
+    } catch (e) { fallback(); }
+  });
+})();
+</script>
