@@ -1,7 +1,7 @@
 # Web Storybook
 
-Storybook develops and documents the reusable **components** under `src/app/components/` (the pieces that take
-`input()` / `output()` and never touch the store). It is **dev/docs only** — not a test runner. A component's
+Storybook develops and documents the reusable **components** under `src/app/components/`: the `ui/` primitives and
+the app components built on them, both taking `input()` / `output()` and never touching the store. It is **dev/docs only** — not a test runner. A component's
 behaviour is tested by its browser-mode spec (see [references/web-testing.md](web-testing.md)); Storybook is where a
 component is built and its states are reviewed.
 
@@ -14,7 +14,7 @@ matches the project's esbuild/Vite toolchain (`@angular/build`) and does not pul
 - [`.storybook/` config](#storybook-config)
 - [`angular.json` targets and scripts](#angularjson-targets-and-scripts)
 - [Ignore + ESLint](#ignore--eslint)
-- [The example story](#the-example-story)
+- [The stories](#the-stories)
 
 ## Dependencies
 
@@ -141,60 +141,132 @@ storybook-static
 `...storybook.configs['flat/recommended']` **before** `eslintConfigPrettier`, so prettier stays the last entry and
 wins the final say on formatting. See [references/eslint-prettier.md](eslint-prettier.md).
 
-## The example story
+## The stories
 
-The scaffold ships one component, `ConfirmDialog` (defined in [references/web.md](web.md) under Components), and one
-story for it. The story drives the signal `input()`s as `args` and wires the `output()`s to `fn()` spies.
+The scaffold ships four components ([references/web.md](web.md) under Components) and one story file beside each. A
+story drives the signal `input()`s as `args` and wires the `output()`s to `fn()` spies. The title names the tier:
+`UI/<Name>` for a primitive, `Components/<Name>` for an app component.
 
-### `web/src/app/components/confirm-dialog.stories.ts`
+### `web/src/app/components/ui/dialog.stories.ts`
+
+A primitive with projected content renders through a `template`, so the story shows the slots filled.
 
 ```ts
 import type { Meta, StoryObj } from '@storybook/angular-vite';
 import { fn } from 'storybook/test';
-import { ConfirmDialog } from './confirm-dialog.component';
+import { UiDialog } from './dialog.component';
 
-// The dialog renders as a full-screen modal overlay, so each story fills the
-// canvas. Outputs are wired to spies via `fn()` so clicks show in the Actions panel.
-const meta: Meta<ConfirmDialog> = {
-  title: 'Components/ConfirmDialog',
-  component: ConfirmDialog,
+const meta: Meta<UiDialog> = {
+  title: 'UI/Dialog',
+  component: UiDialog,
   args: {
-    title: 'Delete entity',
-    message: 'Delete “Acme Corp”? This cannot be undone.',
-    confirmLabel: 'Delete',
-    cancelLabel: 'Cancel',
-    busyLabel: 'Deleting…',
-    busy: false,
-    tone: 'danger',
-    confirmed: fn(),
-    cancelled: fn()
+    title: 'Dialog title',
+    description: 'A short description of what this dialog is for.',
+    dismissible: true,
+    dismissed: fn()
   },
-  argTypes: {
-    tone: { control: 'inline-radio', options: ['danger', 'primary'] },
-    busy: { control: 'boolean' },
-    title: { control: 'text' },
-    message: { control: 'text' }
+  render: (args) => ({
+    props: args,
+    template: `
+      <ui-dialog [title]="title" [description]="description" [dismissible]="dismissible" (dismissed)="dismissed()">
+        <p class="mt-4 text-sm text-slate-700">Body content goes here.</p>
+        <button uiDialogFooter type="button" class="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white">OK</button>
+      </ui-dialog>
+    `
+  })
+};
+
+export default meta;
+type Story = StoryObj<UiDialog>;
+
+export const Default: Story = {};
+```
+
+### `web/src/app/components/ui/select.stories.ts`
+
+```ts
+import type { Meta, StoryObj } from '@storybook/angular-vite';
+import { fn } from 'storybook/test';
+import { UiSelect } from './select.component';
+
+const meta: Meta<UiSelect> = {
+  title: 'UI/Select',
+  component: UiSelect,
+  args: {
+    label: 'Fruit',
+    name: 'fruit',
+    options: [
+      { value: 'apple', label: 'Apple' },
+      { value: 'banana', label: 'Banana' },
+      { value: 'cherry', label: 'Cherry' }
+    ],
+    value: 'banana',
+    valueChange: fn()
   }
 };
 
 export default meta;
-type Story = StoryObj<ConfirmDialog>;
+type Story = StoryObj<UiSelect>;
 
-export const Danger: Story = {};
+export const Default: Story = {};
+```
 
-export const Primary: Story = {
+### `web/src/app/components/ui/pagination.stories.ts`
+
+```ts
+import type { Meta, StoryObj } from '@storybook/angular-vite';
+import { fn } from 'storybook/test';
+import { UiPagination } from './pagination.component';
+
+const meta: Meta<UiPagination> = {
+  title: 'UI/Pagination',
+  component: UiPagination,
+  args: { page: 2, pageCount: 5, pageChange: fn() },
+  render: (args) => ({
+    props: args,
+    template: `<ui-pagination [page]="page" [pageCount]="pageCount" (pageChange)="pageChange($event)">Page {{ page }} of {{ pageCount }}</ui-pagination>`
+  })
+};
+
+export default meta;
+type Story = StoryObj<UiPagination>;
+
+export const Middle: Story = {};
+
+export const FirstPage: Story = {
+  args: { page: 1 }
+};
+```
+
+### `web/src/app/components/delete-dialog.stories.ts`
+
+```ts
+import type { Meta, StoryObj } from '@storybook/angular-vite';
+import { fn } from 'storybook/test';
+import { DeleteDialog } from './delete-dialog.component';
+
+// The dialog is a `fixed inset-0` overlay, so it covers the canvas without a `layout` parameter.
+const meta: Meta<DeleteDialog> = {
+  title: 'Components/DeleteDialog',
+  component: DeleteDialog,
   args: {
-    tone: 'primary',
-    title: 'Publish entity',
-    message: 'Publish “Acme Corp” now? It will be visible to everyone.',
-    confirmLabel: 'Publish'
+    itemKind: 'entity',
+    itemName: 'Acme Corp',
+    busy: false,
+    confirmed: fn(),
+    cancelled: fn()
   }
 };
+
+export default meta;
+type Story = StoryObj<DeleteDialog>;
+
+export const Default: Story = {};
 
 export const Busy: Story = {
   args: { busy: true }
 };
 ```
 
-**A new component** gets a `*.stories.ts` beside it with one story per meaningful state, args for its inputs, and
-`fn()` for its outputs, plus a `*.component.browser.spec.ts` for its behaviour.
+**A new component** gets a `*.stories.ts` beside it, titled for its tier, with one story per meaningful state, args for
+its inputs, and `fn()` for its outputs, plus a `*.component.browser.spec.ts` for its behaviour.

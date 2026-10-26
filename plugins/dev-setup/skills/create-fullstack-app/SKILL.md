@@ -77,7 +77,7 @@ my-app/
         ├── test-setup.ts / testing/   # setupTestBed() for unit; render() + setup for browser mode
         ├── environments/    # production, development, e2e
         └── app/
-            ├── pages/ layouts/ components/   # flat *.component.ts; components/ has ConfirmDialog + its story + browser spec
+            ├── pages/ layouts/ components/   # flat *.component.ts; components/ui/ primitives + app components, each with a story + browser spec
             ├── models/ services/ helpers/  # resource types, EntityService (only HttpClient user), helpers; *.spec.ts beside
             └── store/        # app-context/ + app-router/ globally, one slice per page on its route; reducer/effects specs beside
 ```
@@ -153,7 +153,7 @@ Copy this checklist and tick it off:
    `@analogjs/vitest-angular:test`, `vitest.config.mts` with the `unit` and `browser` projects, the setup files, every
    spec in the [spec inventory](references/web-testing.md#spec-inventory), the e2e environment, `angular.json`
    configuration and Playwright files, and the `storybook` / `build-storybook` / `test:browser` / `test:e2e` scripts.
-   The `ConfirmDialog` component in `components/` (from `web.md`) is the example these build on.
+   The components in `components/ui/` and `components/` (from `web.md`) are the examples these build on.
 
 5. **Add the dependencies**, in this order, each package once:
    1. the API's ([api-setup.md](references/api-setup.md#dependencies));
@@ -221,7 +221,7 @@ These bite first when writing code in the project. The full set is in
 
 - API: `*.controller.ts`, `*.middleware.ts`, `*.dao.ts`, `*.helper.ts`, `db/schemas/*.schema.ts`
 - API and web types and errors: `*.model.ts`
-- Web: `*.component.ts`, flat under `components/` / `layouts/` / `pages/` with no wrapping folder
+- Web: `*.component.ts`, flat under `components/` / `components/ui/` / `layouts/` / `pages/` with no wrapping folder
 - NgRx slices: `*.model.ts`, `*.actions.ts`, `*.reducer.ts`, `*.selectors.ts`, `*.effects.ts`
 - Tests: API `tests/**/*.test.ts` grouped by kind (`unit/`, `api/`, `db/`, `utils/`), one top-level `describe` per file named for the module; web `*.spec.ts` / `*.browser.spec.ts` beside the file, same `describe` rule; e2e `e2e/pages/*.spec.ts`
 
@@ -343,9 +343,14 @@ Each layer has one job; the full walk-through is in [references/api-dao.md](refe
 - **Actions are named for intent, not lifecycle:** `Load` (not `Enter` / `Init`), `Fetch` for one request with a given
   input, `<Action> Success` / `<Action> Failure` for results, and `Leave`.
 - **Inline templates and Tailwind utilities.** There are no `.html` or `.scss` files.
-- **Components are developed in Storybook and tested in three layers.** `components/` holds store-free
-  `input()`/`output()` components (example: `ConfirmDialog`) with a `*.stories.ts` and a `*.component.browser.spec.ts`
-  beside each; none sets `changeDetection` (`OnPush` is Angular 22's default). `ng test` runs on Analog's Vitest builder
+- **Components come in two tiers.** `components/ui/` holds design-system primitives (`UiDialog`, `UiSelect`,
+  `UiPagination`; `ui-` selectors) with the generic API of that component and no app wording, and only the ones the
+  app uses. With a UI library the primitive is imported from it, and `ui/` keeps only adaptations that keep the
+  generic API. `components/` holds app components that compose primitives for one purpose (`DeleteDialog` over
+  `UiDialog`; `app-` selectors). Pages use primitives directly for generic controls and app components for
+  app-specific pieces, and repeat no primitive's markup. ESLint enforces the component and directive prefixes per folder.
+- **Components are developed in Storybook and tested in three layers.** Every component, in either tier, is a
+  store-free `input()`/`output()` component with a `*.stories.ts` and a `*.component.browser.spec.ts` beside it; none sets `changeDetection` (`OnPush` is Angular 22's default). `ng test` runs on Analog's Vitest builder
   from one `vitest.config.mts`: project `unit` (jsdom, `*.spec.ts` — services, slices, helpers) and, with
   `-c browser`, project `browser` (components and pages in real Chromium). Every spec is in `tsconfig.spec.json`,
   because Analog compiles only that program. `pnpm test:e2e` runs Playwright against the real app + API + Postgres on
@@ -387,7 +392,7 @@ pnpm workspace, then:
   the schema test, adding a resource):
   [references/api-entity.md](references/api-entity.md)
 - **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, components, pages, spec, Nginx): [references/web.md](references/web.md)
-- **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the `ConfirmDialog` story): [references/web-storybook.md](references/web-storybook.md)
+- **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the component stories): [references/web-storybook.md](references/web-storybook.md)
 - **Web tests** (Analog's Vitest builder, the unit and browser projects, full-stack Playwright e2e on its own stack): [references/web-testing.md](references/web-testing.md)
 - **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
@@ -417,7 +422,11 @@ pnpm workspace, then:
 - [ ] Every read effect's request ends on its page's `Leave`, and `navigateAfterSave$` checks the form's
       `navigationId`; the effects specs' after-`Leave` cases pass
 - [ ] `pnpm --filter web build-storybook` builds; `pnpm --filter web storybook --smoke-test --ci` starts and exits 0, and
-      `storybook-static/index.json` lists the three `ConfirmDialog` stories
+      `storybook-static/index.json` lists the six component stories (`UI/Dialog`, `UI/Select`, `UI/Pagination` ×2,
+      `Components/DeleteDialog` ×2)
+- [ ] Default scaffold: `components/ui/` holds only `UiDialog`, `UiSelect` and `UiPagination` (`ui-` selectors, no entity wording);
+      `DeleteDialog` is in `components/`; the list page uses `<ui-select>`, `<ui-pagination>` and
+      `<app-delete-dialog>` and writes no `<select>` of its own
 - [ ] `pnpm test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
 - [ ] `pnpm test:e2e` passes (Playwright full-stack; needs Docker, the root `.env` and the migration above), and the dev
       database and any running Compose services are as they were

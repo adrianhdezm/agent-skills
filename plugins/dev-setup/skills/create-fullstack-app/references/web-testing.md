@@ -12,7 +12,7 @@ third is Playwright Test:
 `ng test` is the required check (`test`); `test:browser` and `test:e2e` are additional scripts. Every spec imports
 `{ describe, it, expect }` from `vitest`, follows Arrange / Act / Assert (with `// Arrange` / `// Act` / `// Assert`
 comments once a case has more than one line per phase), and wraps its cases in one top-level `describe`
-named for the file's module (`entity.service`, `entity-list-page.effects`, `confirm-dialog.component`, …).
+named for the file's module (`entity.service`, `entity-list-page.effects`, `delete-dialog.component`, …).
 
 ## Contents
 
@@ -49,8 +49,11 @@ the cases come from here. Names follow the `describe` rule above.
 
 | file | cases |
 | --- | --- |
-| `components/confirm-dialog.component.browser.spec.ts` | the full spec below |
-| `pages/entity-list-page.component.browser.spec.ts` | the watch (fetches the slice's input on init, again for a new input, not for an equal one, nothing while the input is `null`, `leave()` on destroy); the UI states (rows + range label, loading, no-entities-yet, filtered-empty, error banner, Previous / Next disabled at the ends and enabled in the middle); the delete flow (confirm dispatches `delete`, cancel dispatches nothing); the navigation actions built from the slice's input (sort, page size, Next, Apply, Clear) |
+| `components/ui/dialog.component.browser.spec.ts` | the full spec below: named by its title and described by its description; Escape emits `dismissed`, but not while `dismissible` is off |
+| `components/ui/select.component.browser.spec.ts` | the full spec below: the label names the select and the option matching `value` is selected; picking an option emits its value |
+| `components/ui/pagination.component.browser.spec.ts` | the full spec below: Previous / Next disabled at the ends and enabled in the middle; each emits the page next to the current one |
+| `components/delete-dialog.component.browser.spec.ts` | the full spec below: Delete emits `confirmed`, Cancel `cancelled`; while busy both are disabled, the label is _Deleting…_ and Escape does nothing |
+| `pages/entity-list-page.component.browser.spec.ts` | the watch (fetches the slice's input on init, again for a new input, not for an equal one, nothing while the input is `null`, `leave()` on destroy); the UI states (rows + range label, loading, no-entities-yet, filtered-empty, error banner); the delete flow (confirm dispatches `delete`, cancel dispatches nothing); the navigation actions built from the slice's input (sort, page size, Next, Apply, Clear) |
 | `pages/entity-detail-page.component.browser.spec.ts` | loaded entity with an _Edit_ link, error banner, _Loading…_, the watch (`load({ id })` on init, again for a new id on the same component, `leave()` on destroy) |
 | `pages/entity-form-page.component.browser.spec.ts` | the watch on `new` (`load({ id: null })`) and edit (`load({ id })`), `leave()` on destroy; fills the form on load; dispatches `create` / `update` with the form values; does not save an empty name; Save disabled with its label while loading or saving; error banner |
 
@@ -402,14 +405,14 @@ emit one `fetchSuccess` and collect with `toArray()` — an empty page past the 
 
 Components and pages are rendered in **real Chromium** and asserted/driven through the `page` locators. This is
 component-level — pages get a mock store, there is no backend; the full request→response path is the e2e suite.
-Co-located with the file as `*.browser.spec.ts`: `components/confirm-dialog.component.browser.spec.ts` and one
-`pages/<page>.component.browser.spec.ts` per page.
+Co-located with the file as `*.browser.spec.ts`: one per component (`components/ui/*.component.browser.spec.ts` and
+`components/delete-dialog.component.browser.spec.ts`) and one `pages/<page>.component.browser.spec.ts` per page.
 
 ### `web/src/testing/render.ts`
 
 `render()` mounts a **page** — a component without required inputs — and starts change detection at once. A
 component with required `input.required()`s cannot go through it: the first change detection runs before any input is
-set and throws `NG0950`. Component specs mount by hand instead (see the `ConfirmDialog` spec below).
+set and throws `NG0950`. Component specs mount by hand instead (see the component specs below).
 
 ```ts
 // render.ts — mounts a component into the live document for the `page` locators
@@ -468,56 +471,202 @@ describe('entity-detail-page.component', () => {
 });
 ```
 
-### Components — `components/confirm-dialog.component.browser.spec.ts`
+### Components — `components/**/*.component.browser.spec.ts`
 
 A store-free component is driven through its signal inputs and outputs, mounted in this order:
 `TestBed.createComponent` → `fixture.componentRef.setInput(name, value)` for every required input → append to
 `document.body` → `fixture.autoDetectChanges()`, then a `vi.fn()` subscribed to each output. A new component gets the
 same kind of spec beside its story.
 
+Each behaviour is tested in the tier that owns it. A primitive's spec covers the primitive's behaviour (labelling,
+Escape, the disabled ends). An app component's spec covers only what it adds (its buttons, its busy state), and a page
+spec does not repeat either.
+
+#### `components/ui/dialog.component.browser.spec.ts`
+
 ```ts
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { page, userEvent } from 'vitest/browser';
+import { describe, expect, it, vi } from 'vitest';
+import { UiDialog } from './dialog.component';
+
+function setup(dismissible = true): { fixture: ComponentFixture<UiDialog>; dismissed: ReturnType<typeof vi.fn> } {
+  // Set the required inputs before the first change detection, which render() would run at once (NG0950).
+  const fixture = TestBed.createComponent(UiDialog);
+  fixture.componentRef.setInput('title', 'Rename item');
+  fixture.componentRef.setInput('description', 'Pick a new name.');
+  fixture.componentRef.setInput('dismissible', dismissible);
+  document.body.appendChild(fixture.nativeElement as HTMLElement);
+  fixture.autoDetectChanges();
+  const dismissed = vi.fn();
+  fixture.componentInstance.dismissed.subscribe(dismissed);
+  return { fixture, dismissed };
+}
+
+describe('dialog.component', () => {
+  it('renders a dialog named by its title and described by its description', async () => {
+    // Arrange
+    setup();
+
+    // Assert
+    const dialog = page.getByRole('dialog', { name: 'Rename item' });
+    await expect.element(dialog).toBeVisible();
+    await expect.element(dialog).toHaveAccessibleDescription('Pick a new name.');
+  });
+
+  it('emits dismissed on Escape', async () => {
+    // Arrange
+    const { dismissed } = setup();
+
+    // Act
+    await userEvent.keyboard('{Escape}');
+
+    // Assert
+    expect(dismissed).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Escape while not dismissible', async () => {
+    // Arrange
+    const { dismissed } = setup(false);
+
+    // Act
+    await userEvent.keyboard('{Escape}');
+
+    // Assert
+    expect(dismissed).not.toHaveBeenCalled();
+  });
+});
+```
+
+#### `components/ui/select.component.browser.spec.ts`
+
+```ts
+import { TestBed } from '@angular/core/testing';
 import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfirmDialog } from './confirm-dialog.component';
+import { UiSelect } from './select.component';
 
-function setup(inputs: Partial<Record<'title' | 'message' | 'busy', unknown>> = {}): {
-  fixture: ComponentFixture<ConfirmDialog>;
-  confirmed: ReturnType<typeof vi.fn>;
-  cancelled: ReturnType<typeof vi.fn>;
-} {
-  // Set the required inputs before the first change detection, which render() would run at once (NG0950).
-  const fixture = TestBed.createComponent(ConfirmDialog);
-  fixture.componentRef.setInput('title', 'Delete entity');
-  fixture.componentRef.setInput('message', 'Delete “Acme”? This cannot be undone.');
-  for (const [name, value] of Object.entries(inputs)) {
-    fixture.componentRef.setInput(name, value);
-  }
+function setup(): { valueChange: ReturnType<typeof vi.fn> } {
+  const fixture = TestBed.createComponent(UiSelect);
+  fixture.componentRef.setInput('label', 'Fruit');
+  fixture.componentRef.setInput('name', 'fruit');
+  fixture.componentRef.setInput('options', [
+    { value: 'apple', label: 'Apple' },
+    { value: 'banana', label: 'Banana' }
+  ]);
+  fixture.componentRef.setInput('value', 'banana');
+  document.body.appendChild(fixture.nativeElement as HTMLElement);
+  fixture.autoDetectChanges();
+  const valueChange = vi.fn();
+  fixture.componentInstance.valueChange.subscribe(valueChange);
+  return { valueChange };
+}
+
+describe('select.component', () => {
+  it('is named by its label and shows the option matching its value', async () => {
+    // Arrange
+    setup();
+
+    // Assert
+    await expect.element(page.getByLabelText('Fruit')).toHaveValue('banana');
+  });
+
+  it('emits the value of the option picked', async () => {
+    // Arrange
+    const { valueChange } = setup();
+
+    // Act
+    await page.getByLabelText('Fruit').selectOptions('apple');
+
+    // Assert
+    expect(valueChange).toHaveBeenCalledWith('apple');
+  });
+});
+```
+
+#### `components/ui/pagination.component.browser.spec.ts`
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { page } from 'vitest/browser';
+import { describe, expect, it, vi } from 'vitest';
+import { UiPagination } from './pagination.component';
+
+function setup(current: number, pageCount: number): { pageChange: ReturnType<typeof vi.fn> } {
+  const fixture = TestBed.createComponent(UiPagination);
+  fixture.componentRef.setInput('page', current);
+  fixture.componentRef.setInput('pageCount', pageCount);
+  document.body.appendChild(fixture.nativeElement as HTMLElement);
+  fixture.autoDetectChanges();
+  const pageChange = vi.fn();
+  fixture.componentInstance.pageChange.subscribe(pageChange);
+  return { pageChange };
+}
+
+describe('pagination.component', () => {
+  it.each([
+    { current: 1, pageCount: 0, previous: false, next: false },
+    { current: 1, pageCount: 3, previous: false, next: true },
+    { current: 2, pageCount: 3, previous: true, next: true },
+    { current: 3, pageCount: 3, previous: true, next: false }
+  ])('on page $current of $pageCount, Previous enabled: $previous, Next enabled: $next', async ({ current, pageCount, previous, next }) => {
+    // Arrange
+    setup(current, pageCount);
+
+    // Assert
+    const previousButton = page.getByRole('button', { name: 'Previous' });
+    const nextButton = page.getByRole('button', { name: 'Next' });
+    await (previous ? expect.element(previousButton).toBeEnabled() : expect.element(previousButton).toBeDisabled());
+    await (next ? expect.element(nextButton).toBeEnabled() : expect.element(nextButton).toBeDisabled());
+  });
+
+  it.each([
+    { button: 'Previous', expected: 1 },
+    { button: 'Next', expected: 3 }
+  ])('emits page $expected when $button is clicked on page 2', async ({ button, expected }) => {
+    // Arrange
+    const { pageChange } = setup(2, 3);
+
+    // Act
+    await page.getByRole('button', { name: button }).click();
+
+    // Assert
+    expect(pageChange).toHaveBeenCalledWith(expected);
+  });
+});
+```
+
+#### `components/delete-dialog.component.browser.spec.ts`
+
+`UiDialog`'s spec owns the dialog's name, description and Escape. This spec covers what `DeleteDialog` adds.
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { page, userEvent } from 'vitest/browser';
+import { describe, expect, it, vi } from 'vitest';
+import { DeleteDialog } from './delete-dialog.component';
+
+function setup(busy = false): { confirmed: ReturnType<typeof vi.fn>; cancelled: ReturnType<typeof vi.fn> } {
+  const fixture = TestBed.createComponent(DeleteDialog);
+  fixture.componentRef.setInput('itemKind', 'entity');
+  fixture.componentRef.setInput('itemName', 'Acme');
+  fixture.componentRef.setInput('busy', busy);
   document.body.appendChild(fixture.nativeElement as HTMLElement);
   fixture.autoDetectChanges();
   const confirmed = vi.fn();
   const cancelled = vi.fn();
   fixture.componentInstance.confirmed.subscribe(confirmed);
   fixture.componentInstance.cancelled.subscribe(cancelled);
-  return { fixture, confirmed, cancelled };
+  return { confirmed, cancelled };
 }
 
-describe('confirm-dialog.component', () => {
-  it('renders a dialog named by its title, with the message', async () => {
-    // Arrange
-    setup();
-
-    // Assert
-    await expect.element(page.getByRole('dialog', { name: 'Delete entity' })).toBeVisible();
-    await expect.element(page.getByText('Delete “Acme”? This cannot be undone.')).toBeVisible();
-  });
-
+describe('delete-dialog.component', () => {
   it('emits confirmed once when Delete is clicked', async () => {
     // Arrange
     const { confirmed, cancelled } = setup();
 
     // Act
-    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('dialog', { name: 'Delete entity' }).getByRole('button', { name: 'Delete' }).click();
 
     // Assert
     expect(confirmed).toHaveBeenCalledTimes(1);
@@ -536,13 +685,17 @@ describe('confirm-dialog.component', () => {
     expect(confirmed).not.toHaveBeenCalled();
   });
 
-  it('disables both buttons and shows the busy label while busy', async () => {
+  it('while busy, disables both buttons, shows the busy label and ignores Escape', async () => {
     // Arrange
-    setup({ busy: true });
+    const { cancelled } = setup(true);
+
+    // Act
+    await userEvent.keyboard('{Escape}');
 
     // Assert
     await expect.element(page.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
     await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(cancelled).not.toHaveBeenCalled();
   });
 });
 ```
@@ -556,10 +709,10 @@ rendering, the page specs cover:
 - **The watch** (all pages): the first route state dispatches the load action (`fetch({ input })`, `load({ id })`),
   an equal value dispatches nothing, a new value on the same component dispatches it again, `null` dispatches nothing,
   and `ngOnDestroy` dispatches `leave()` and ends the watch.
-- **UI states** (list page): loading, filtered-empty vs. no-entities-yet, the error banner, and the `Previous`/`Next`
-  disabled logic — one `renderList(state)` helper over `provideMockStore` selector overrides, asserted with
-  `toBeDisabled()` / `toBeEnabled()`.
-- **The delete flow** (list page): _Delete_ on a row opens the `ConfirmDialog`; confirming dispatches
+- **UI states** (list page): loading, filtered-empty vs. no-entities-yet and the error banner — one
+  `renderList(state)` helper over `provideMockStore` selector overrides. Which pagination button is disabled is
+  `UiPagination`'s spec, not the page's.
+- **The delete flow** (list page): _Delete_ on a row opens the `DeleteDialog`; confirming dispatches
   `EntityListPageActions.delete({ id })`, cancelling closes the dialog and dispatches nothing.
 - **Navigation actions** (list page): changing the Sort / Per-page selects and clicking Next / Clear each dispatch the
   exact `AppRouterActions.navigate({ commands: [], queryParams: toParams(...) })`, built from the slice's input. The

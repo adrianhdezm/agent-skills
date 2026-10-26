@@ -32,7 +32,8 @@ once, then look things up. The quickest way in is the question you have:
 | add an API route                              | a handler in `controllers/<resource>.controller.ts`, mounted in `app.ts`   | [API building blocks](#32-building-blocks) |
 | make a column filterable or sortable          | one line in the resource's schema file                                     | [List queries](#34-list-queries)          |
 | change what an error response looks like     | `middlewares/error.middleware.ts`                                          | [HTTP contract](#33-http-contract)        |
-| add a reusable UI piece                       | `web/src/app/components/` + its story + its browser spec                   | [Web building blocks](#44-building-blocks) |
+| add a base UI component (dialog, select, …)   | `web/src/app/components/ui/` + its story + its browser spec — only if the app uses it | [Components](#47-components-ui-primitives-and-app-components) |
+| add an app-specific UI piece                  | `web/src/app/components/`, composing `ui/` primitives                       | [Components](#47-components-ui-primitives-and-app-components) |
 | keep some state on the web                    | depends on the kind of state                                               | [Where state lives](#43-where-state-lives) |
 | call the API from the web                     | a method on `services/<resource>.service.ts`, called from an effect        | [Web building blocks](#44-building-blocks) |
 | know which test to write                      | —                                                                          | [Which test do I write?](#73-which-test-do-i-write) |
@@ -419,7 +420,8 @@ an `effect()`.
 
 | block            | lives in                                   | is                                                              | may use                                                    | must not                                                       |
 | ---------------- | ------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| component        | `components/<name>.component.ts`           | a store-free UI piece: signal `input()` / `output()`            | other components                                           | inject the `Store`, a service or the `Router`                  |
+| ui primitive     | `components/ui/<name>.component.ts`        | a design-system base component with a generic API: signal `input()` / `output()` | other `ui/` primitives, Angular / CDK / the UI library | import an app component, a model or a helper; inject anything; carry app wording |
+| app component    | `components/<name>.component.ts`           | a store-free UI piece for one app purpose, built from primitives | `ui/` primitives, other app components, models             | inject the `Store`, a service or the `Router`                  |
 | layout           | `layouts/<name>-layout.component.ts`       | the shell around the pages                                      | the `Store` (read)                                         | inject services                                                |
 | page             | `pages/<name>-page.component.ts`           | one state's screen; loads from its watch                        | the `Store` (its own slice's selectors, dispatch), `RouterLink`, components, local signals | inject services, `Router`, `ActivatedRoute`, `FormBuilder` |
 | slice            | `store/<page-name>/<page-name>.{model,actions,reducer,selectors}.ts` | one page's route state, data and status | resource models, helpers, `navigatedRoute`         | hold another page's data, read another state's route           |
@@ -476,7 +478,8 @@ an `effect()`.
   would clobber.
 - **No component sets `changeDetection`:** `OnPush` is Angular 22's default.
 - **Templates:** the status-driven body is an `@switch (status())`; the error banner over it is an
-  `@if (status() === 'error')`. Bind a component's signal inputs with property syntax (`[title]="'Delete entity'"`).
+  `@if (status() === 'error')`. Bind a component's signal inputs with property syntax, literals included (`[itemKind]="'entity'"`), so all
+  bindings read alike.
 - **Forms and accessibility:** every input, select and textarea has a `name` and a label; free-text inputs that are
   not personal data set `autocomplete="off"`. A select gets its own `<label for>` + `id` (a wrapping label folds the
   option text into its accessible name), and each `<option>` reflects the current value with `[selected]`.
@@ -485,7 +488,48 @@ an `effect()`.
 - **Dates:** a date filter is a day in the viewer's time zone, sent as local midnight in ISO-8601; dates are shown
   with `date: 'medium'`.
 - **Components are built in Storybook** (`@storybook/angular-vite`): each has a `*.stories.ts` beside it with one story
-  per meaningful state, `args` for its inputs and `fn()` for its outputs.
+  per meaningful state, `args` for its inputs and `fn()` for its outputs, titled `UI/<Name>` for a primitive and
+  `Components/<Name>` for an app component.
+
+### 4.7 Components: ui primitives and app components
+
+Components come in two tiers, shaped like shadcn's `components/ui/` beside the app's own components. Both are
+store-free.
+
+| tier          | lives in                            | selector / class         | example                               | API                                                             |
+| ------------- | ----------------------------------- | ------------------------ | ------------------------------------- | --------------------------------------------------------------- |
+| ui primitive  | `components/ui/<name>.component.ts` | `ui-<name>` / `Ui<Name>` | `UiDialog`, `UiSelect`, `UiPagination` | the generic one of that component: no resource, flow or app wording |
+| app component | `components/<name>.component.ts`    | `app-<name>` / `<Name>`  | `DeleteDialog`                        | what this app needs, in the app's words                          |
+
+- **`ui/` holds only commonly recognised base components:** dialog, select, pagination, tabs, tooltip, the kind a
+  design system or a UI library ships under that name. A piece named for a resource or a flow (`delete-dialog`,
+  `entity-table`, `filter-strip`) is never a primitive, however reusable it looks.
+- **A primitive comes from the UI library when the project has one,** and is imported straight from it (with
+  Fundamental NGX, `@fundamental-ngx/core/<component>`). `ui/` then holds only adaptations: a gap in the library, or a
+  wrapper the app needs. An adaptation keeps the generic shape and API of the component it adapts, and it never gains
+  an input or an output that only one use needs.
+- **App-specific behaviour goes in an app component that composes the primitive.** `DeleteDialog` sets `UiDialog`'s
+  title, description and footer to the app's delete wording and adds the busy state. A new need (another confirm, a
+  form dialog) is a new app component over the same `UiDialog`, not a new input on it.
+- **Pages use both:** a primitive directly for a generic control (the list page's `<ui-select>`s and
+  `<ui-pagination>`), and an app component for an app-specific piece. A page repeats no primitive's markup: once a
+  page would write a primitive's structure itself (a labelled `<select>` and its options, Previous / Next), it uses
+  the primitive.
+- **No catalogue in advance.** Add a primitive when the app first needs it, not because a design system has it. A
+  primitive is for structure or behaviour: labelling, an overlay, keyboard handling, paging. A native element that
+  needs only utility classes (a button, a text input) stays native, even when its class string repeats.
+- **An app component is a self-contained piece with its own inputs and outputs** (a dialog, a card), named for its
+  purpose, even with one user. It may take inputs (`DeleteDialog`'s `itemKind`, `itemName`); what makes it an app
+  component is the app's wording and behaviour. A page's own layout (the list page's filter strip) stays in the page.
+- **Imports go one way:** pages → app components → `ui/` primitives. A primitive imports only other primitives,
+  Angular, the CDK or the UI library, never an app component, a model or a helper. A primitive's types
+  (`UiSelectOption`) are imported from its file by the pages and app components that use it.
+- **ESLint enforces the prefixes:** `component-selector` and `directive-selector` require `ui` under
+  `components/ui/` (`ui-dialog`, `[uiButton]`) and `app` everywhere else, so a template shows the tier of every tag
+  and directive it uses.
+- **Test each behaviour where it lives.** A primitive's spec covers its own behaviour (labelling, Escape, the
+  disabled ends of a pagination). An app component's spec covers only what it adds. A page spec covers what the page
+  dispatches, not what its components already prove.
 
 ## 5. Naming
 
@@ -500,9 +544,10 @@ an `effect()`.
 | helper (API and web)     | `helpers/<name>.helper.ts`                           | `dao.helper.ts`, `entity-list-params.helper.ts` |
 | model (API and web)      | `models/<name>.model.ts`                             | `dao.model.ts`, `entity.model.ts`               |
 | web component / layout / page | `<name>.component.ts`, flat in its folder       | `pages/entity-list-page.component.ts`           |
+| web ui primitive         | `components/ui/<name>.component.ts`, flat in `ui/`   | `components/ui/dialog.component.ts`             |
 | web service              | `services/<resource>.service.ts`                     | `entity.service.ts`                             |
 | NgRx slice               | `store/<page-name>/<page-name>.{model,actions,reducer,selectors,effects}.ts` | `entity-list-page.effects.ts` |
-| story                    | `<name>.stories.ts`, beside the component            | `confirm-dialog.stories.ts`                     |
+| story                    | `<name>.stories.ts`, beside the component            | `delete-dialog.stories.ts`                      |
 | API unit test            | `tests/unit/<src path>/<file>.test.ts`               | `tests/unit/controllers/entity.controller.test.ts` |
 | API DAO / API test       | `tests/db/<resource>.dao.test.ts`, `tests/api/<resource>.api.test.ts` | `entity.api.test.ts`             |
 | web unit / browser spec  | `<file>.spec.ts` / `<file>.browser.spec.ts`, beside the file | `entity.service.spec.ts`                 |
@@ -510,7 +555,8 @@ an `effect()`.
 
 Folders are plural (`controllers/`, `daos/`, `helpers/`, `middlewares/`, `models/`, `schemas/`); the file keeps the
 singular suffix. Angular files sit flat in their folder — `pages/entity-list-page.component.ts`, never
-`pages/entity-list/entity-list-page.component.ts` — and a slice lives under `store/`, not beside its page.
+`pages/entity-list/entity-list-page.component.ts` — and a slice lives under `store/`, not beside its page. The one
+nested component folder is `components/ui/`, the primitives' tier.
 
 **Identifiers**
 
@@ -525,7 +571,8 @@ singular suffix. Angular files sit flat in their folder — `pages/entity-list-p
 | NgRx action group       | `<Page>Actions`, `source` = page name         | `EntityListPageActions`, `'Entity List Page'`                  |
 | feature key / selectors | `<PAGE>_FEATURE_KEY`, `select<Thing>`          | `ENTITY_LIST_PAGE_FEATURE_KEY`, `selectListInput`              |
 | effect                  | `<what it does>$`                             | `stepBackPastLastPage$`, `navigateAfterSave$`                  |
-| page / component class  | the name without a suffix                     | `EntityListPage`, `ConfirmDialog`, `MainLayout`                |
+| page / component class  | the name without a suffix                     | `EntityListPage`, `DeleteDialog`, `MainLayout`                 |
+| ui primitive class / selector | `Ui<Name>` / `ui-<name>`                | `UiDialog` / `ui-dialog`                                       |
 
 "Dao", not "Repository": a class per table returning rows is DAO-shaped. `PaginatedResult`, not `Connection`, which
 names a cursor-paginated result.
@@ -657,7 +704,7 @@ Storybook is not a test: it is where components are built and their states revie
 | new service method                             | the service spec                                                                        |
 | new action / page state                        | the reducer spec, the effects spec if it requests, the page's browser spec               |
 | new effect that requests                       | the effects spec, including a response after `Leave` (read) or after the page changed (write) |
-| new component                                  | its browser spec and its story                                                          |
+| new component or ui primitive                  | its browser spec and its story                                                          |
 | new page or user flow                          | the slice specs, the page's browser spec, an e2e spec that opens the page by its URL    |
 | new resource                                   | all of the above — see [Adding a resource](#8-adding-a-resource)                         |
 
@@ -778,6 +825,10 @@ Each was tried or considered and rejected; the reason is the line after the dash
   URL; there is no store → URL sync to keep in step.
 - **No boolean `loading` / `saving` flags** — one status union cannot contradict itself.
 - **No SCSS or per-component CSS files** — Tailwind utilities in inline templates.
+- **No app component in `components/ui/`, and no app input on a primitive** — `ui/` holds generic base components;
+  app-specific wording and behaviour live in an app component that composes them.
+- **No primitive catalogue** — `ui/` holds the base components the app uses, and a library's component is imported
+  rather than rewritten.
 - **No `@Input()` decorators** — components keep signal `input()` / `output()`, and their browser specs set them with
   `setInput`.
 - **No `zone.js`** — the app, the tests and Storybook all run zoneless.
@@ -798,4 +849,6 @@ Each was tried or considered and rejected; the reason is the line after the dash
 - [ ] An API type change is mirrored in the web's `models/`.
 - [ ] Every new building block has the tests [7.3](#73-which-test-do-i-write) lists, and none [7.5](#75-what-not-to-test)
       rules out; a new component has a story.
+- [ ] A new component sits in its tier: a generic base component in `components/ui/` (`ui-` selector, no app wording),
+      anything app-specific in `components/`, composing the primitives.
 - [ ] This file still describes the code: a change to a rule changes it here in the same commit.
