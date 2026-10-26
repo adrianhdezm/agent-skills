@@ -477,6 +477,21 @@ Slices are not colocated under `pages/<page>/store/`. `pages/health-page.compone
 
 `pages/health-page.component.ts`, not `health/health-page.ts`, following the Angular style guide's CLI 20+ direction.
 
+### Two component tiers: `components/ui/` primitives and app components
+
+`components/ui/` holds design-system base components (`UiDialog`, `UiSelect`, `UiPagination`) with the generic API of
+that component, and `components/` holds app components that compose them (`DeleteDialog`). The scaffold used to ship
+one `ConfirmDialog` whose defaults (_Delete_, _Deleting…_, a danger tone) made it half generic, half app-specific: each
+new confirm would either add an input to it or copy it. The list page also wrote its two labelled selects and its
+Previous / Next by hand, carrying the `[selected]` and `<label for>` details in page code. With two tiers, the generic
+shape is written once and stays generic, and app wording sits in a component named for its purpose.
+
+The layout follows shadcn's `components/ui/`, a shape most frontend developers recognise. `ui/` holds only commonly
+recognised base components, and only the ones the app uses. With a UI library (Fundamental NGX), the library supplies
+the primitives and `ui/` keeps only adaptations, each with the generic API, so swapping the library or adding one does
+not reach into app components. The `ui-` / `app-` selector prefixes are enforced per folder by ESLint rather than left
+to review.
+
 ### Inline templates, no HTML or SCSS files
 
 One file per component. Angular ESLint's `processInlineTemplates` still lints the templates.
@@ -493,7 +508,7 @@ reset clobbers FD-NGX's base styles, and `body` margin and font are set by hand.
 
 ### Storybook runs on the Vite/Analog builder, not webpack
 
-Components (`components/`, `input()`/`output()`, store-free) are developed and documented in Storybook. The Angular
+Components (`components/` and `components/ui/`, `input()`/`output()`, store-free) are developed and documented in Storybook. The Angular
 webpack builder (`@storybook/angular`) would pull a second, webpack toolchain into a project that is deliberately
 esbuild/Vite (`@angular/build`). `@storybook/angular-vite` compiles Angular through `@analogjs/vite-plugin-angular` on
 Vite instead, so Storybook shares the app's toolchain (and the plugin `ng test` uses). `@angular/animations` comes
@@ -523,9 +538,9 @@ builder, both projects pass on 5, so the pin was dropped.
 Under Vitest, the Analog plugin compiles only the files in `tsconfig.spec.json`'s program; any other file falls through
 to Vite's plain TypeScript transform, which skips the Angular compiler. The browser specs used to sit in a separate
 `tsconfig.browser.json`, and components reached only from them were compiled without their signal `input()` /
-`output()` metadata, so `setInput` and template bindings failed (`NG0303` / `NG0315`) and `ConfirmDialog` was left to
-Storybook and e2e. With every spec, unit and browser, plus both setup files in `tsconfig.spec.json`, signal-input
-components are browser-tested like pages, and `ConfirmDialog` has its own spec. Keep `input()` / `output()` on
+`output()` metadata, so `setInput` and template bindings failed (`NG0303` / `NG0315`) and the scaffold's one component
+was left to Storybook and e2e. With every spec, unit and browser, plus both setup files in `tsconfig.spec.json`,
+signal-input components are browser-tested like pages, and each component has its own spec. Keep `input()` / `output()` on
 components; never switch to `@Input()` to make a component testable.
 
 ### The web e2e is full-stack, not stubbed, and isolated from the dev stack

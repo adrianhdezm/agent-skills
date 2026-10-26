@@ -4,7 +4,7 @@ Angular 22 + NgRx 22 + `@ngrx/router-store` + Tailwind v4. This file covers the 
 reference layers FD-NGX on top.
 
 The scaffold ships a complete **entity CRUDL** example wired end to end: a list page with filter / sort / pagination
-controls, a detail page, a shared form page for create and edit, and a confirm dialog for delete. State is
+controls, a detail page, a shared form page for create and edit, and a delete dialog built on the `ui/` dialog. State is
 route-driven: each page route names its state, and the URL enters the store one way, from `routerNavigatedAction` into
 the page reducer whose state matches. Each page reads only its own slice, registered on its route, loads its data from
 its own lifecycle, and owns the requests it starts: a read ends when the page is left, and a write's follow-up runs
@@ -188,10 +188,12 @@ web/
         ├── app.component.ts         # root
         ├── app.config.ts            # global slice (appContext), provideRouterStore, app-router effects
         ├── app.routes.ts            # one route per state (data.state), each registering its page slice
-        ├── components/
-        │   ├── confirm-dialog.component.ts    # example: presentational, store-free, input()/output()
-        │   ├── confirm-dialog.component.browser.spec.ts   # its browser-mode test
-        │   └── confirm-dialog.stories.ts      # its Storybook story
+        ├── components/               # store-free, input()/output(); each with a .stories.ts + .component.browser.spec.ts
+        │   ├── ui/                   # design-system primitives: generic API, `ui-` selectors, `Ui<Name>` classes
+        │   │   ├── dialog.component.ts      # UiDialog: modal shell, title + description + body + footer slot
+        │   │   ├── select.component.ts      # UiSelect: labelled native select
+        │   │   └── pagination.component.ts  # UiPagination: Previous / Next + projected status text
+        │   └── delete-dialog.component.ts   # app component: UiDialog with the app's delete wording, `app-` selector
         ├── layouts/
         │   └── main-layout.component.ts
         ├── pages/
@@ -1434,83 +1436,210 @@ export const navigateAfterSave$ = createEffect(
 
 ## 10. Pages
 
-### Components: `components/confirm-dialog.component.ts`
+### Components: `components/ui/` primitives and `components/` app components
 
-Components are presentational and **store-free**: they take `input()` / `output()` and leave the action to the host.
-The scaffold ships one, `ConfirmDialog` — a modal used by the list page's delete flow and developed in Storybook
-([references/web-storybook.md](web-storybook.md)). It is the template for every later component.
+Components come in two tiers, and both are presentational and **store-free**: they take `input()` / `output()` and
+leave the action to the host.
+
+- **`components/ui/`: design-system primitives.** Base components any design system has: dialog, select,
+  pagination. Each one has the generic shape and API of that component, with no resource, flow or app wording
+  in its inputs, defaults or copy. Its selector is `ui-<name>`, its class `Ui<Name>`.
+- **`components/`: app components.** A primitive configured for one purpose in this app, with the app's wording
+  and behaviour. Its selector is `app-<name>`. `DeleteDialog` is the `UiDialog` the app asks "delete this?" with.
+
+Pages use both: a primitive directly for a generic control (the list page's sort, page size and pagination), an app
+component for an app-specific piece (its delete confirmation). The scaffold ships only the primitives it uses. When the
+app needs something more specific, compose a primitive in an app component; never add an app input to the primitive.
+The rule and the ESLint check that enforces the prefixes are in the conventions
+([coding-conventions.md §4.7](coding-conventions.md#47-components-ui-primitives-and-app-components)).
+
+#### `components/ui/dialog.component.ts`
 
 ```ts
-import { Component, computed, input, output } from '@angular/core';
-
-export type ConfirmDialogTone = 'danger' | 'primary';
+import { Component, input, output } from '@angular/core';
 
 let nextId = 0;
 
-// A modal confirm dialog driven entirely by inputs/outputs (no store). The host
-// decides when it is shown; it emits `confirmed` / `cancelled` and leaves the action
-// to the caller. `busy` disables both buttons and swaps the confirm label while
-// the confirmed action is in flight.
+// A modal dialog: a title, an optional description, the projected body, and a footer
+// for the elements marked `uiDialogFooter`. Escape emits `dismissed` unless
+// `dismissible` is off; the host decides when the dialog is shown and what closes it.
 @Component({
-  selector: 'app-confirm-dialog',
+  selector: 'ui-dialog',
   host: { class: 'contents', '(document:keydown.escape)': 'onEscape()' },
   template: `
     <div class="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
-      <div role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId" class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="titleId"
+        [attr.aria-describedby]="description() ? descriptionId : null"
+        class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+      >
         <h2 [id]="titleId" class="text-lg font-semibold text-slate-900">{{ title() }}</h2>
-        <p class="mt-2 text-sm text-slate-600">{{ message() }}</p>
+        @if (description()) {
+          <p [id]="descriptionId" class="mt-2 text-sm text-slate-600">{{ description() }}</p>
+        }
+        <ng-content />
         <div class="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            (click)="cancelled.emit()"
-            [disabled]="busy()"
-            class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-          >
-            {{ cancelLabel() }}
-          </button>
-          <button type="button" (click)="confirmed.emit()" [disabled]="busy()" [class]="confirmClasses()">
-            {{ busy() ? busyLabel() : confirmLabel() }}
-          </button>
+          <ng-content select="[uiDialogFooter]" />
         </div>
       </div>
     </div>
   `
 })
-export class ConfirmDialog {
+export class UiDialog {
   readonly title = input.required<string>();
-  readonly message = input.required<string>();
-  readonly confirmLabel = input('Delete');
-  readonly cancelLabel = input('Cancel');
-  readonly busyLabel = input('Deleting…');
-  readonly busy = input(false);
-  readonly tone = input<ConfirmDialogTone>('danger');
+  readonly description = input<string>();
+  readonly dismissible = input(true);
 
-  readonly confirmed = output<void>();
-  readonly cancelled = output<void>();
+  readonly dismissed = output<void>();
 
-  protected readonly titleId = `confirm-dialog-title-${nextId++}`;
+  private readonly id = nextId++;
+  protected readonly titleId = `ui-dialog-title-${this.id}`;
+  protected readonly descriptionId = `ui-dialog-description-${this.id}`;
 
-  private static readonly TONE_CLASSES: Record<ConfirmDialogTone, string> = {
-    danger: 'bg-red-600 hover:bg-red-500',
-    primary: 'bg-slate-900 hover:bg-slate-700'
-  };
-
-  protected readonly confirmClasses = computed(
-    () => `rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${ConfirmDialog.TONE_CLASSES[this.tone()]}`
-  );
-
-  // Escape cancels, but not while the action is in flight.
   protected onEscape(): void {
-    if (!this.busy()) {
-      this.cancelled.emit();
+    if (this.dismissible()) {
+      this.dismissed.emit();
     }
   }
 }
 ```
 
-A host binds its inputs with property syntax — `[title]="'Delete entity'"`, not a static `title="…"` — so the signal
-input is wired as an input rather than a plain attribute. No component sets `changeDetection`: `OnPush` is Angular 22's
-default.
+#### `components/ui/select.component.ts`
+
+```ts
+import { Component, input, output } from '@angular/core';
+
+export interface UiSelectOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+let nextId = 0;
+
+// A labelled native select. The label is its own `<label for>`, not a wrapper, so the
+// option text stays out of the select's accessible name. Each option reflects `value`
+// with `[selected]`: a `[value]` on the `<select>` is applied before `@for` renders the
+// options, so it does not take.
+@Component({
+  selector: 'ui-select',
+  host: { class: 'flex items-center gap-2 text-sm' },
+  template: `
+    <label [for]="id" class="text-slate-600">{{ label() }}</label>
+    <select
+      #select
+      [id]="id"
+      [name]="name()"
+      (change)="valueChange.emit(select.value)"
+      class="rounded border border-slate-300 bg-white px-2 py-1"
+    >
+      @for (option of options(); track option.value) {
+        <option [value]="option.value" [selected]="option.value === value()">{{ option.label }}</option>
+      }
+    </select>
+  `
+})
+export class UiSelect {
+  readonly label = input.required<string>();
+  readonly name = input.required<string>();
+  readonly options = input.required<readonly UiSelectOption[]>();
+  readonly value = input.required<string>();
+
+  readonly valueChange = output<string>();
+
+  protected readonly id = `ui-select-${nextId++}`;
+}
+```
+
+#### `components/ui/pagination.component.ts`
+
+```ts
+import { Component, input, output } from '@angular/core';
+
+// Previous / Next over `pageCount` pages (1-based), with the projected content as its
+// status text. It emits the page asked for and leaves moving there to the host.
+@Component({
+  selector: 'ui-pagination',
+  host: { class: 'block' },
+  template: `
+    <nav aria-label="Pagination" class="flex items-center justify-between gap-4 text-sm">
+      <p class="text-slate-600"><ng-content /></p>
+      <div class="flex gap-2">
+        <button type="button" [disabled]="page() <= 1" (click)="pageChange.emit(page() - 1)" [class]="buttonClasses">
+          Previous
+        </button>
+        <button type="button" [disabled]="page() >= pageCount()" (click)="pageChange.emit(page() + 1)" [class]="buttonClasses">
+          Next
+        </button>
+      </div>
+    </nav>
+  `
+})
+export class UiPagination {
+  readonly page = input.required<number>();
+  readonly pageCount = input.required<number>();
+
+  readonly pageChange = output<number>();
+
+  protected readonly buttonClasses =
+    'rounded border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40';
+}
+```
+
+#### `components/delete-dialog.component.ts`
+
+```ts
+import { Component, computed, input, output } from '@angular/core';
+import { UiDialog } from './ui/dialog.component';
+
+// The app's delete confirmation: a UiDialog with the app's wording and a danger action.
+// It emits `confirmed` / `cancelled` and leaves the delete to the host. `busy` disables
+// both buttons, keeps Escape from closing it and swaps the label while the delete runs.
+@Component({
+  selector: 'app-delete-dialog',
+  imports: [UiDialog],
+  template: `
+    <ui-dialog [title]="title()" [description]="description()" [dismissible]="!busy()" (dismissed)="cancelled.emit()">
+      <button
+        uiDialogFooter
+        type="button"
+        (click)="cancelled.emit()"
+        [disabled]="busy()"
+        class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+      >
+        Cancel
+      </button>
+      <button
+        uiDialogFooter
+        type="button"
+        (click)="confirmed.emit()"
+        [disabled]="busy()"
+        class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+      >
+        {{ busy() ? 'Deleting…' : 'Delete' }}
+      </button>
+    </ui-dialog>
+  `
+})
+export class DeleteDialog {
+  readonly itemKind = input.required<string>();
+  readonly itemName = input.required<string>();
+  readonly busy = input(false);
+
+  readonly confirmed = output<void>();
+  readonly cancelled = output<void>();
+
+  protected readonly title = computed(() => `Delete ${this.itemKind()}`);
+  protected readonly description = computed(() => `Delete “${this.itemName()}”? This cannot be undone.`);
+}
+```
+
+A host binds every input with property syntax (`[itemKind]="'entity'"`), literals included, so all bindings read
+alike; a static `itemKind="entity"` would also set the signal input. `uiDialogFooter` is a plain attribute that
+`<ng-content select>` matches, not a directive: a misspelt one lands in the body slot. No component sets `changeDetection`: `OnPush` is
+Angular 22's default. Each one has a `*.stories.ts` ([references/web-storybook.md](web-storybook.md)) and a
+`*.component.browser.spec.ts` ([references/web-testing.md](web-testing.md)) beside it.
 
 ### Pages
 
@@ -1571,21 +1700,23 @@ ngOnDestroy(): void {
   `toIsoDate` sends local midnight as ISO-8601, and `toLocalDate` turns it back into the day when reading the URL.
   `toFilterForm` reads back only what the strip can express; other operators in a deep link are kept in the URL but
   not shown.
-- Sort is a select of `field:direction` pairs, exactly these, in this order: _Newest first_ (`createdAt:DESC`, the
+- The selects and the pagination are the `ui/` primitives, used directly: two `<ui-select>`s and one
+  `<ui-pagination>`. The page holds no `<select>`, `<option>` or Previous / Next markup of its own.
+- Sort is a `<ui-select [label]="'Sort'" [name]="'sort'">` of `field:direction` pairs, exactly these, in this order: _Newest first_ (`createdAt:DESC`, the
   default), _Oldest first_ (`createdAt:ASC`), _Name A–Z_ (`name:ASC`), _Name Z–A_ (`name:DESC`), _Recently updated_
-  (`updatedAt:DESC`). Picking an option always writes its field and direction to the URL. Page size is a select of
-  10 / 20 / 50 / 100. Changing either resets to page 1.
-- Each select has its own `<label for>` and an `id` (`entity-list-sort` / `Sort`, `entity-list-page-size` /
-  `Per page`), not a wrapping `<label>`: a wrapping label folds the option text into the accessible name, and the
-  specs' `getByLabelText('Sort')` stops matching. Each `<option>` shows the URL's value with
-  `[selected]="option.value === sortValue()"` (and `size === listInput().pageSize`), the slice's value; a `[value]` on the `<select>` is
-  applied before the `@for` renders the options, so it does not take.
-- Pagination: _Previous_ / _Next_ navigate with `page ± 1`; the label shows `first–last of total · page X of Y` via the
-  helper's `formatRange`, with `totalPages` computed from `total` and `pageSize`. Stepping back from a page past the
-  end is the slice's `stepBackPastLastPage$` effect, not the page's.
-- Delete: an `<app-confirm-dialog>` (the `ConfirmDialog` component above), shown while a `pendingDelete` signal holds
-  the row, dispatches `EntityListPageActions.delete` on `(confirmed)` and clears the signal on `(cancelled)`; it is
-  `[busy]` while `status() === 'deleting'`. `pendingDelete` is a `linkedSignal` over the items
+  (`updatedAt:DESC`). Picking an option always writes its field and direction to the URL. Page size is a
+  `<ui-select [label]="'Per page'" [name]="'pageSize'">` of 10 / 20 / 50 / 100, its option values the numbers as
+  strings, and the page turns the emitted value back into a number. Changing either resets to page 1. The options are
+  `readonly UiSelectOption[]` constants in the page; `[value]` is the slice's value (`sortValue()`,
+  `String(listInput().pageSize)`), and `(valueChange)` navigates. Labelling and reflecting the value are `UiSelect`'s
+  job, so the specs' `getByLabelText('Sort')` finds the select.
+- Pagination: `<ui-pagination [page]="listInput().page" [pageCount]="totalPages()" (pageChange)="…">` navigates to the
+  emitted page; its projected text is `first–last of total · page X of Y` from the helper's `formatRange`, with
+  `totalPages` computed from `total` and `pageSize`. Disabling _Previous_ / _Next_ at the ends is `UiPagination`'s.
+  Stepping back from a page past the end is the slice's `stepBackPastLastPage$` effect, not the page's.
+- Delete: an `<app-delete-dialog [itemKind]="'entity'" [itemName]="row.name">` (the `DeleteDialog` app component
+  above), shown while a `pendingDelete` signal holds the row, dispatches `EntityListPageActions.delete` on
+  `(confirmed)` and clears the signal on `(cancelled)`; it is `[busy]` while `status() === 'deleting'`. `pendingDelete` is a `linkedSignal` over the items
   (`linkedSignal<Entity[], Entity | null>({ source: items, computation: () => null })`), so the dialog stays open, busy,
   until the refetch after the delete delivers a new page of items, and closes then. On a failed delete the items do
   not change, so the dialog stays open, no longer busy, over the error banner. The row button and the dialog's

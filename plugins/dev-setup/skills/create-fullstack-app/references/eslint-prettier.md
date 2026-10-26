@@ -207,6 +207,14 @@ export default defineConfig([
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility]
   },
   {
+    // components/ui/ holds the design-system primitives; their `ui-` prefix shows the tier in every template.
+    files: ['src/app/components/ui/**/*.ts'],
+    rules: {
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'ui', style: 'camelCase' }],
+      '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'ui', style: 'kebab-case' }]
+    }
+  },
+  {
     // Reducers are dispatch switches that grow one branch per action, so their
     // cyclomatic complexity scales with the number of actions by design.
     files: ['**/*.reducer.ts'],
@@ -242,7 +250,8 @@ export default defineConfig([
 - **Complexity guards as `warn`, not `error`**: they signal when a module grows too dense without blocking prototype
   code.
 - **Per-file overrides carry a comment**: `*.controller.ts` → `require-await` off (uniform controller signature);
-  `*.reducer.ts` → `complexity` off (grows with actions by design); tests → `max-lines-per-function` off (and, in web,
+  `*.reducer.ts` → `complexity` off (grows with actions by design); `src/app/components/ui/**` → the `ui` component and
+  directive prefix instead of `app` (the primitives' tier); tests → `max-lines-per-function` off (and, in web,
   `max-nested-callbacks` off, since `describe`/`it`/callback nesting is idiomatic).
 - **Web only: `eslint-plugin-storybook` + extra ignores** (`storybook-static/**` is build output; `playwright.config.ts`
   sits at the web root, where the project service looks in `tsconfig.json`, but only `e2e/tsconfig.json` includes it —
