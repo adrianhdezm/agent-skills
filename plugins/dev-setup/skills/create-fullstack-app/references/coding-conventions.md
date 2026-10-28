@@ -474,8 +474,9 @@ an `effect()`.
 
 - **One file per component:** inline `template`, no `.html` / `.scss` siblings. Angular ESLint lints inline templates.
 - **Styling:** Tailwind utilities in the template, plus a `host` class for the host element. The only global
-  stylesheet is `src/styles.css`. Tailwind's preflight is on unless Fundamental NGX is installed, whose base styles it
-  would clobber.
+  stylesheet is `src/styles.css`, with Tailwind's preflight on. With Fundamental NGX it also imports the registry's
+  `styles/fundamental.css`, and colours come from the SAP token utilities (`text-sap-link-color`), never `slate-*` or
+  a hex value.
 - **No component sets `changeDetection`:** `OnPush` is Angular 22's default.
 - **Templates:** the status-driven body is an `@switch (status())`; the error banner over it is an
   `@if (status() === 'error')`. Bind a component's signal inputs with property syntax, literals included (`[itemKind]="'entity'"`), so all
@@ -505,7 +506,9 @@ store-free.
   design system or a UI library ships under that name. A piece named for a resource or a flow (`delete-dialog`,
   `entity-table`, `filter-strip`) is never a primitive, however reusable it looks.
 - **A primitive comes from the UI library when the project has one,** and is imported straight from it (with
-  Fundamental NGX, `@fundamental-ngx/core/<component>`). `ui/` then holds only adaptations: a gap in the library, or a
+  Fundamental NGX, from the registry code in `components/ui/<name>/<name>.ts`; see
+  [§4.8](#48-with-fundamental-ngx-the-registry-primitives)), and the app writes no `ui/<name>.component.ts` of its own
+  for it. Beside the library's folders, `ui/` then holds only adaptations: a gap in the library, or a
   wrapper the app needs. An adaptation keeps the generic shape and API of the component it adapts, and it never gains
   an input or an output that only one use needs.
 - **App-specific behaviour goes in an app component that composes the primitive.** `DeleteDialog` sets `UiDialog`'s
@@ -530,6 +533,69 @@ store-free.
 - **Test each behaviour where it lives.** A primitive's spec covers its own behaviour (labelling, Escape, the
   disabled ends of a pagination). An app component's spec covers only what it adds. A page spec covers what the page
   dispatches, not what its components already prove.
+
+### 4.8 With Fundamental NGX: the registry primitives
+
+This section applies when the project was scaffolded with the Fundamental NGX opt-in (it has a `web/components.json`).
+Its primitives come from the [fundamental-ngx-registry](https://github.com/adrianhdezm/fundamental-ngx-registry),
+copied into `web/src/app/components/ui/<name>/` by the shadcn CLI, one folder per component. Those folders,
+`web/src/app/lib/` and `web/src/styles/` are registry code: never edited by hand, skipped by ESLint and Prettier, and
+replaced by `--overwrite`. An app adaptation of a registry primitive is a flat `ui/<name>.component.ts` beside the
+folders, with a `ui-` selector, linted like the rest of the app.
+
+**Install** one or more from `web/`, then import the classes from the file the CLI wrote:
+
+```sh
+R=https://adrianhdezm.github.io/fundamental-ngx-registry/r
+pnpm dlx shadcn@4 add --yes $R/<name>.json [$R/<other>.json …]
+```
+
+```ts
+import { Button } from '@/app/components/ui/button/button';
+```
+
+**The basic primitives.** Use the registry's component where the default scaffold would write a `ui/` primitive or a
+native element with utility classes. `<name>` is the registry item; the CLI adds the items it depends on.
+
+| need                         | `<name>`         | import from `@/app/components/ui/…` | use in a template                                                        |
+| ---------------------------- | ---------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| button, or a link styled as one | `button`      | `button/button`: `Button`       | `<button fdButton variant="emphasized">Save</button>`, `<a fdButton routerLink>` |
+| text input, textarea         | `input`          | `input/input`: `FormControl`    | `<input fdFormControl id="name" />`, `<textarea fdFormControl>`          |
+| field label                  | `form`           | `form/form`: `FormLabel`, `FormItem` | `<label fdFormLabel for="name">Name</label>`                       |
+| checkbox                     | `checkbox`       | `checkbox/checkbox`: `Checkbox` | `<fd-checkbox [(ngModel)]="done" label="Done" />`                        |
+| radio button                 | `radio`          | `radio/radio`: `RadioButton`    | `<fd-radio-button name="kind" [value]="'a'">A</fd-radio-button>`         |
+| switch                       | `switch`         | `switch/switch`: `Switch`       | `<fd-switch [(ngModel)]="enabled" />`                                    |
+| select                       | `select`         | `select/select`: `Select`, `SelectOption` | `<fd-select ariaLabelledBy="sort-label" [value]="v" (valueChange)="…"><li fd-option [value]="x">X</li></fd-select>` |
+| combobox (type to filter)    | `combobox`       | `combobox/combobox`: `Combobox` | `<fd-combobox [dropdownValues]="items" />`                               |
+| date picker                  | `date-picker`    | `date-picker/date-picker`: `DatePicker` | `<fd-date-picker [(ngModel)]="date" />`                          |
+| dialog                       | `dialog`         | `dialog/dialog`: `Dialog`, `DialogHeader`, `DialogBody`, `DialogFooter`, `DialogTitle` | `<fd-dialog>` with `<fd-dialog-header>`, `-body`, `-footer`; or `DialogService.open()` |
+| confirm / message box        | `message-box`    | `message-box/message-box`: `MessageBoxService` | `MessageBoxService.open(...)` for a semantic confirm or alert |
+| popover                      | `popover`        | `popover/popover`: `Popover`    | `<fd-popover>` with `<fd-popover-control>` and `<fd-popover-body>`       |
+| pagination                   | `pagination`     | `pagination/pagination`: `Pagination` | `<fd-pagination [totalItems] [currentPage] [itemsPerPage] (currentPageChange)>` |
+| tabs                         | `tabs`           | `tabs/tabs`: `TabList`, `TabPanel` | `<fd-tab-list><fd-tab title="Info">…</fd-tab></fd-tab-list>`          |
+| inline message, error banner | `message-strip`  | `message-strip/message-strip`: `MessageStrip` | `<fd-message-strip type="error" [dismissible]="false">…</fd-message-strip>` |
+| busy indicator               | `busy-indicator` | `busy-indicator/busy-indicator`: `BusyIndicator` | `<fd-busy-indicator loading />`                       |
+| list                         | `list`           | `list/list`: `List`, `ListItem` | `<ul fd-list><li fd-list-item>…</li></ul>`                               |
+| heading                      | `title`          | `title/title`: `Title`          | `<h2 fd-title>…</h2>`                                                    |
+| icon                         | `icon`           | `icon/icon`: `Icon`             | `<fd-icon glyph="add" />`                                                |
+| toolbar                      | `toolbar`        | `toolbar/toolbar`: `Toolbar`    | `<fd-toolbar>` with buttons, `<fd-toolbar-spacer />`                     |
+| status text                  | `object-status`  | `object-status/object-status`: `ObjectStatusComponent` | `<span fdObjectStatus status="positive">Active</span>` |
+| card                         | `card`           | `card/card`: `Card`             | `<fd-card>` with `<fd-card-header>`                                      |
+| app shell bar                | `shellbar`       | `shellbar/shellbar`: `Shellbar` | `<fd-shellbar>` with `<fd-shellbar-branding>`                            |
+
+Check a component's inputs in its file before using it; the full list of items is the registry's `registry.json`.
+
+- **Label a custom control with `ariaLabelledBy`.** `fd-select` and `fd-combobox` render a `role="combobox"` element,
+  not a native control, so `<label for>` does not name them; give the label an `id` and pass it. Native inputs keep
+  `<label fdFormLabel for>` + `id`.
+- **Specs find a select by its role:** `getByRole('combobox', { name: 'Sort' })`, then
+  `getByRole('option', { name: … })`. There is no `selectOptions` on it.
+- **Special buttons carry a hidden type description** (_Default Action_ for `emphasized`, _Negative Action_ for
+  `negative`, …) that joins the accessible name, so a Vitest browser spec matches such a button with
+  `{ name: 'Save', exact: false }`.
+- **Bind library state one way and navigate from the output.** A registry component with a `model()` (`currentPage`,
+  `value`) updates itself; the page binds the slice's value in and turns the output into a navigation, so the URL
+  stays the source.
 
 ## 5. Naming
 

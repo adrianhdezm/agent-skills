@@ -487,8 +487,8 @@ Previous / Next by hand, carrying the `[selected]` and `<label for>` details in 
 shape is written once and stays generic, and app wording sits in a component named for its purpose.
 
 The layout follows shadcn's `components/ui/`, a shape most frontend developers recognise. `ui/` holds only commonly
-recognised base components, and only the ones the app uses. With a UI library (Fundamental NGX), the library supplies
-the primitives and `ui/` keeps only adaptations, each with the generic API, so swapping the library or adding one does
+recognised base components, and only the ones the app uses. With a UI library (Fundamental NGX, copied from its
+registry into `components/ui/<name>/`), the library supplies the primitives and `ui/` keeps only adaptations beside them, each with the generic API, so swapping the library or adding one does
 not reach into app components. The `ui-` / `app-` selector prefixes are enforced per folder by ESLint rather than left
 to review.
 
@@ -501,10 +501,30 @@ One file per component. Angular ESLint's `processInlineTemplates` still lints th
 Styling is Tailwind utilities in the template plus a `host` class for host-element rules. The only global stylesheet is
 `src/styles.css`.
 
-### Tailwind preflight only without Fundamental NGX
+### Fundamental NGX comes from the registry, through the shadcn CLI
 
-`styles.css` imports Tailwind's layers one by one. Preflight is on by default; with FD-NGX it is removed, because its
-reset clobbers FD-NGX's base styles, and `body` margin and font are set by hand.
+The opt-in used to install `@fundamental-ngx/core` and its siblings, pinned exactly because their peer ranges were
+tight, and loaded the library's prebuilt stylesheet through `angular.json`. That stylesheet and Tailwind fought:
+preflight had to go, `body` was styled by hand, and Storybook and the browser tests needed the stylesheets imported a
+second time. The [fundamental-ngx-registry](https://github.com/adrianhdezm/fundamental-ngx-registry) ports the same
+components to signals and Tailwind v4 utilities over the SAP theme tokens, and publishes them as a shadcn registry.
+The CLI copies the source into `src/app/components/ui/`, so preflight stays on, the theme is one `@import` in
+`styles.css` that every runner already loads, and there is no library version to pin against Angular's major. The
+cost is code the app owns: it is kept out of lint and format (its style is the registry's), compiled by the app's
+strict tsconfig, and updated with `shadcn add --overwrite` and a reviewed diff.
+
+The primitives stay where the default scaffold keeps them, in `src/app/components/ui/`: `components.json` points the
+`ui` and `lib` aliases into `src/app/`, and the registry leaves `target` off its component and lib files so the CLI
+follows them. Each registry component is a folder there and each app adaptation a flat `*.component.ts`, so the line
+between registry code and app code is the folder, and the lint and format ignores follow it. Only the theme lands
+outside `app/`, in `src/styles/` beside `styles.css`.
+
+### `fd-pagination` without its page-size select
+
+`fd-pagination` can render a page-size select, but on a change it emits the new size and then a clamped page in the
+same tick. Each output becomes a navigation built from the slice's input, which has not changed yet, so the second
+navigation overwrites the first. The list page keeps Per page as its own `fd-select`, binds `fd-pagination` one way,
+and navigates only from `currentPageChange`.
 
 ### Storybook runs on the Vite/Analog builder, not webpack
 

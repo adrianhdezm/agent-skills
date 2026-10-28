@@ -16,7 +16,8 @@ Creates a pnpm-workspace monorepo with this shape:
   a state. The URL enters the store one way (`routerNavigatedAction` → the page reducer whose state matches), pages
   read only their slice, each page loads its data from its own lifecycle, and its requests end with it: reads are
   cancelled on `Leave`, and a save's follow-up runs only while the form that started it is open.
-  Templates are inline, and there are no `.html` or `.scss` files. Fundamental NGX + SAP Horizon is opt-in.
+  Templates are inline, and there are no `.html` or `.scss` files. SAP Fiori Horizon components are opt-in, copied
+  from the [fundamental-ngx-registry](https://github.com/adrianhdezm/fundamental-ngx-registry) with the shadcn CLI.
 - **Docker Compose** runs `db` + `api` + `web`, both images built from the repo root; Nginx serves the web app
   statically. A single root `.env` feeds everything.
 - **An `entity` CRUDL example** runs end to end, from DAO to Angular pages. It is a placeholder and the template for
@@ -107,7 +108,7 @@ Once the inputs are confirmed, run every step to the end without asking. Stop on
 port is taken, the target already holds a `package.json`, or a check still fails after you have found its cause.
 
 1. **Confirm the inputs and check the toolchain.** Ask for the repo name, the DB name (default `app`) and whether to add
-   Fundamental NGX, unless the prompt already says. The app name shown in the UI is the repo name in Title Case
+   SAP Fiori Horizon components from the Fundamental NGX registry, unless the prompt already says. The app name shown in the UI is the repo name in Title Case
    (`my-app` → `My App`); it replaces every `<App name>` and the CLI's `<title>Web</title>` in `web/src/index.html`. Node must be 24 or newer, pnpm 11 or newer (`allowBuilds` is a
    pnpm 11 setting), and Docker must be running. Use pnpm for everything, never npm. Stop if the target directory
    already holds a `package.json`: follow [Adding to an existing repo](#adding-to-an-existing-repo) instead.
@@ -152,7 +153,9 @@ port is taken, the target already holds a `package.json`, or a check still fails
      --style=scss --routing=true --ssr=false --defaults
    ```
 
-   For the Fundamental NGX opt-in, layer [references/fundamental-ngx.md](references/fundamental-ngx.md) on top.
+   For the Fundamental NGX opt-in, also write `web/components.json` and the `@/*` path, the lint and format ignores,
+   the Vite `tsconfigPaths` and the replaced components from [references/fundamental-ngx.md](references/fundamental-ngx.md),
+   and drop the three hand-written `ui/` primitives with their stories and specs.
 
    Then add **Storybook** ([references/web-storybook.md](references/web-storybook.md)) and the **test setup**
    ([references/web-testing.md](references/web-testing.md)): the `test` target switched to
@@ -167,7 +170,9 @@ port is taken, the target already holds a `package.json`, or a check still fails
    3. Storybook's ([web-storybook.md](references/web-storybook.md#dependencies));
    4. the test layers' ([web-testing.md §1](references/web-testing.md#dependencies) and
       [§4](references/web-testing.md#dependencies-and-script)), with the one-time `playwright install chromium`;
-   5. the shared tooling ([monorepo-root.md](references/monorepo-root.md#shared-tooling)). Before it, check that the
+   5. with the Fundamental NGX opt-in, the registry components through the shadcn CLI
+      ([fundamental-ngx.md §3](references/fundamental-ngx.md#3-add-the-components));
+   6. the shared tooling ([monorepo-root.md](references/monorepo-root.md#shared-tooling)). Before it, check that the
       TypeScript peer ranges of typescript-eslint and `@angular/compiler-cli@22` still overlap, and pin the newest
       version both accept, exactly, with `pnpm add -E --save-catalog`.
 
@@ -211,7 +216,7 @@ skill called this one, such as `design-solution`, hand these back to it instead.
 | pnpm                                    | 11+                         | `allowBuilds` in `pnpm-workspace.yaml`                            |
 | TypeScript                              | exact 6.0.x, in catalog     | Angular 22 needs `>=6.0 <6.1`; typescript-eslint supports `<6.1`  |
 | `@angular/*`, `@ngrx/*`, angular-eslint | major 22                    | NgRx and angular-eslint release in step with Angular's major      |
-| `@fundamental-ngx/*`                    | exact 0.65.x                | the release whose peer range covers Angular 22                    |
+| `shadcn` (Fundamental NGX opt-in)       | major 4, through `pnpm dlx` | the CLI the registry is published for; nothing to install or pin  |
 | Tailwind                                | major 4                     | the CSS-first `@import` layers and `@tailwindcss/postcss` plugin  |
 | Vitest, `@vitest/browser*`              | major 5, in catalog         | one major for the API and web; the browser packages match it      |
 | Storybook / `@storybook/angular-vite`   | major 10                    | the Vite/Analog builder that fits the esbuild toolchain           |
@@ -406,7 +411,10 @@ pnpm workspace, then:
 - **Web scaffold** (CLI, cleanup, Tailwind, NgRx, router-store, components, pages, spec, Nginx): [references/web.md](references/web.md)
 - **Web Storybook** (Vite/Analog builder, `.storybook/` config, targets, the component stories): [references/web-storybook.md](references/web-storybook.md)
 - **Web tests** (Analog's Vitest builder, the unit and browser projects, full-stack Playwright e2e on its own stack): [references/web-testing.md](references/web-testing.md)
-- **Fundamental NGX + SAP Horizon opt-in**: [references/fundamental-ngx.md](references/fundamental-ngx.md)
+- **Fundamental NGX + SAP Horizon opt-in** (the registry, `components.json`, the shadcn CLI, what replaces the
+  hand-written primitives and their specs): [references/fundamental-ngx.md](references/fundamental-ngx.md); the
+  registry primitives and how to install them are in
+  [coding-conventions.md §4.8](references/coding-conventions.md#48-with-fundamental-ngx-the-registry-primitives)
 - **ESLint + Prettier per project**: [references/eslint-prettier.md](references/eslint-prettier.md)
 - **Coding conventions** (copied to the repo root: architecture and building blocks of both projects, HTTP contract,
   list queries, route-driven state, the store and the router, request lifetimes, where web state lives, naming, code style, the test
@@ -439,6 +447,10 @@ pnpm workspace, then:
 - [ ] Default scaffold: `components/ui/` holds only `UiDialog`, `UiSelect` and `UiPagination` (`ui-` selectors, no entity wording);
       `DeleteDialog` is in `components/`; the list page uses `<ui-select>`, `<ui-pagination>` and
       `<app-delete-dialog>` and writes no `<select>` of its own
+- [ ] Fundamental NGX opt-in: `web/src/app/components/ui/` holds one folder per registry component and no
+      `*.component.ts`, and there is no `web/src/components/`; `DeleteDialog` composes `fd-dialog`; the list page uses
+      two `fd-select`s and `fd-pagination`; `pnpm lint` and `pnpm format:check` skip the component folders,
+      `src/app/lib` and `src/styles`; Storybook lists only `Components/DeleteDialog` ×2
 - [ ] `pnpm test:browser` passes (Vitest browser mode + Playwright; needs `playwright install chromium` once)
 - [ ] `pnpm test:e2e` passes (Playwright full-stack; needs Docker, the root `.env` and the migration above), and the dev
       database and any running Compose services are as they were
