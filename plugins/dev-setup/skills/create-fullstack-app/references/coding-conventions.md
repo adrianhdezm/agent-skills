@@ -734,10 +734,11 @@ Storybook is not a test: it is where components are built and their states revie
   or a helper. Every slice has its reducer and effects specs; selectors get a spec only once one has logic.
 
 **Web browser** (`*.browser.spec.ts`, Chromium)
-- *Real / stubbed:* the component or page rendered by Angular in real Chromium with Tailwind applied. Pages get
-  `provideMockStore` and `provideRouter([])`; a component is mounted by hand — `TestBed.createComponent`, `setInput`
-  for every required input, append to `document.body`, `autoDetectChanges()` — because `render()` (in
-  `src/testing/render.ts`) starts change detection before inputs are set.
+- *Real / stubbed:* the component or page rendered by Angular in real Chromium with Tailwind applied. Pages mount
+  through `renderPage()` (in `src/testing/render-page.ts`): `provideMockStore` with the page's selectors,
+  `provideRouter([])`, and `dispatch` spied before the page exists. A component is mounted by hand —
+  `TestBed.createComponent`, `setInput` for every required input, append to `document.body`, `autoDetectChanges()` —
+  because `renderPage()` starts change detection before inputs are set.
 - *Assert:* through the `page` locators, by role and accessible name: each UI state of the status union, what a click
   or input dispatches (spy on `MockStore.dispatch` before `createComponent`), the page watch (the first route state
   loads, an equal one does not, a new one on the same component does, `Leave` on destroy — moved with

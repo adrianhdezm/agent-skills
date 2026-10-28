@@ -155,6 +155,11 @@ Copy it to `.env` for local work: `cp .env.example .env`. The API fails fast if 
 `--env-file`), and `db/client.ts` throws if `DATABASE_URL` is unset — there is no hardcoded connection-string fallback.
 `.env.example` is committed; `.env` is not.
 
+A harness may refuse to write `.env` or `.env.example` (env files are often protected). Then give the user the file's
+contents to create, list it under **Blocked on me**, and carry on: steps 3 to 6 do not read `.env`. Every step that
+does waits for it: `db:generate` / `db:migrate`, `pnpm --filter api dev`, Compose's `${DB_PASSWORD}`, and
+`pnpm test:e2e`, whose setup parses it.
+
 ## `docker-compose.yml`
 
 ```yaml

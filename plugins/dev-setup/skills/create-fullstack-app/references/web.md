@@ -182,7 +182,7 @@ web/
 ├── vitest.config.mts        # Vitest projects `unit` (jsdom) + `browser` (Chromium), run by `ng test`
 └── src/
     ├── test-setup.ts        # setupTestBed() for the unit project
-    ├── testing/             # render() + browser-setup.ts for the browser project; navigated() for reducer specs
+    ├── testing/             # renderPage() + browser-setup.ts for the browser project; navigated() for reducer specs
     ├── environments/        # environment.ts, environment.development.ts, environment.e2e.ts
     └── app/
         ├── app.component.ts         # root

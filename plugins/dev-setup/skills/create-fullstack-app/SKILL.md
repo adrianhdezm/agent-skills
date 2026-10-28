@@ -78,7 +78,7 @@ my-app/
     ├── playwright.config.ts  # full-stack e2e runner
     ├── e2e/                  # Playwright specs (pages/) + e2e ports/DB + API seeding (utils/) + global setup/teardown
     └── src/
-        ├── test-setup.ts / testing/   # setupTestBed() for unit; render() + setup for browser mode
+        ├── test-setup.ts / testing/   # setupTestBed() for unit; renderPage() + setup for browser mode
         ├── environments/    # production, development, e2e
         └── app/
             ├── pages/ layouts/ components/   # flat *.component.ts; components/ui/ primitives + app components, each with a story + browser spec
@@ -105,7 +105,9 @@ Copy this checklist and tick it off:
 ```
 
 Once the inputs are confirmed, run every step to the end without asking. Stop only when the toolchain is missing, a
-port is taken, the target already holds a `package.json`, or a check still fails after you have found its cause.
+port is taken, the target already holds a `package.json`, the Fundamental NGX registry writes outside `src/app/`
+([fundamental-ngx.md §3](references/fundamental-ngx.md#3-add-the-components)), or a check still fails after you have
+found its cause.
 
 1. **Confirm the inputs and check the toolchain.** Ask for the repo name, the DB name (default `app`) and whether to add
    SAP Fiori Horizon components from the Fundamental NGX registry, unless the prompt already says. The app name shown in the UI is the repo name in Title Case
@@ -132,6 +134,8 @@ port is taken, the target already holds a `package.json`, or a check still fails
    pnpm pkg set packageManager="pnpm@$(pnpm --version)"
    cp .env.example .env
    ```
+
+   If the env files cannot be written, follow [monorepo-root.md](references/monorepo-root.md#envexample) and carry on.
 
 3. **Write the API** from [references/api-setup.md](references/api-setup.md) (manifest, configs, app shell,
    Dockerfile), [references/api-dao.md](references/api-dao.md) (DAO contract, list-input vocabulary and builder helper,
@@ -170,16 +174,21 @@ port is taken, the target already holds a `package.json`, or a check still fails
    3. Storybook's ([web-storybook.md](references/web-storybook.md#dependencies));
    4. the test layers' ([web-testing.md §1](references/web-testing.md#dependencies) and
       [§4](references/web-testing.md#dependencies-and-script)), with the one-time `playwright install chromium`;
-   5. with the Fundamental NGX opt-in, the registry components through the shadcn CLI
+   5. with the Fundamental NGX opt-in, the registry components through the shadcn CLI, then the placement check
       ([fundamental-ngx.md §3](references/fundamental-ngx.md#3-add-the-components));
    6. the shared tooling ([monorepo-root.md](references/monorepo-root.md#shared-tooling)). Before it, check that the
       TypeScript peer ranges of typescript-eslint and `@angular/compiler-cli@22` still overlap, and pin the newest
       version both accept, exactly, with `pnpm add -E --save-catalog`.
 
-6. **Copy the conventions, format and run the checks.** `<skill-dir>` is this skill's base directory.
+6. **Copy the conventions, check the files, format and run the checks.** `<skill-dir>` is this skill's base
+   directory. The file check prints every file of [references/file-manifest.txt](references/file-manifest.txt) that
+   is missing, and nothing when all are there; write any it lists before going on. Use `default` in place of `fiori`
+   without the Fundamental NGX opt-in.
 
    ```sh
    cp <skill-dir>/references/coding-conventions.md coding-conventions.md
+   grep -E '^(all|fiori) ' <skill-dir>/references/file-manifest.txt | cut -d' ' -f2 \
+     | while read -r f; do [ -e "$f" ] || echo "missing: $f"; done
    pnpm install
    pnpm format
    pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format:check
@@ -420,11 +429,14 @@ pnpm workspace, then:
   list queries, route-driven state, the store and the router, request lifetimes, where web state lives, naming, code style, the test
   tiers, adding a resource, a before-you-merge checklist): [references/coding-conventions.md](references/coding-conventions.md)
 - **Decisions and their reasons**: [references/decisions.md](references/decisions.md)
+- **Every file the scaffold writes**, per variant, for the step 6 check:
+  [references/file-manifest.txt](references/file-manifest.txt)
 
 ## Review Checklist
 
 - [ ] Node 24+, pnpm 11+ and Docker confirmed; TypeScript peer ranges checked before pinning
 - [ ] `typescript` in the catalog is an exact 6.0.x; shared tools read `catalog:` in both manifests
+- [ ] The step 6 file check prints nothing: every file in `references/file-manifest.txt` for the variant exists
 - [ ] `pnpm install` succeeds at the root with no `ERR_PNPM_IGNORED_BUILDS`
 - [ ] `pnpm build && pnpm typecheck && pnpm test && pnpm lint && pnpm format:check` passes
 - [ ] `docker compose up --build` starts all three services and the `db` healthcheck passes
