@@ -1,7 +1,7 @@
 # Web scaffold
 
 Angular 22 + NgRx 22 + `@ngrx/router-store` + Tailwind v4. This file covers the default stack; the Fundamental NGX
-reference layers FD-NGX on top.
+reference ([fundamental-ngx.md](fundamental-ngx.md)) adds the registry's components on top and lists what changes.
 
 The scaffold ships a complete **entity CRUDL** example wired end to end: a list page with filter / sort / pagination
 controls, a detail page, a shared form page for create and edit, and a delete dialog built on the `ui/` dialog. State is
@@ -105,7 +105,7 @@ required `test` check.
 
 ### `web/src/styles.css`
 
-Imports Tailwind's layers one by one, so preflight can be dropped when Fundamental NGX is added:
+Imports Tailwind's layers one by one. The Fundamental NGX opt-in appends its theme import after them:
 
 ```css
 @layer theme, base, components, utilities;
