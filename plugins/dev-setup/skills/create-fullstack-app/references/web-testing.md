@@ -241,6 +241,29 @@ describe('entity.service', () => {
     req.flush({ items: [], total: 0, page: 2, pageSize: 50, totalPages: 0 });
   });
 
+  it('get issues a GET at the id URL', () => {
+    service.get('e1').subscribe();
+    const req = httpMock.expectOne(`${API}/entities/e1`);
+    expect(req.request.method).toBe('GET');
+    req.flush({});
+  });
+
+  it('create POSTs the input to the collection URL', () => {
+    service.create({ name: 'Acme', description: null }).subscribe();
+    const req = httpMock.expectOne(`${API}/entities`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ name: 'Acme', description: null });
+    req.flush({});
+  });
+
+  it('update PATCHes the input at the id URL', () => {
+    service.update('e1', { name: 'Renamed' }).subscribe();
+    const req = httpMock.expectOne(`${API}/entities/e1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ name: 'Renamed' });
+    req.flush({});
+  });
+
   it('delete issues a DELETE at the id URL', () => {
     service.delete('e1').subscribe();
     const req = httpMock.expectOne(`${API}/entities/e1`);
@@ -408,52 +431,65 @@ component-level — pages get a mock store, there is no backend; the full reques
 Co-located with the file as `*.browser.spec.ts`: one per component (`components/ui/*.component.browser.spec.ts` and
 `components/delete-dialog.component.browser.spec.ts`) and one `pages/<page>.component.browser.spec.ts` per page.
 
-### `web/src/testing/render.ts`
+### `web/src/testing/render-page.ts`
 
-`render()` mounts a **page** — a component without required inputs — and starts change detection at once. A
-component with required `input.required()`s cannot go through it: the first change detection runs before any input is
-set and throws `NG0950`. Component specs mount by hand instead (see the component specs below).
+`renderPage()` mounts a **page** over a mock store seeded with selector values, and starts change detection at once.
+It spies on `dispatch` before the page exists, so a spec sees what the page's `ngOnInit` watch dispatches. Every page
+spec mounts through it, from a small `setup()` of its own that lists the page's selectors; it is the one place the
+mock store, the router and the spy are wired. A component with `input.required()`s cannot go through it: the first
+change detection runs before any input is set and throws `NG0950`. Component specs mount by hand instead (see the
+component specs below).
 
 ```ts
-// render.ts — mounts a component into the live document for the `page` locators
-import { type EnvironmentProviders, type Provider, type Type } from '@angular/core';
-import { type ComponentFixture, TestBed } from '@angular/core/testing';
+// render-page.ts — mounts a page over a mock store, into the live document for the `page` locators
+import { type Type } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { MockStore, type MockSelector, provideMockStore } from '@ngrx/store/testing';
+import { vi } from 'vitest';
 
-export function render<T>(component: Type<T>, providers: (Provider | EnvironmentProviders)[] = []): ComponentFixture<T> {
-  TestBed.configureTestingModule({ providers });
+// `dispatch` is spied before the page exists, so the actions of its ngOnInit watch are recorded.
+// The return type is inferred on purpose: it keeps the spy typed as `dispatch`'s own mock.
+export function renderPage<T>(component: Type<T>, selectors: MockSelector[]) {
+  TestBed.configureTestingModule({ providers: [provideRouter([]), provideMockStore({ selectors })] });
+  const store = TestBed.inject(MockStore);
+  const dispatch = vi.spyOn(store, 'dispatch');
   const fixture = TestBed.createComponent(component);
-  document.body.appendChild(fixture.nativeElement);
+  document.body.appendChild(fixture.nativeElement as HTMLElement);
   fixture.autoDetectChanges();
-  return fixture;
+  return { fixture, store, dispatch };
 }
 ```
 
 ### Example — `pages/entity-detail-page.component.browser.spec.ts`
 
+The full spec. The list and form page specs follow the same shape: a `setup()` over `renderPage()` that defaults each
+selector, then the cases from the [spec inventory](#spec-inventory).
+
 ```ts
-import { provideRouter } from '@angular/router';
-import { provideMockStore } from '@ngrx/store/testing';
 import { page } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
-import { render } from '../../testing/render';
+import { renderPage } from '../../testing/render-page';
 import { type Entity } from '../models/entity.model';
+import { EntityDetailPageActions } from '../store/entity-detail-page/entity-detail-page.actions';
 import { type EntityDetailPageStatus } from '../store/entity-detail-page/entity-detail-page.model';
 import { selectEntity, selectError, selectId, selectStatus } from '../store/entity-detail-page/entity-detail-page.selectors';
 import { EntityDetailPage } from './entity-detail-page.component';
 
-const entity: Entity = { id: 'e1', name: 'Acme', description: 'An entity', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' };
+const entity: Entity = {
+  id: 'e1',
+  name: 'Acme',
+  description: 'An entity',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-02T00:00:00.000Z'
+};
 
-function setup(status: EntityDetailPageStatus, value: Entity | null, error: string | null): void {
-  render(EntityDetailPage, [
-    provideRouter([]),
-    provideMockStore({
-      selectors: [
-        { selector: selectId, value: 'e1' },
-        { selector: selectStatus, value: status },
-        { selector: selectEntity, value },
-        { selector: selectError, value: error }
-      ]
-    })
+function setup(status: EntityDetailPageStatus, value: Entity | null, error: string | null) {
+  return renderPage(EntityDetailPage, [
+    { selector: selectId, value: 'e1' },
+    { selector: selectStatus, value: status },
+    { selector: selectEntity, value },
+    { selector: selectError, value: error }
   ]);
 }
 
@@ -467,6 +503,27 @@ describe('entity-detail-page.component', () => {
   it('shows the error message in the error state', async () => {
     setup('error', null, 'Entity not found');
     await expect.element(page.getByText('Entity not found')).toBeVisible();
+  });
+
+  it('shows Loading… while loading', async () => {
+    setup('loading', null, null);
+    await expect.element(page.getByText('Loading…')).toBeVisible();
+  });
+
+  it('loads the id on init, again for a new id on the same component, and leaves on destroy', () => {
+    // Arrange
+    const { fixture, store, dispatch } = setup('idle', null, null);
+    expect(dispatch).toHaveBeenCalledWith(EntityDetailPageActions.load({ id: 'e1' }));
+    dispatch.mockClear();
+
+    // Act: a link to another entity reuses the component.
+    store.overrideSelector(selectId, 'e2');
+    store.refreshState();
+    fixture.destroy();
+
+    // Assert
+    expect(dispatch).toHaveBeenCalledWith(EntityDetailPageActions.load({ id: 'e2' }));
+    expect(dispatch).toHaveBeenCalledWith(EntityDetailPageActions.leave());
   });
 });
 ```
@@ -491,7 +548,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { UiDialog } from './dialog.component';
 
 function setup(dismissible = true): { fixture: ComponentFixture<UiDialog>; dismissed: ReturnType<typeof vi.fn> } {
-  // Set the required inputs before the first change detection, which render() would run at once (NG0950).
+  // Set the required inputs before the first change detection, or it throws NG0950.
   const fixture = TestBed.createComponent(UiDialog);
   fixture.componentRef.setInput('title', 'Rename item');
   fixture.componentRef.setInput('description', 'Pick a new name.');
@@ -710,7 +767,7 @@ rendering, the page specs cover:
   an equal value dispatches nothing, a new value on the same component dispatches it again, `null` dispatches nothing,
   and `ngOnDestroy` dispatches `leave()` and ends the watch.
 - **UI states** (list page): loading, filtered-empty vs. no-entities-yet and the error banner — one
-  `renderList(state)` helper over `provideMockStore` selector overrides. Which pagination button is disabled is
+  `renderList(state)` over `renderPage()`, each selector defaulted and overridable. Which pagination button is disabled is
   `UiPagination`'s spec, not the page's.
 - **The delete flow** (list page): _Delete_ on a row opens the `DeleteDialog`; confirming dispatches
   `EntityListPageActions.delete({ id })`, cancelling closes the dialog and dispatches nothing.
@@ -722,27 +779,18 @@ rendering, the page specs cover:
 
 Two setup rules make these work:
 
-1. **Spy on `dispatch` _before_ `createComponent`** — the shared `render` helper injects the store only after creating
-   the component, too late to observe `ngOnInit`. For watch and action specs, inline the setup instead: configure →
-   `TestBed.inject(MockStore)` → `vi.spyOn(store, 'dispatch')` → `createComponent` → append → `autoDetectChanges()`.
+1. **Mount through `renderPage()`.** It spies on `dispatch` before `createComponent`, which a watch or action spec
+   needs: a spy added after the page exists misses everything `ngOnInit` dispatched. Keep the helper's inferred
+   return type; a hand-written one such as `ReturnType<typeof vi.spyOn>` turns the spy into `any`, and the
+   type-checked lint rejects every call on it.
 2. **Move the route state with `overrideSelector` + `refreshState()`**, as the reducer would after a navigation. An
    equal value must be a new object: the same reference is dropped by NgRx's own `select` before the page's
    `distinctUntilChanged` sees it, and the case would pass without the operator.
 
 ```ts
 const input: ListEntityInput = { filter: undefined, sort: undefined, page: 2, pageSize: 20 };
-TestBed.configureTestingModule({
-  providers: [
-    provideRouter([]),
-    provideMockStore({ selectors: [{ selector: selectListInput, value: input } /* status, items, total, error */] })
-  ]
-});
-// ...spy before createComponent:
-const store = TestBed.inject(MockStore);
-const dispatch = vi.spyOn(store, 'dispatch');
-const fixture = TestBed.createComponent(EntityListPage);
-document.body.appendChild(fixture.nativeElement);
-fixture.autoDetectChanges();
+// status, items, total and error take their defaults in the spec's renderList()
+const { fixture, store, dispatch } = renderList({ input });
 expect(dispatch).toHaveBeenCalledWith(EntityListPageActions.fetch({ input }));
 
 dispatch.mockClear();

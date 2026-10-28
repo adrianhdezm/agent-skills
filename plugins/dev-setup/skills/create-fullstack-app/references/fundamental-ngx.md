@@ -44,10 +44,10 @@ takes it with `--overwrite`. The primitives tier is still `web/src/app/component
 components in their folders, and the app's own adaptations of them as flat `<name>.component.ts` files beside those
 folders. The scaffold needs no adaptation.
 
-This placement needs a registry build that leaves `target` off its component and lib files. A build that pins
-`target: "src/components/ui/…"` makes the CLI write there whatever the aliases say, beside `src/app/` instead of inside
-it. If `add` reports `src/components/ui/…` or `src/lib/…` paths, stop: the registry has to publish without those
-targets first (`targetOf()` in its `scripts/build-registry.mjs`, and the `target` of its `registry:lib` entries).
+The registry publishes its component and lib files without a `target`, so the aliases decide where they go; only the
+styles carry a fixed `target`. A file with a `target` is written there whatever the aliases say, so if the registry
+ever pins one again, its code lands beside `src/app/` (in `src/components/ui/` or `src/lib/`) while the app imports it
+from inside. [§3](#3-add-the-components) checks the paths `add` reports, so that shows up at once, not at the build.
 
 ## 2. Wire the CLI
 
@@ -95,6 +95,18 @@ R=https://adrianhdezm.github.io/fundamental-ngx-registry/r
 pnpm dlx shadcn@4 add --yes \
   $R/button.json $R/dialog.json $R/select.json $R/pagination.json $R/input.json $R/form.json $R/message-strip.json
 ```
+
+Then check where it wrote: every component under `src/app/components/ui/`, `utils.ts` under `src/app/lib/`, and
+nothing beside `src/app/`:
+
+```sh
+test -f src/app/lib/utils.ts && test -f src/app/components/ui/dialog/dialog.ts \
+  && test ! -e src/components && test ! -e src/lib && echo "registry placement ok"
+```
+
+If it does not print `registry placement ok`, the registry has pinned its targets again
+([§1](#1-what-the-registry-owns)). Halt the run and report it under **Blocked on me**: moving the files by hand would
+be undone by the next `add --overwrite`, so the fix belongs in the registry.
 
 The CLI pulls in each component's `registryDependencies` (`dialog` brings `bar`, `busy-indicator`, `icon` and
 `title`; `select` brings `list`, `popover` and more), and it:
@@ -246,6 +258,22 @@ Its story (`delete-dialog.stories.ts`) is unchanged.
 
 ### `pages/entity-list-page.component.ts`
 
+The registry imports replace the three `ui/` primitives'. `SelectOption` is the `fd-option` directive, so the page's
+own option type takes another name (`Option<T>` below):
+
+```ts
+import { Button } from '@/app/components/ui/button/button';
+import { FormLabel } from '@/app/components/ui/form/form';
+import { FormControl } from '@/app/components/ui/input/input';
+import { MessageStrip } from '@/app/components/ui/message-strip/message-strip';
+import { Pagination } from '@/app/components/ui/pagination/pagination';
+import { Select, SelectOption } from '@/app/components/ui/select/select';
+import { DeleteDialog } from '../components/delete-dialog.component';
+
+// in @Component:
+imports: [Button, DatePipe, DeleteDialog, FormControl, FormLabel, MessageStrip, Pagination, RouterLink, Select, SelectOption],
+```
+
 - **Sort and Per page** are two `fd-select`s, each labelled by an `fdFormLabel` through `ariaLabelledBy`. The options
   are `<li fd-option [value]>`; the select emits the picked value on `(valueChange)`. The option constants become a
   local `Option<T>` list (`UiSelectOption` is gone), and Per page binds numbers, so the page no longer converts the
@@ -303,21 +331,50 @@ Its story (`delete-dialog.stories.ts`) is unchanged.
 
 The same substitutions: the error banner is an `fd-message-strip`, _Edit_ is `<a fdButton>`, _Save_ is
 `<button fdButton variant="emphasized" type="submit">`, the form's input and textarea take `fdFormControl` with their own
-`<label fdFormLabel for>`, and the colours are token utilities. In the form page, import the registry directive as
-`FormControl as FdFormControl`: Angular's `FormControl` is already imported from `@angular/forms`.
+`<label fdFormLabel for>`, and the colours are token utilities. Their registry imports:
+
+```ts
+// entity-detail-page.component.ts
+import { Button } from '@/app/components/ui/button/button';
+import { MessageStrip } from '@/app/components/ui/message-strip/message-strip';
+// in @Component:
+imports: [Button, DatePipe, MessageStrip, RouterLink],
+
+// entity-form-page.component.ts: Angular's FormControl is already imported from @angular/forms
+import { Button } from '@/app/components/ui/button/button';
+import { FormLabel } from '@/app/components/ui/form/form';
+import { FormControl as FdFormControl } from '@/app/components/ui/input/input';
+import { MessageStrip } from '@/app/components/ui/message-strip/message-strip';
+// in @Component:
+imports: [Button, FdFormControl, FormLabel, MessageStrip, ReactiveFormsModule, RouterLink],
+```
 
 ### `layouts/main-layout.component.ts`
 
+The whole file, in place of `web.md`'s:
+
 ```ts
-host: { class: 'flex min-h-screen flex-col bg-sap-background-color' },
-template: `
-  <header class="flex h-12 items-center bg-sap-shell-color px-6 text-sap-shell-text-color shadow-sap-content-shadow1">
-    <span class="text-lg font-bold tracking-wide">{{ appName() }}</span>
-  </header>
-  <main class="flex-1 p-6">
-    <router-outlet />
-  </main>
-`
+import { Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { Store } from '@ngrx/store';
+import { selectAppName } from '../store/app-context/app-context.selectors';
+
+@Component({
+  selector: 'app-main-layout',
+  imports: [RouterOutlet],
+  host: { class: 'flex min-h-screen flex-col bg-sap-background-color' },
+  template: `
+    <header class="flex h-12 items-center bg-sap-shell-color px-6 text-sap-shell-text-color shadow-sap-content-shadow1">
+      <span class="text-lg font-bold tracking-wide">{{ appName() }}</span>
+    </header>
+    <main class="flex-1 p-6">
+      <router-outlet />
+    </main>
+  `
+})
+export class MainLayout {
+  protected readonly appName = inject(Store).selectSignal(selectAppName);
+}
 ```
 
 For a full SAP shell bar (product switch, user menu), add the registry's `shellbar` instead.
