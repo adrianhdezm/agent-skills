@@ -87,7 +87,7 @@ my-app/
 
 | What                 | Value                                                                                                                                                                                                                                                                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000), Vite's HMR socket 24678 in development, RustFS 9000 (moved with `RUSTFS_PORT`) and Storybook 6006 when picked                                                                                                                                                             |
+| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000), Vite's HMR socket 24678 in development (moved with `HMR_PORT`), Vitest's browser-mode API 63315 during tests, RustFS 9000 (moved with `RUSTFS_PORT`) and Storybook 6006 when picked                                                                                       |
 | scripts              | `dev` `node --env-file=.env server.ts`; `build` `react-router build`; `start` `node server.ts` (production gets its environment from Compose); `typecheck` `react-router typegen && tsc -b`; `lint`, `test`, `format`, `format:check`, `compose:up`, `compose:down`                                                                              |
 | `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                                                                                                        |
 | dependencies         | the React Router set and the shadcn/ui packages from their docs; `hono`, `@hono/node-server`                                                                                                                                                                                                                                                     |
@@ -173,6 +173,7 @@ The config files as a fresh scaffold writes them, before any optional entry adds
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true
   },
+  // With the optional entries, also "migrate.ts", "drizzle.config.ts", "scripts" and ".storybook/**/*".
   "include": ["server.ts", "vite.config.ts", "vitest.config.ts", "react-router.config.ts"]
 }
 ```
@@ -300,6 +301,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter()],
   resolve: { tsconfigPaths: true },
+  // HMR_PORT, when set, moves Vite's live-reload socket off its default 24678.
+  server: { hmr: { port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : undefined } },
   environments: {
     ssr: {
       build: {
@@ -339,7 +342,9 @@ export default defineConfig({
 
 - **Check the ports first**; stop with the user if one is taken, or set another `PORT` in `.env`.
 - **`pnpm exec playwright install chromium`** after the install, once.
-- **`cp .env.example .env`** once `.env.example` is written.
+- **`cp .env.example .env`** once `.env.example` is written, then fill its secrets: `AUTH_SECRET` with
+  `openssl rand -base64 32`, and `S3_ACCESS_KEY` / `S3_SECRET_KEY` with any values (Compose hands them to RustFS as its
+  credentials). `HMR_PORT` is optional: set it to move Vite's live-reload socket.
 - **Add the shadcn primitives after the app files**, then check none landed in a `~` folder.
 
 ## Conventions
@@ -377,6 +382,8 @@ required checks.
   variable once a database is added), and `--env-file` never overrides a variable already set, so `.env`'s
   `NODE_ENV=development` would otherwise start the dev server.
 - **Development**: `pnpm dev` serves the welcome heading.
-- **Compose**: `pnpm compose:up` brings `db` up healthy and then `app`; the app container serves the heading, and
+- **Compose**: `pnpm compose:up` brings `db` up healthy, `migrate` to exit 0 when the database entry is picked, and then
+  `app` healthy; with file storage, `pnpm storage:bucket` then creates the bucket. The app container serves the heading,
+  and
   `docker compose exec -T db psql -U postgres -tAc "select datname from pg_database where datname='app'"` prints
   `app`. Leave Compose running or `pnpm compose:down`, and say which.
