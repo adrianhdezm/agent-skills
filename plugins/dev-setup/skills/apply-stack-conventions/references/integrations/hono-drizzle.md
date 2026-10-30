@@ -267,6 +267,17 @@ function mapNotFound(error: unknown): unknown {
 }
 ```
 
+`src/controllers/home.controller.ts`:
+
+```ts
+import type { Context } from 'hono';
+import type { AppEnv } from '../models/app-context.model.js';
+
+export async function getHome(c: Context<AppEnv>): Promise<Response> {
+  return c.json({ service: 'api', status: 'running' });
+}
+```
+
 `src/controllers/health.controller.ts`:
 
 ```ts
