@@ -75,6 +75,7 @@ my-app/
 │       ├── api/entity.api.test.ts
 │       └── utils/            # http-mocks, test-server, pg-container, entity-seed
 └── web/                      # the Angular app's package, plus the e2e suite:
+    ├── tsconfig.node.json    # vitest.config.mts and playwright.config.ts, as in the Angular app
     ├── playwright.config.ts
     └── e2e/                  # global-setup, global-teardown, tsconfig.json, pages/, utils/{env,api}.ts
 ```
@@ -118,9 +119,267 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 | shared tooling        | in the catalog, read as `catalog:` by both packages: `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the exact `typescript`                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `api/package.json`    | `name: "api"`, `version: "0.0.0"`, `private`, `type: "module"`, written by hand; dependencies from the Express and Drizzle docs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `"**/*.{ts,js,mjs,json,md,yml,yaml}"`; `start` `node --env-file=../.env dist/server.js`; `db:generate`, `db:migrate` as the Drizzle doc says |
-| API configs           | the tsconfigs from the Express doc; `drizzle.config.ts` and the three Vitest projects from Drizzle + Postgres, with `env: { LOG_LEVEL: 'silent' }` at the root; `eslint.config.mjs` with the shared rules, `globals.node`, the controller override (`*.controller.ts`: `@typescript-eslint/require-await` off, because every handler is `async` for one shape), ignoring `dist/**`, `db/**`, `eslint.config.mjs`; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`                                                                                                                         |
+| API configs           | the tsconfigs, `eslint.config.mjs` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | web package           | the Angular app blueprint's values with `<name>` = `web`, minus `packageManager` and the CLI's `prettier` and `typescript` entries (the catalog has them); the browser calls the API directly and Nginx proxies nothing                                                                                                                                                                                                                                                                                                                                                                                        |
-| e2e                   | `@playwright/test@1`; the example's End to end values; ESLint ignores `playwright.config.ts`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| e2e                   | `@playwright/test@1`; the example's End to end values; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+## Reference code
+
+The API's configs as a fresh scaffold writes them (strict presets), and the web's ESLint config (`recommendedTypeChecked`, scoped to `**/*.ts`); the web's tsconfigs and `vitest.config.mts` are the Angular app blueprint's. The tables above say why each value is there.
+
+`api/tsconfig.json`:
+
+```jsonc
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}
+```
+
+`api/tsconfig.app.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "target": "ES2022",
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "moduleDetection": "force",
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true,
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts"]
+}
+```
+
+`api/tsconfig.node.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["drizzle.config.ts", "vitest.config.ts", "src/express.d.ts", "tests/**/*.ts"]
+}
+```
+
+`api/eslint.config.mjs`:
+
+```js
+import js from '@eslint/js';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import prettier from 'eslint-config-prettier/flat';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig([
+  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', 'dist/**', 'db/**', 'eslint.config.mjs']),
+  js.configs.recommended,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        // src/ belongs to tsconfig.app.json; config files and tests to tsconfig.node.json.
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    }
+  },
+  prettier,
+  {
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // Every handler is `async` for one shape, whether or not it awaits.
+    files: ['**/*.controller.ts'],
+    rules: { '@typescript-eslint/require-await': 'off' }
+  },
+  {
+    // A describe holds every case for one module.
+    files: ['tests/**/*.ts'],
+    rules: { 'max-lines-per-function': 'off', 'max-nested-callbacks': 'off', 'max-statements': 'off' }
+  }
+]);
+```
+
+`api/vitest.config.ts`:
+
+```ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    env: { LOG_LEVEL: 'silent' },
+    projects: [
+      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'] } },
+      { extends: true, test: { name: 'db', include: ['tests/db/**/*.test.ts'], hookTimeout: 120_000, testTimeout: 30_000 } },
+      { extends: true, test: { name: 'api', include: ['tests/api/**/*.test.ts'], hookTimeout: 120_000, testTimeout: 30_000 } }
+    ]
+  }
+});
+```
+
+`web/eslint.config.mjs`:
+
+```js
+import js from '@eslint/js';
+import angular from 'angular-eslint';
+import prettier from 'eslint-config-prettier/flat';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import storybook from 'eslint-plugin-storybook';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig([
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'dist/**',
+    '.angular/**',
+    'storybook-static/**',
+    'eslint.config.mjs'
+    // Config files that no type-checked project includes.
+  ]),
+  js.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.browser },
+      parserOptions: {
+        // Each folder belongs to a project: src/ to tsconfig.app.json (specs to tsconfig.spec.json), e2e/ and .storybook/ to their own.
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    },
+    processor: angular.processInlineTemplates,
+    extends: [tseslint.configs.recommendedTypeChecked, angular.configs.tsRecommended],
+    rules: {
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
+      '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }]
+    }
+  },
+  {
+    files: ['**/*.html'],
+    extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility]
+  },
+  ...storybook.configs['flat/recommended'],
+  prettier,
+  {
+    files: ['**/*.ts'],
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // Components under components/ui/ are primitives: their selectors start with `ui`.
+    files: ['src/app/components/ui/**/*.ts'],
+    rules: {
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'ui', style: 'camelCase' }],
+      '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'ui', style: 'kebab-case' }]
+    }
+  },
+  {
+    // A reducer is one `on` per action: its branches are the point, not a smell.
+    files: ['**/*.reducer.ts'],
+    rules: { complexity: 'off' }
+  },
+  {
+    // A describe holds every case for one module; @vitest/browser/context is the old import.
+    files: ['**/*.spec.ts'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'max-statements': 'off',
+      'no-restricted-imports': ['error', { paths: [{ name: '@vitest/browser/context', message: 'Use `vitest/browser`.' }] }]
+    }
+  }
+]);
+```
+
+`web/tsconfig.node.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["vitest.config.mts", "playwright.config.ts"]
+}
+```
 
 ## Scaffold
 
