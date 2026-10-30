@@ -17,8 +17,8 @@ stories: app/components/**/*.stories.tsx ─► preview.ts imports ../app/app.cs
 | devDependencies         | `storybook@10`, `@storybook/react-vite@10`, `eslint-plugin-storybook@10`                                                                                                                |
 | scripts                 | `storybook` `storybook dev -p 6006`; `build-storybook` `storybook build`                                                                                                                |
 | `.storybook/main.ts`    | stories `../app/components/**/*.stories.tsx`, `framework: '@storybook/react-vite'`, a `viteFinal` that removes `reactRouter()` and any runtime plugin and keeps `resolve.tsconfigPaths` |
-| `.storybook/preview.ts` | imports `../app/app.css`                                                                                                                                                                |
-| tsconfig                | `.storybook/` in `tsconfig.node.json`'s `include`; stories in the runtime project with the components                                                                                   |
+| `.storybook/preview.ts` | `/// <reference types="vite/client" />`, then imports `../app/app.css` (the node project has no Vite types otherwise)                                                                   |
+| tsconfig                | `".storybook/**/*"` in `tsconfig.node.json`'s `include` (a bare `.storybook/` matches nothing: globs skip dot-folders); stories in the runtime project with the components              |
 | lint                    | `...storybook.configs['flat/recommended']` in `eslint.config.js`                                                                                                                        |
 
 ## Pitfalls
