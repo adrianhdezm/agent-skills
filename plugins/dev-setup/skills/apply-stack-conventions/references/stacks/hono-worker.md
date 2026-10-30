@@ -46,21 +46,199 @@ my-worker/
 
 ## Required values
 
-| What                       | Value                                                                                                                                                                                                                                                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| scripts                    | `dev` `vite dev`; `build` `vite build`; `preview`, `deploy`, `cf-typegen` as the Cloudflare Workers doc says; `typecheck` `wrangler types && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                                                       |
-| `allowBuilds`              | `esbuild`, `workerd`                                                                                                                                                                                                                                                                                         |
-| dependencies               | `hono`                                                                                                                                                                                                                                                                                                       |
-| devDependencies            | `@types/node@24`, `wrangler`, `vite`, `@cloudflare/vite-plugin`, `vitest@5`, `@cloudflare/vitest-plugin`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, the pinned `typescript`                                                                                         |
-| `wrangler.jsonc`           | `main: "./src/app.ts"`                                                                                                                                                                                                                                                                                       |
-| `vite.config.ts`           | `cloudflare({ viteEnvironment: { name: 'worker' } })`, `environments.worker.build.sourcemap: true`                                                                                                                                                                                                           |
-| `vitest.config.ts`         | `cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`                                                                                                                                                                                                                                           |
-| `tsconfig.cloudflare.json` | includes `src`, `worker-configuration.d.ts`; `lib`/`target` `ES2024`, `types: ["./worker-configuration.d.ts"]`, `module: "ESNext"`, `moduleResolution: "bundler"`, `noUncheckedSideEffectImports`; no DOM                                                                                                    |
-| `tsconfig.node.json`       | the same with `types: ["node"]`, including the two Vite configs                                                                                                                                                                                                                                              |
-| `tsconfig.test.json`       | extends the Worker project, adds `tests`, `types: ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]`, so only tests see the test runtime                                                                                                                                                    |
-| `eslint.config.js`         | the shared blocks, ignoring the shared list plus `dist`, `.wrangler`, `worker-configuration.d.ts`, `eslint.config.js`; tests: `no-restricted-imports` for `cloudflare:test` (message: import `exports` and `env` from `cloudflare:workers`); no `globals` package (the runtime globals come from TypeScript) |
-| `.prettierignore`          | `worker-configuration.d.ts`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                |
-| `.gitignore`               | `node_modules/`, `dist/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                                                                                                 |
+| What              | Value                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scripts           | `dev` `vite dev`; `build` `vite build`; `preview`, `deploy`, `cf-typegen` as the Cloudflare Workers doc says; `typecheck` `wrangler types && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                                                                             |
+| `allowBuilds`     | `esbuild`, `workerd`                                                                                                                                                                                                                                                                                                               |
+| dependencies      | `hono`                                                                                                                                                                                                                                                                                                                             |
+| devDependencies   | `@types/node@24`, `wrangler`, `vite`, `@cloudflare/vite-plugin`, `vitest@5`, `@cloudflare/vitest-plugin`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, the pinned `typescript`                                                                                                               |
+| `wrangler.jsonc`  | `main: "./src/app.ts"`                                                                                                                                                                                                                                                                                                             |
+| configs           | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code: one project per runtime (the Worker, the Vite configs on Node, the tests with the test runtime's types); ESLint bans `cloudflare:test` in tests, and needs no `globals` package, since the runtime's globals come from TypeScript |
+| `.prettierignore` | `worker-configuration.d.ts`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                      |
+| `.gitignore`      | `node_modules/`, `dist/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                                                                                                                       |
+
+## Reference code
+
+The config files as a fresh scaffold writes them; the tables above say why each value is there.
+
+`tsconfig.json`:
+
+```jsonc
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.cloudflare.json" }, { "path": "./tsconfig.node.json" }, { "path": "./tsconfig.test.json" }]
+}
+```
+
+`tsconfig.cloudflare.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "types": ["./worker-configuration.d.ts"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.cloudflare.tsbuildinfo",
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src", "worker-configuration.d.ts"]
+}
+```
+
+`tsconfig.node.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}
+```
+
+`tsconfig.test.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.cloudflare.json",
+  "compilerOptions": {
+    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo"
+  },
+  "include": ["src", "tests", "worker-configuration.d.ts"]
+}
+```
+
+`eslint.config.js`:
+
+```js
+import js from '@eslint/js';
+import prettier from 'eslint-config-prettier/flat';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig([
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'dist',
+    '.wrangler',
+    'worker-configuration.d.ts',
+    'eslint.config.js'
+  ]),
+  js.configs.recommended,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      parserOptions: {
+        // Each folder belongs to a tsconfig project: src (workerd), tests (workerd + test types), the Vite configs (Node).
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    }
+  },
+  prettier,
+  {
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // A describe holds every case for one module, so the size guardrails do not apply to tests.
+    files: ['tests/**/*.ts'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'max-statements': 'off',
+      'no-restricted-imports': [
+        'error',
+        { paths: [{ name: 'cloudflare:test', message: 'Import `exports` and `env` from `cloudflare:workers`.' }] }
+      ]
+    }
+  }
+]);
+```
+
+`vite.config.ts`:
+
+```ts
+import { cloudflare } from '@cloudflare/vite-plugin';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [cloudflare({ viteEnvironment: { name: 'worker' } })],
+  resolve: { tsconfigPaths: true },
+  environments: { worker: { build: { sourcemap: true } } }
+});
+```
+
+`vitest.config.ts`:
+
+```ts
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })]
+});
+```
 
 ## Scaffold
 
