@@ -12,6 +12,8 @@ How code is linted: flat config, one shared rule set, framework presets on top, 
 - **Size guardrails are warnings**, so one reads as a nudge in the editor. A stack that passes `--max-warnings 0` turns
   them into a failing check; the others let them warn.
 - **Generated and vendored code goes in `globalIgnores`**, not under a rule override.
+- **A deprecated import is a lint error, not only a pitfall**: `no-restricted-imports` names the module and its
+  replacement in `message`, scoped to the folders where it would appear, so the old path cannot come back.
 
 ## Required values
 
@@ -24,6 +26,10 @@ The shared rules ESLint itself provides, under `// Correctness`, `// Complexity 
 | Size        | `complexity` 10, `max-depth` 4, `max-lines-per-function` 75, `max-statements` 20, `max-params` 4, `max-nested-callbacks` 3 | `warn`                                                           |
 |             | `max-lines`                                                                                                                | `warn`, `{ max: 400, skipBlankLines: true, skipComments: true }` |
 | Clarity     | `no-else-return`, `no-nested-ternary`, `no-unneeded-ternary`                                                               | `warn`                                                           |
+
+Every package ignores, besides what its framework or runtime generates: `**/node_modules/**`, `**/coverage/**`,
+`**/.cache/**`, `**/*.tsbuildinfo`, its build output, and an ESLint config that no type-checked project
+includes.
 
 The test files' block turns off `max-lines-per-function`, `max-nested-callbacks` and `max-statements`: a `describe`
 holds every case for one module.
@@ -42,3 +48,4 @@ holds every case for one module.
 - **An override is per folder or file pattern, with a comment saying why**, never a blanket `eslint-disable` at the top
   of a file. A single-line disable names the rule and carries its reason.
 - **Generated and vendored code is ignored**, never patched with overrides.
+- **A deprecated import is forbidden with `no-restricted-imports`**, its `message` naming the replacement.
