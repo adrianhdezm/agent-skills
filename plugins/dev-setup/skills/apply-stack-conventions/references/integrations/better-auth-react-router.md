@@ -7,7 +7,7 @@ use it once they add sign-in.
 ## The seam
 
 ```
-workers/app.ts ─► betterAuth({ database: adapter, secret, baseURL, … }) ─► appContext.auth
+workers/app.ts ─► createAuth(db, { secret, baseURL }) ─► appContext.auth      (app/lib/auth.ts: betterAuth({ … }))
 app/routes.ts: route('api/auth/*', 'routes/auth.tsx') ─► loader/action return auth.handler(request)
 protected layout middleware ─► auth.api.getSession({ headers: request.headers }) ─► userContext, or redirect to /login
 login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpEmail ─► redirect(safeRedirectTo(…))
@@ -15,14 +15,15 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 ## Where it lives
 
-| File                                               | Holds                                                                  |
-| -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `workers/app.ts`                                   | Better Auth built per request on Workers, once at module scope on Node |
-| `app/context.ts`                                   | `auth: ReturnType<typeof betterAuth>` on `appContext`; `userContext`   |
-| `app/routes/auth.tsx`                              | the splat route's loader and action                                    |
-| `app/routes/login.tsx`, `signup.tsx`, `logout.tsx` | the credentials forms and sign-out                                     |
-| the protected layout route                         | `export const middleware: Route.MiddlewareFunction[] = [requireUser]`  |
-| `app/lib/utils.ts`                                 | `safeRedirectTo`                                                       |
+| File                                               | Holds                                                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| `app/lib/auth.ts`                                  | `createAuth(db, …)`: the `betterAuth` options and adapter; `AppAuth`    |
+| `workers/app.ts`                                   | calls `createAuth` per request on Workers, once at module scope on Node |
+| `app/context.ts`                                   | `auth: AppAuth` on `appContext`; `userContext`                          |
+| `app/routes/auth.tsx`                              | the splat route's loader and action                                     |
+| `app/routes/login.tsx`, `signup.tsx`, `logout.tsx` | the credentials forms and sign-out                                      |
+| the protected layout route                         | `export const middleware: Route.MiddlewareFunction[] = [requireUser]`   |
+| `app/lib/utils.ts`                                 | `safeRedirectTo`                                                        |
 
 ## Required values
 
@@ -43,8 +44,8 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 ## Conventions
 
-- **Better Auth is built in `workers/app.ts`** (per request on Workers, once on Node) and reached as
-  `context.get(appContext).auth`.
+- **Better Auth is built by `createAuth` in `app/lib/auth.ts`**, called from `workers/app.ts` (per request on Workers,
+  once on Node), and reached as `context.get(appContext).auth`.
 - **Its endpoints are the `api/auth/*` splat route**; login, signup and logout are ordinary routes outside the protected
   layout.
 - **The protected layout's middleware reads the session once** and puts the user on `userContext`; loaders and actions
