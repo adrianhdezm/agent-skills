@@ -48,6 +48,9 @@ two tiers of tests, and a static build.
 
 ## Pitfalls
 
+- **The CLI's manifest is not `"type": "module"`**, and stays that way: a config file that uses `import` ends in `.mjs`
+  or `.mts`, and Playwright loads `playwright.config.ts` and `e2e/**` as CommonJS, where `import.meta` throws ("Cannot
+  use 'import.meta' outside a module"): use `__dirname` there.
 - **A component with `input.required()` cannot be mounted by a helper that starts change detection at once**
   (`NG0950`): mount it by hand, `TestBed.createComponent` → `setInput` for each required input → append to
   `document.body` → `autoDetectChanges()`.
