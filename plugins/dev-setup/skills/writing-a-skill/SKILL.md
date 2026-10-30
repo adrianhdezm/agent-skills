@@ -64,7 +64,7 @@ Omit any section that doesn't apply — don't leave empty placeholders.
 
 Use verb-object form, the command the user would type: `verify-build`, `debug-failure`, `confirm-my-goal`. Lowercase letters, numbers, and hyphens only, max 64 chars. The H1 title matches the name (`# Verify Build`).
 
-Scaffolding a new project is one skill, `bootstrap-project`, and how each technology is used and connected is one skill, `apply-stack-conventions`. A new stack becomes a blueprint in `apply-stack-conventions`, not a new `create-<thing>` skill; a new technology, integration or example becomes a doc there, and `bootstrap-project` finds it by looking it up.
+Scaffolding a new project is one skill, `bootstrap-project`, and how each technology is used and connected is one skill, `apply-stack-conventions`. A new stack becomes a blueprint in `apply-stack-conventions`, not a new `create-<thing>` skill; a new technology, integration or example becomes a doc there, and `bootstrap-project` finds it through that skill's hand-off. The list of stacks lives only in `apply-stack-conventions`; other skills link to it.
 
 Older skills keep their gerund names (`setting-up-npm-block`, `writing-a-skill`). Do not use that form for new ones.
 

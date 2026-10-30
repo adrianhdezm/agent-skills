@@ -50,15 +50,10 @@ It is grounded in the real code and the project's conventions, not in a framewor
 2. **Settle the stack.** If the project already has code, the stack is what is there. If it has no code yet, the stack
    is the first decision, and it comes before the rest of the design. Take it through the `bootstrap-project`
    interview ([interview.md](../bootstrap-project/references/interview.md)): fill in what the analysis already
-   answers, recommend a combination from its table with the reason in one sentence, and ask the user that question
-   alone. The combinations:
-   - **Node package**: a CLI, a library or a script.
-   - **Hono Worker**: an API or small service on Cloudflare Workers.
-   - **React Router on Workers**: a web app on the edge, nothing to operate.
-   - **React Router on Node**: a web app next to Postgres, run by Docker Compose.
-   - **Angular app**: an Angular client alone, calling an API that already exists.
-   - **Angular full stack**: an Express + Postgres API and an Angular client, with a CRUDL example wired end to end.
-   - something else, if the user names it.
+   answers, recommend a stack from the
+   [Stacks section of `apply-stack-conventions`](../apply-stack-conventions/SKILL.md#stacks), the one list of stacks
+   and what each suits, with the reason in one sentence, and ask the user that question alone. Something else is fine
+   if the user names it.
 
    Then run `bootstrap-project` with that combination in the project folder; it asks only what is still open. Offer
    to commit the scaffold on its own, so later diffs show only the feature. Design against the real scaffold: where it

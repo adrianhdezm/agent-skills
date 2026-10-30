@@ -1,25 +1,17 @@
 ---
 name: bootstrap-project
-description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by looking up the apply-stack-conventions docs for each technology, each pair that connects and the examples to start from, applying what exists and filling any gap with sensible defaults it reports. Seven combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, or when design-solution settles the stack.
+description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the apply-stack-conventions skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Seven combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, or when design-solution settles the stack.
 ---
 
 # Bootstrap Project
 
-One skill for every new project. A short interview settles the combination of technologies. Then, for each piece, look
-up what the `apply-stack-conventions` skill knows, and build from it:
+One skill for every new project. A short interview settles the combination of technologies; the
+`apply-stack-conventions` skill turns it into the stack, the docs and examples that apply, the gaps and an assembled
+`coding-conventions.md`; this skill builds the project from that hand-off. It keeps no list of stacks or docs of its
+own: a new stack, technology, integration or example is added there, and found here through the hand-off.
 
-| Look for                                   | In `<conventions-dir>/references/` | Use it for                                        |
-| ------------------------------------------ | ---------------------------------- | ------------------------------------------------- |
-| a blueprint for the whole combination      | `stacks/`                          | the list of docs and examples, values, smoke test |
-| a doc for each concept the project needs   | `architecture/`                    | what holds everywhere, and which docs realise it  |
-| a doc for each technology                  | `technologies/`                    | how it is set up and used                         |
-| a doc for each pair that connects          | `integrations/`                    | how the two are wired                             |
-| an example of what the project starts with | `examples/`                        | the starter code, its data and its tests          |
-
-Apply what exists. Where nothing exists, build with sensible defaults and the technology's official docs, and record
-the gap. `<conventions-dir>` is the `apply-stack-conventions` skill's base directory, `<skill-dir>/../apply-stack-conventions`.
-That skill resolves the stack, lists the docs and examples, and assembles `coding-conventions.md`; its
-`references/catalog.md` lists every doc and example with what it covers.
+Apply what the docs say. Where no doc exists, build with sensible defaults and the technology's official docs, and
+record the gap.
 
 **Done means:** the combination and the docs it uses were stated, every check passes, the smoke test passes,
 `coding-conventions.md` is assembled at the root, every gap is listed under **Found**, and the
@@ -31,7 +23,7 @@ Copy this checklist and tick it off:
 
 ```
 - [ ] 1. Combination settled
-- [ ] 2. Docs and examples looked up, gaps named
+- [ ] 2. Hand-off received, its docs and examples read, gaps named
 - [ ] 3. Toolchain and ports checked, target empty
 - [ ] 4. Project built
 - [ ] 5. Conventions placed, checks pass
@@ -40,17 +32,14 @@ Copy this checklist and tick it off:
 
 1. **Settle the combination** with [references/interview.md](references/interview.md). Skip every question the request,
    the analysis or the calling skill already answers; ask the rest in one message, each with its default. When the user
-   asks which stack fits, recommend one from its table. State the result in its one-line form.
+   asks which stack fits, recommend one as the interview says. State the result in its one-line form.
 
-2. **Look up the docs and examples** by running the `apply-stack-conventions` skill with the combination, including
-   each optional concept (authentication, file storage) the request asks for. It hands back the stack, the blueprint,
-   the docs and examples, the gaps and an assembled `coding-conventions.md`. Read the blueprint and every doc and
-   example it lists, then state what you will use and what has no doc, in one line each:
-
-   ```
-   Docs: Data access, REST API, pnpm, TypeScript, Node, Express, Drizzle, Express + Drizzle, … · Examples: Entity CRUDL (API part)
-   Gaps: no doc for Fastify (official docs and defaults instead)
-   ```
+2. **Get the docs and examples** by running the `apply-stack-conventions` skill with the combination, including each
+   optional entry (database, authentication, file storage, Storybook, Fundamental NGX) the request asks for. Its
+   hand-off names the stack, the blueprint, the docs and examples (absolute paths), the gaps and the assembled
+   `coding-conventions.md`. Read the blueprint and every doc and example it lists, then quote its `Stack`, `Docs` (by
+   title), `Examples` and `Gaps` lines before writing a file. A broken doc under its `Found` goes under this run's
+   **Found**.
 
    Stop and ask only when a gap is a technology the user named and the choice changes the project's shape (which
    database, which framework); otherwise carry on.
@@ -74,9 +63,9 @@ Copy this checklist and tick it off:
    Stop only when the toolchain is missing, a port is taken, a pitfall says to stop, or a check still fails after you
    have found its cause.
 
-5. **Place the conventions**: copy the `coding-conventions.md` that step 2 handed back to the project root, then run
-   `pnpm format` and every check. Confirm what the checks miss: `private` is a boolean, `typescript` is exact, and
-   nothing was emitted next to the sources.
+5. **Place the conventions**: copy the `coding-conventions.md` named on the hand-off's `Conventions` line to the
+   project root, then run `pnpm format` and every check. Confirm what the checks miss: `private` is a boolean,
+   `typescript` is exact, and nothing was emitted next to the sources.
 
 6. **Run the smoke test**: the blueprint's, or, without one, start what the project ships and exercise each example's
    Done when against it.
@@ -85,12 +74,13 @@ Then offer to commit the scaffold on its own, so later diffs show only the featu
 
 ## Adding to an existing project
 
-Do not run `pnpm init` and do not overwrite anything. Settle what the project is, or is becoming, and run the
-`apply-stack-conventions` skill on it as in step 2: it resolves the stack from the project's files. Then set the
-missing fields and scripts with `pnpm pkg set` (ask before replacing a script, a `packageManager` or a Compose file),
-merge `allowBuilds`, install, write each config the project lacks and merge the rest, saying what changed. Follow the
-blueprint's Scaffold notes for existing projects where it has them. Delete any `*.js`, `*.d.ts` and `*.tsbuildinfo` an
-earlier `tsc -b` left next to the sources, place the conventions, then format and check.
+Do not run `pnpm init` and do not overwrite anything. Settle only what the project is becoming that its files do not
+show, and run the `apply-stack-conventions` skill on it as in step 2: it resolves the stack from the project's files and
+reports where its `coding-conventions.md` has drifted from the docs. Then set the missing fields and scripts with
+`pnpm pkg set` (ask before replacing a script, a `packageManager` or a Compose file), merge `allowBuilds`, install,
+write each config the project lacks and merge the rest, saying what changed. Follow the blueprint's Scaffold notes for
+existing projects where it has them. Delete any `*.js`, `*.d.ts` and `*.tsbuildinfo` an earlier `tsc -b` left next to
+the sources, place the conventions, then format and check.
 
 ## End of the run
 
@@ -102,7 +92,7 @@ another skill called this one, such as `design-solution`, hand these back to it 
 
 ## Review Checklist
 
-- [ ] The combination, the docs and examples used and the gaps were stated before the first file was written
+- [ ] The combination, and the hand-off's docs, examples and gaps, were stated before the first file was written
 - [ ] `allowBuilds` was written before the first `pnpm add`; `typescript` is an exact 6.0.x; `private` is a boolean;
       `packageManager` is set
 - [ ] Config files follow the docs' and the blueprint's required values; reference code was written as given
