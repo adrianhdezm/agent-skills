@@ -42,9 +42,9 @@ my-api/
 ├── Dockerfile / drizzle.config.ts / eslint.config.js
 ├── package.json / pnpm-lock.yaml / pnpm-workspace.yaml
 ├── tsconfig{,.app,.node}.json / vitest.config.ts
-├── db/scripts/init.sql       # no db/migrations/ is shipped
+├── db/scripts/init.sql, db/migrations/   # the init migration the scaffold generated and committed
 ├── src/
-│   ├── server.ts / app.ts / logger.ts / express.d.ts
+│   ├── server.ts / app.ts / migrate.ts / logger.ts / express.d.ts
 │   ├── db/client.ts / db/schema.ts / db/schemas/entity.schema.ts
 │   ├── models/               # dao.model, list-input.model, error.model, app-context.model
 │   ├── helpers/              # dao.helper, list-input.helper, query-parser.helper
@@ -74,7 +74,7 @@ my-api/
 | `docker-compose.yml`  | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the Express + Docker Compose `api` service                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `.prettierignore`     | `node_modules`, `dist`, `db/migrations`, `db/data`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `.dockerignore`       | `**/node_modules`, `dist`, `.git`, `.env`, `db`, `coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `.dockerignore`       | `**/node_modules`, `dist`, `.git`, `.env`, `db/data`, `coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ## Reference code
 
@@ -232,7 +232,8 @@ export default defineConfig({
 - **Check the ports first**; stop with the user if one is taken, or set another `PORT` in `.env`.
 - **The manifest is written by the tools** (`pnpm init`, `pnpm pkg set`), with `type: "module"`.
 - **`cp .env.example .env`** once `.env.example` is written.
-- **Bring the stack up for the smoke test**; `db:generate --name init` produces exactly one migration.
+- **Generate the `init` migration before the first `compose:up`**: the image carries `db/migrations/`, and the
+  `migrate` service applies it before the API starts. It produces exactly one migration, committed with the scaffold.
 
 ## Conventions
 
@@ -306,12 +307,12 @@ add the schema, controller (with a stub in `createStubContext`), DAO (with a see
 ## Smoke test
 
 ```sh
-pnpm compose:up
-pnpm db:generate --name init && pnpm db:migrate
+pnpm db:generate --name init                  # exactly one migration
+pnpm compose:up                               # db healthy, migrate exits 0, then api
 pnpm test:integration
 curl -s http://localhost:3000/health          # {"status":"ok","db":"up",…}
 ```
 
-`db:generate` produces exactly one migration. Through the API, `POST /entities` creates, a filtered, sorted, paged
+`docker compose ps -a` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
 `GET /entities` answers `{ items, total, page, pageSize, totalPages }`, an unknown filter field is a 400, `PATCH`
 updates, `DELETE` answers 204 and then 404.

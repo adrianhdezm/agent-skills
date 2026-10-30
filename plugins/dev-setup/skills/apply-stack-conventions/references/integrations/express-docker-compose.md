@@ -8,7 +8,8 @@ only, next to the database it waits for. REST API on Node and the Angular full s
 ```
 Dockerfile: build stage (node:24-alpine, corepack, frozen install, tsc build) ─► dist/
             runtime stage (node:24-alpine, --prod install, dist/) ─► CMD ["node", "dist/server.js"]
-docker-compose.yml: api (DATABASE_URL at host db, PORT, ports '${PORT:-3000}:3000') ─► depends_on db healthy
+docker-compose.yml: migrate (same image, node dist/migrate.js) ─► depends_on db healthy, runs to completion
+                    api (DATABASE_URL at host db, PORT, ports '${PORT:-3000}:3000') ─► depends_on migrate completed
 ```
 
 - **The runtime stage runs the compiled server**: `dist/` and production dependencies only; `tsx`, `pino-pretty` and
@@ -17,17 +18,21 @@ docker-compose.yml: api (DATABASE_URL at host db, PORT, ports '${PORT:-3000}:300
 
 ## Required values
 
-| What          | Value                                                                                                                                                           |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| build stage   | the Docker Compose doc's, with `--ignore-scripts` (nothing in the build or runtime runs esbuild), building with the package's `build`                           |
-| runtime stage | `pnpm install --prod --frozen-lockfile --ignore-scripts`; copy `dist/`; `ENV NODE_ENV=production`; `USER node`; `EXPOSE 3000`; `CMD ["node", "dist/server.js"]` |
-| service `api` | `build` from the repo root; `environment`: `DATABASE_URL` at host `db`, `PORT: '3000'`; ports `'${PORT:-3000}:3000'`; `depends_on` `db` being healthy           |
+| What              | Value                                                                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| build stage       | the Docker Compose doc's, with `--ignore-scripts` (nothing in the build or runtime runs esbuild), building with the package's `build`                                                         |
+| runtime stage     | `pnpm install --prod --frozen-lockfile --ignore-scripts`; copy `dist/` and `db/migrations/`; `ENV NODE_ENV=production`; `USER node`; `EXPOSE 3000`; `CMD ["node", "dist/server.js"]`          |
+| service `migrate` | the same `build`; `command: ['node', 'dist/migrate.js']`; `environment`: `DATABASE_URL` at host `db`; `depends_on` `db` being healthy; it exits when done                                     |
+| service `api`     | `build` from the repo root; `environment`: `DATABASE_URL` at host `db`, `PORT: '3000'`; ports `'${PORT:-3000}:3000'`; `depends_on` `migrate` with `condition: service_completed_successfully` |
 
 ## Pitfalls
 
 - **`start` with `--env-file`** fails in the container, where there is no `.env`: the image's `CMD` runs `node` directly
   and Compose provides the environment.
-- **A missing migration** fails the first request with "relation does not exist": migrations run before the API serves.
+- **A missing migration** fails the first request with "relation does not exist": the `migrate` service runs them
+  before the API starts.
+- **An image without `db/migrations/`** fails the `migrate` service: `.dockerignore` leaves out `db/data` only, never
+  all of `db`.
 
 ## Conventions
 
@@ -35,4 +40,5 @@ docker-compose.yml: api (DATABASE_URL at host db, PORT, ports '${PORT:-3000}:300
 
 ## Verify it is wired
 
-- `pnpm compose:up` brings `api` up after `db` is healthy, and `GET /health` answers `ok`.
+- `pnpm compose:up` on an empty database brings `db` up healthy, runs `migrate` to exit code 0, then brings `api` up,
+  and `GET /health` answers `ok`.

@@ -25,6 +25,31 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 | Vitest projects     | `unit` (no database), `db` and `api` (Testcontainers; `hookTimeout: 120_000`, `testTimeout: 30_000` for the first image pull); `test` runs `--project unit`, `test:integration` runs `--project db --project api` |
 | `allowBuilds`       | `cpu-features`, `protobufjs`, `ssh2` set to `false`: optional native dependencies of Testcontainers that the local Docker socket never needs                                                                      |
 
+## Reference code
+
+`src/migrate.ts`, which applies the committed migrations with drizzle-orm's own migrator, a production dependency, so
+the image needs no drizzle-kit; the engine's Compose integration runs it before the app:
+
+```ts
+import { fileURLToPath } from 'node:url';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
+
+// Applies db/migrations/ and exits: Compose runs it before the API, from the same image.
+const url = process.env.DATABASE_URL;
+if (!url) {
+  throw new Error('DATABASE_URL is not set');
+}
+const pool = new Pool({ connectionString: url });
+try {
+  const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url));
+  await migrate(drizzle(pool), { migrationsFolder, migrationsTable: '__migrations__', migrationsSchema: 'public' });
+} finally {
+  await pool.end();
+}
+```
+
 ## Pitfalls
 
 - **drizzle-kit does not load `.env`**: run its bin under `node --env-file`.

@@ -13,8 +13,8 @@ its client is built and tested there, belong to that engine's integration.
 - **The client is the engine's**: the engine's integration says how it is built; `drizzle.config.ts` reads the same
   connection setting and throws when it is unset.
 - **Migrations only.** `db:generate` writes a migration from the schema files and `db:migrate` applies it; there is no
-  `db:push`. The scaffold ships no migrations: the first `db:generate --name init` creates one clean snapshot, named
-  and timestamped by the user. drizzle-kit does not load `.env`, so its scripts run its bin under
+  `db:push`. No doc ships a migration file: the scaffold's own `db:generate --name init` creates the first clean
+  snapshot from its schema, and it is committed with the scaffold. drizzle-kit does not load `.env`, so its scripts run its bin under
   `node --env-file=../.env node_modules/drizzle-kit/bin.cjs …`.
 - **drizzle-kit reads the resource schema files** (`src/db/schemas/*.schema.ts`), because it finds tables from module
   exports; `db/schema.ts` only groups them in the object handed to `drizzle(pool, { schema })`.
@@ -62,7 +62,8 @@ metacharacters, so user input is matched literally.
 - **drizzle-kit does not load `.env`**: run its bin under `node --env-file`.
 - **drizzle-zod's object schemas strip unknown keys** rather than rejecting them, so a body with an extra field would
   pass: end every row input schema in `.strict()` (before any `.refine`), as the reference code does.
-- **A shipped migration** carries the scaffold's clock and diverges from the schema on the first edit: ship none.
+- **A migration copied from a doc** carries another project's clock and diverges from the schema on the first edit:
+  generate it.
 
 ## Reference code
 
