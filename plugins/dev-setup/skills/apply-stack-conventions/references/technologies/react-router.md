@@ -16,11 +16,9 @@ and generated route types.
   checks.
 - **The app files**: `app/root.tsx` exports `Layout` (the document: `<Meta />`, `<Links />`, `<ScrollRestoration />`,
   `<Scripts />`), a default `App` rendering `<Outlet />`, and an `ErrorBoundary` that shows 404s, other route error
-  responses, and the message and stack of an `Error` in development only; it imports `./app.css`. `app/env.d.ts`
-  references `@react-router/dev/vite/env` so `virtual:react-router/server-build` resolves before the first build.
+  responses, and the message and stack of an `Error` in development only; it imports `./app.css`.
   `app/entry.server.tsx` streams the document (reference code below). `public/favicon.ico` is a placeholder.
-- **Imports inside `app/` use the `~/` alias** (`paths: { "~/*": ["./app/*"] }`, resolved by Vite through
-  `resolve.tsconfigPaths`); a route module imports its own `+types` relatively.
+- **Imports inside `app/` use the `~/` alias** (`paths: { "~/*": ["./app/*"] }` in the runtime project); a route module imports its own `+types` relatively.
 - **A route component is tested through `createRoutesStub`** with stubbed `loader` and `action`, so data flows through
   the router as in production; tests mirror `app/` in `tests/unit/` and render in a real browser.
 
@@ -28,11 +26,10 @@ and generated route types.
 
 | Where                | Value                                                                                                                                                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| dependencies         | `react`, `react-dom`, `react-router`, `isbot`; dev: `@react-router/dev`, `@types/react`, `@types/react-dom`, `vite`                                                                                                                                                                                                      |
-| runtime tsconfig     | `include`: `.react-router/types/**/*`, `app`, `workers` and the target's files; `lib: ["ES2024", "DOM", "DOM.Iterable"]`; `jsx: "react-jsx"`; `rootDirs: [".", "./.react-router/types"]`; `paths: { "~/*": ["./app/*"] }`; `module: "ESNext"`, `moduleResolution: "bundler"`; `types`: the target's plus `"vite/client"` |
+| dependencies         | `react`, `react-dom`, `react-router`, `isbot`; dev: `@react-router/dev`, `@types/react`, `@types/react-dom`                                                                                                                                                                                                              |
+| runtime tsconfig     | `include`: `.react-router/types/**/*`, `app`, `workers` and the target's files; `lib: ["ES2024", "DOM", "DOM.Iterable"]`; `jsx: "react-jsx"`; `rootDirs: [".", "./.react-router/types"]`; `paths: { "~/*": ["./app/*"] }`; `module: "ESNext"`, `moduleResolution: "bundler"`; `types`: the target's and the build tool's |
 | `tsconfig.test.json` | extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`                                                                                                                                                                                                                                        |
 | `tsconfig.node.json` | includes `react-router.config.ts` and the build and test configs                                                                                                                                                                                                                                                         |
-| Vite plugins         | `reactRouter()` last; `resolve.tsconfigPaths: true`                                                                                                                                                                                                                                                                      |
 | `typecheck`          | `react-router typegen && tsc -b`, after any runtime type generator                                                                                                                                                                                                                                                       |
 | `dev` / `build`      | `react-router dev`, or a custom server that runs the app / `react-router build`                                                                                                                                                                                                                                          |
 | `.gitignore`         | `build/`, `.react-router/`                                                                                                                                                                                                                                                                                               |
@@ -40,7 +37,6 @@ and generated route types.
 ## Pitfalls
 
 - **`root.tsx` without both `Layout` and a default export renders a blank page** with nothing in the browser console.
-- **`virtual:react-router/server-build` cannot be found** on a fresh clone without `app/env.d.ts`.
 - **`./+types/home` cannot be found** when `typecheck` skips `react-router typegen`.
 - **`createRoutesStub` returns loosely typed values**: tests assign them without a type of their own.
 

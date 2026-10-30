@@ -22,6 +22,8 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [File storage](../architecture/file-storage.md) — optional (file-storage)
 - [UI components](../architecture/ui-components.md)
 - [React Router](../technologies/react-router.md)
+- [Vite](../technologies/vite.md)
+- [React Router + Vite](../integrations/react-router-vite.md)
 - [Tailwind](../technologies/tailwind.md)
 - [shadcn](../technologies/shadcn.md)
 - [React Router + shadcn/ui](../integrations/react-router-shadcn.md)

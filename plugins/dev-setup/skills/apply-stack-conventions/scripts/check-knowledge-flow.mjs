@@ -37,6 +37,7 @@ const names = {
   storybook: [/\bStorybook\b/, /@storybook\//, /\bstorybook@/],
   tailwind: [/\bTailwind\b/, /\btailwindcss\b/],
   typescript: [/\bTypeScript\b/],
+  vite: [/\bVite\b/, /\bvite\b/],
   vitest: [/\bVitest\b/, /\bvitest\b/]
 };
 /**

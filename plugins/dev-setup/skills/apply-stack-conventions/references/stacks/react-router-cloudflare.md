@@ -21,6 +21,8 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [File storage](../architecture/file-storage.md) — optional (file-storage)
 - [UI components](../architecture/ui-components.md)
 - [React Router](../technologies/react-router.md)
+- [Vite](../technologies/vite.md)
+- [React Router + Vite](../integrations/react-router-vite.md)
 - [Tailwind](../technologies/tailwind.md)
 - [shadcn](../technologies/shadcn.md)
 - [React Router + shadcn/ui](../integrations/react-router-shadcn.md)
@@ -29,6 +31,7 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [Storybook](../technologies/storybook.md) — optional (storybook)
 - [React Router + Storybook](../integrations/react-router-storybook.md) — optional (storybook)
 - [Cloudflare Workers](../technologies/cloudflare-workers.md)
+- [Cloudflare Workers + Vite](../integrations/cloudflare-workers-vite.md)
 - [Hono + Cloudflare Workers](../integrations/hono-cloudflare-workers.md)
 - [React Router + Drizzle](../integrations/react-router-drizzle.md)
 - [Cloudflare D1](../technologies/cloudflare-d1.md) — optional (database)
@@ -85,7 +88,7 @@ my-app/
 | `wrangler.jsonc`           | `main: "./workers/app.ts"`, `vars: { "APP_NAME": "<App name>" }`, `observability: { "enabled": true }`                                                                                                                                                            |
 | `vite.config.ts`           | `cloudflare({ viteEnvironment: { name: 'ssr' } })`, `tailwindcss()`, `reactRouter()`, in that order                                                                                                                                                               |
 | `tsconfig.cloudflare.json` | includes `worker-configuration.d.ts`; `types: ["./worker-configuration.d.ts", "vite/client"]`                                                                                                                                                                     |
-| `.gitignore`               | `node_modules/`, `build/`, `.react-router/`, `.wrangler/`, `.dev.vars*`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                     |
+| `.gitignore`               | `node_modules/`, `build/`, `.react-router/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                                   |
 | `.prettierignore`          | `pnpm-lock.yaml`, `worker-configuration.d.ts`                                                                                                                                                                                                                     |
 
 ## Scaffold

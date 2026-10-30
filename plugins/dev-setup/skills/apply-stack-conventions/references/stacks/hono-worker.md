@@ -15,6 +15,8 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [REST API](../architecture/rest-api.md)
 - [Hono](../technologies/hono.md)
 - [Cloudflare Workers](../technologies/cloudflare-workers.md)
+- [Vite](../technologies/vite.md)
+- [Cloudflare Workers + Vite](../integrations/cloudflare-workers-vite.md)
 - [Hono + Cloudflare Workers](../integrations/hono-cloudflare-workers.md)
 - [ESLint](../technologies/eslint.md)
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
@@ -61,7 +63,7 @@ my-worker/
 | `tsconfig.test.json`       | extends the Worker project, adds `tests`, `types: ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]`, so only tests see the test runtime                                                                        |
 | `eslint.config.js`         | the shared blocks, ignoring `node_modules`, `dist`, `.wrangler`, `worker-configuration.d.ts`, `eslint.config.js`; no `globals` package (the runtime globals come from TypeScript)                                                |
 | `.prettierignore`          | `worker-configuration.d.ts`, `pnpm-lock.yaml`                                                                                                                                                                                    |
-| `.gitignore`               | `node_modules/`, `dist/`, `.wrangler/`, `.dev.vars*`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                       |
+| `.gitignore`               | `node_modules/`, `dist/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                     |
 
 ## Scaffold
 

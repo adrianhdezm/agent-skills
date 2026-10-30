@@ -1,14 +1,14 @@
 # Storybook
 
 Storybook 10 as the workshop where components are built and reviewed: a story file beside every component, one story per
-meaningful state, on the app's own Vite build. Not a test runner.
+meaningful state, on the app's own build tool. Not a test runner.
 
 **Realises:** [UI components](../architecture/ui-components.md)
 
 ## Use it like this
 
-- **On the framework's Vite builder**, so stories compile the way the app does; the framework's integration names the
-  package. Never a webpack builder beside a Vite app.
+- **On the app's own builder**, so stories compile the way the app does; the framework's integration names the
+  package. Never a second builder beside the app's.
 - **A story file beside every component** in `components/` and `components/ui/`, named after it (`<name>.stories.*`),
   with one story per meaningful state: `args` for its inputs, `fn()` for its outputs.
 - **Titles follow the tiers**: `UI/<Name>` for a primitive, `Components/<Name>` for an app component.
@@ -22,7 +22,7 @@ meaningful state, on the app's own Vite build. Not a test runner.
 
 | What                   | Value                                                                   |
 | ---------------------- | ----------------------------------------------------------------------- |
-| dependencies           | dev `storybook@10`, the framework's Vite package on the same major      |
+| dependencies           | dev `storybook@10`, the framework's builder package on the same major   |
 | config                 | `.storybook/main.ts` (stories glob, framework), `.storybook/preview.ts` |
 | port                   | `6006`                                                                  |
 | `.gitignore` additions | `*storybook.log`, `storybook-static`                                    |
