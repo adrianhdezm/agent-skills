@@ -36,6 +36,7 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [Angular + the API contract](../integrations/angular-api-contract.md)
 - [Docker Compose](../technologies/docker-compose.md)
 - [Postgres + Docker Compose](../integrations/postgres-docker-compose.md)
+- [Nginx + Docker Compose](../integrations/nginx-docker-compose.md)
 - [ESLint](../technologies/eslint.md)
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
 - [Prettier](../technologies/prettier.md)

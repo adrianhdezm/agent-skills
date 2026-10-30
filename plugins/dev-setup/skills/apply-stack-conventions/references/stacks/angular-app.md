@@ -23,6 +23,8 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [Angular + Storybook](../integrations/angular-storybook.md)
 - [Nginx](../technologies/nginx.md)
 - [Angular + Nginx](../integrations/angular-nginx.md)
+- [Docker Compose](../technologies/docker-compose.md)
+- [Nginx + Docker Compose](../integrations/nginx-docker-compose.md)
 - [Angular + Fundamental NGX](../integrations/angular-fundamental-ngx.md) — optional
 - [Angular + the API contract](../integrations/angular-api-contract.md)
 - [ESLint](../technologies/eslint.md)
@@ -74,7 +76,7 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 | `src/index.html`    | `<title>` is `<App name>`                                                                                                                                                                                                                                                                                                          |
 | `eslint.config.mjs` | the Angular + ESLint presets, selectors, overrides and ignores                                                                                                                                                                                                                                                                     |
 | `.prettierrc`       | shared, with the HTML override; `.prettierignore`: `node_modules`, `dist`, `.angular`                                                                                                                                                                                                                                              |
-| `Dockerfile`        | builds with `node:24-alpine` and Corepack, copies `dist/<name>/browser` into `nginx:1.27-alpine` with the Angular doc's `nginx.conf`                                                                                                                                                                                               |
+| `Dockerfile`        | Nginx + Docker Compose's two stages, as Angular + Nginx says                                                                                                                                                                                                                                                                       |
 
 `<App name>` is the repo name in Title Case.
 
