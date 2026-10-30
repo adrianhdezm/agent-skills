@@ -80,7 +80,7 @@ with an `id: string | null` instead of the input, statuses `'idle' | 'loading' |
 `Load Success` / `Load Failure` / `Leave` group, and one `load$` read ending on `Leave`; its reducer starts the slice
 over when the id changes. Its files close this section.
 
-**`app.config.ts`**
+**`src/app/app.config.ts`**
 
 ```ts
 import { type ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners } from '@angular/core';
@@ -114,7 +114,7 @@ export const appConfig: ApplicationConfig = {
 };
 ```
 
-**`app.routes.ts`**
+**`src/app/app.routes.ts`**
 
 ```ts
 import type { Routes } from '@angular/router';
@@ -168,7 +168,7 @@ export const routes: Routes = [
 ];
 ```
 
-**`store/app-router/app-router.model.ts`**
+**`src/app/store/app-router/app-router.model.ts`**
 
 ```ts
 import { type Params } from '@angular/router';
@@ -190,7 +190,7 @@ export interface NavigatedRoute {
 }
 ```
 
-**`store/app-router/app-router.serializer.ts`**
+**`src/app/store/app-router/app-router.serializer.ts`**
 
 ```ts
 import { type Params, type RouterStateSnapshot } from '@angular/router';
@@ -220,7 +220,7 @@ export function navigatedRoute(action: RouterNavigatedAction): NavigatedRoute {
 }
 ```
 
-**`store/app-router/app-router.actions.ts`**
+**`src/app/store/app-router/app-router.actions.ts`**
 
 ```ts
 import { createActionGroup, props } from '@ngrx/store';
@@ -237,7 +237,7 @@ export const AppRouterActions = createActionGroup({
 });
 ```
 
-**`store/app-router/app-router.effects.ts`**
+**`src/app/store/app-router/app-router.effects.ts`**
 
 ```ts
 import { inject } from '@angular/core';
@@ -256,7 +256,7 @@ export const navigate$ = createEffect(
 );
 ```
 
-**`store/entity-list-page/entity-list-page.model.ts`**
+**`src/app/store/entity-list-page/entity-list-page.model.ts`**
 
 ```ts
 import { type Entity, type ListEntityInput } from '../../models/entity.model';
@@ -274,7 +274,7 @@ export interface EntityListPageState {
 }
 ```
 
-**`store/entity-list-page/entity-list-page.actions.ts`**
+**`src/app/store/entity-list-page/entity-list-page.actions.ts`**
 
 ```ts
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
@@ -298,7 +298,7 @@ export const EntityListPageActions = createActionGroup({
 });
 ```
 
-**`store/entity-list-page/entity-list-page.reducer.ts`**
+**`src/app/store/entity-list-page/entity-list-page.reducer.ts`**
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
@@ -334,7 +334,7 @@ export const entityListPageReducer = createReducer(
 );
 ```
 
-**`store/entity-list-page/entity-list-page.selectors.ts`**
+**`src/app/store/entity-list-page/entity-list-page.selectors.ts`**
 
 ```ts
 import { createFeatureSelector, createSelector } from '@ngrx/store';
@@ -352,7 +352,7 @@ export const selectTotal = createSelector(selectEntityListPageState, (s) => s.to
 export const selectError = createSelector(selectEntityListPageState, (s) => s.error);
 ```
 
-**`store/entity-list-page/entity-list-page.effects.ts`**
+**`src/app/store/entity-list-page/entity-list-page.effects.ts`**
 
 ```ts
 import { inject } from '@angular/core';
@@ -428,7 +428,7 @@ export const delete$ = createEffect(
 );
 ```
 
-**`store/entity-form-page/entity-form-page.model.ts`**
+**`src/app/store/entity-form-page/entity-form-page.model.ts`**
 
 ```ts
 import { type Entity } from '../../models/entity.model';
@@ -454,7 +454,7 @@ export interface EntityFormPageState {
 }
 ```
 
-**`store/entity-form-page/entity-form-page.actions.ts`**
+**`src/app/store/entity-form-page/entity-form-page.actions.ts`**
 
 ```ts
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
@@ -482,7 +482,7 @@ export const EntityFormPageActions = createActionGroup({
 In the reducer, `target.id !== state.target?.id` is `true` for the first `{ id: null }` too, since the initial
 `target` is `null`; `action.payload.event` is the router's `NavigationEnd`, whose `id` is unique per navigation.
 
-**`store/entity-form-page/entity-form-page.reducer.ts`**
+**`src/app/store/entity-form-page/entity-form-page.reducer.ts`**
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
@@ -538,7 +538,7 @@ function formTarget(route: NavigatedRoute): EntityFormTarget | null {
 }
 ```
 
-**`store/entity-form-page/entity-form-page.selectors.ts`**
+**`src/app/store/entity-form-page/entity-form-page.selectors.ts`**
 
 ```ts
 import { createFeatureSelector, createSelector } from '@ngrx/store';
@@ -557,7 +557,7 @@ export const selectEntity = createSelector(selectEntityFormPageState, (s) => s.e
 export const selectError = createSelector(selectEntityFormPageState, (s) => s.error);
 ```
 
-**`store/entity-form-page/entity-form-page.effects.ts`**
+**`src/app/store/entity-form-page/entity-form-page.effects.ts`**
 
 ```ts
 import { inject } from '@angular/core';
@@ -700,7 +700,7 @@ export function renderPage<T>(component: Type<T>, selectors: MockSelector[]) {
 }
 ```
 
-**`store/entity-detail-page/entity-detail-page.model.ts`**
+**`src/app/store/entity-detail-page/entity-detail-page.model.ts`**
 
 ```ts
 import { type Entity } from '../../models/entity.model';
@@ -717,7 +717,7 @@ export interface EntityDetailPageState {
 }
 ```
 
-**`store/entity-detail-page/entity-detail-page.actions.ts`**
+**`src/app/store/entity-detail-page/entity-detail-page.actions.ts`**
 
 ```ts
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
@@ -735,7 +735,7 @@ export const EntityDetailPageActions = createActionGroup({
 });
 ```
 
-**`store/entity-detail-page/entity-detail-page.reducer.ts`**
+**`src/app/store/entity-detail-page/entity-detail-page.reducer.ts`**
 
 ```ts
 import { createReducer, on } from '@ngrx/store';
@@ -770,7 +770,7 @@ export const entityDetailPageReducer = createReducer(
 );
 ```
 
-**`store/entity-detail-page/entity-detail-page.selectors.ts`**
+**`src/app/store/entity-detail-page/entity-detail-page.selectors.ts`**
 
 ```ts
 import { createFeatureSelector, createSelector } from '@ngrx/store';
@@ -787,7 +787,7 @@ export const selectEntity = createSelector(selectEntityDetailPageState, (s) => s
 export const selectError = createSelector(selectEntityDetailPageState, (s) => s.error);
 ```
 
-**`store/entity-detail-page/entity-detail-page.effects.ts`**
+**`src/app/store/entity-detail-page/entity-detail-page.effects.ts`**
 
 ```ts
 import { inject } from '@angular/core';
