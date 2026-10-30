@@ -18,12 +18,10 @@ docker-compose.yml: migrate (same image, node dist/migrate.js) ─► depends_on
 
 ## Required values
 
-| What              | Value                                                                                                                                                                                         |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| build stage       | the Docker Compose doc's, with `--ignore-scripts` (nothing in the build or runtime runs esbuild), building with the package's `build`                                                         |
-| runtime stage     | `pnpm install --prod --frozen-lockfile --ignore-scripts`; copy `dist/` and `db/migrations/`; `ENV NODE_ENV=production`; `USER node`; `EXPOSE 3000`; `CMD ["node", "dist/server.js"]`          |
-| service `migrate` | the same `build`; `command: ['node', 'dist/migrate.js']`; `environment`: `DATABASE_URL` at host `db`; `depends_on` `db` being healthy; it exits when done                                     |
-| service `api`     | `build` from the repo root; `environment`: `DATABASE_URL` at host `db`, `PORT: '3000'`; ports `'${PORT:-3000}:3000'`; `depends_on` `migrate` with `condition: service_completed_successfully` |
+| What                | Value                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `Dockerfile`        | the Docker Compose doc's compiled API image, as given: `--ignore-scripts` on both installs, since nothing runs esbuild |
+| `migrate` and `api` | the Docker Compose doc's two services, as given; in a workspace, `build` names the API's Dockerfile from the repo root |
 
 ## Pitfalls
 
