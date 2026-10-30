@@ -58,6 +58,9 @@ pnpm add -D -E "typescript@$(pnpm view 'typescript@~6.0.0' version)"
 - **Two projects sharing one `tsBuildInfoFile`** (an extended config inheriting it) overwrite each other: every
   project sets its own.
 - **`tsc -p .` on a solution file checks nothing**; `tsc -b` follows the references.
+- **A build or test tool that compiles through a project's tsconfig emits nothing when the tsconfig sets `noEmit`.**
+  Where a framework's tooling does, its doc says so: that project leaves `noEmit` out, and its `typecheck` passes
+  `--noEmit` on the command line instead.
 - **`types` left out means runtime globals and built-in modules do not resolve** under TypeScript 6.
 - **`esModuleInterop` and `baseUrl`** are not written: the first is always on in TypeScript 6, the second is
   deprecated, and `paths` work without it.
