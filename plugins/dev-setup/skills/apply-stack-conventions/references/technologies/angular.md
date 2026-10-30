@@ -15,8 +15,10 @@ two tiers of tests, and a static build.
   then the cleanup, at once: delete `.editorconfig` (the formatter owns indentation), `README.md` (the docs live at the
   repo root), the CLI's root component (`app.ts`, `app.html`, `app.scss`, `app.spec.ts`: the root component is wiring,
   and has no spec) and every `.scss` file; in a workspace package also delete `packageManager` (the root's) and the
-  shared tools' entries (the root catalog adds them back). The CLI's `.vscode/` and `public/favicon.ico` stay;
-  `<title>` in `src/index.html` becomes the app name.
+  shared tools' entries (the root catalog adds them back), its `.gitignore` (the root's covers it) and its `.prettierrc`
+  (the shared one replaces it). The new root component is `app.component.ts` (class `App`), so `src/main.ts` imports
+  it from `./app/app.component` instead of `./app/app`. The CLI's `.vscode/` and `public/favicon.ico` stay; `<title>`
+  in `src/index.html` becomes the app name.
 
 - **Standalone, zoneless, signal components.** Every component takes signal `input()` / `output()`, never `@Input()`;
   none sets `changeDetection`, because `OnPush` is Angular 22's default and writing it on one makes the others look
