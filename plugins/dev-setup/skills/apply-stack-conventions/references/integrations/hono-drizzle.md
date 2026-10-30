@@ -156,6 +156,171 @@ export function createStubContext() {
 }
 ```
 
+`src/controllers/entity.controller.ts`: every list, id and body path, each 400 and 404 thrown as an `HTTPException`.
+
+```ts
+import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { z } from 'zod';
+import {
+  createEntityInputSchema,
+  entityIdInputSchema,
+  listEntityInputSchema,
+  updateEntityInputSchema
+} from '../db/schemas/entity.schema.js';
+import { normalizeQuery } from '../helpers/query-parser.helper.js';
+import type { AppEnv } from '../models/app-context.model.js';
+import { NotFoundError } from '../models/error.model.js';
+
+const LIST_PARAMS: ReadonlySet<string> = new Set(['filter', 'sortField', 'sortDirection', 'page', 'pageSize']);
+
+export async function listEntities(c: Context<AppEnv>): Promise<Response> {
+  const query = normalizeQuery(c.req.queries());
+  const unknown = Object.keys(query).filter((key) => !LIST_PARAMS.has(key));
+  if (unknown.length > 0) {
+    throw new HTTPException(400, { message: `Unknown query params: ${unknown.join(', ')}` });
+  }
+
+  let filter: unknown;
+  if (typeof query.filter === 'string') {
+    try {
+      filter = JSON.parse(query.filter);
+    } catch (error) {
+      throw new HTTPException(400, { message: 'filter must be valid JSON', cause: error });
+    }
+  }
+  const sort =
+    typeof query.sortField === 'string'
+      ? { field: query.sortField, direction: query.sortDirection === 'DESC' ? 'DESC' : 'ASC' }
+      : undefined;
+  const parsed = listEntityInputSchema.safeParse({
+    filter,
+    sort,
+    page: query.page === undefined ? undefined : Number(query.page),
+    pageSize: query.pageSize === undefined ? undefined : Number(query.pageSize)
+  });
+  if (!parsed.success) {
+    throw new HTTPException(400, { message: 'Invalid query', cause: z.flattenError(parsed.error) });
+  }
+
+  return c.json(await c.var.context.entityDao.list(parsed.data));
+}
+
+export async function getEntity(c: Context<AppEnv>): Promise<Response> {
+  const params = entityIdInputSchema.safeParse({ id: c.req.param('id') });
+  if (!params.success) {
+    throw new HTTPException(400, { message: 'Invalid id', cause: z.flattenError(params.error) });
+  }
+  const row = await c.var.context.entityDao.get(params.data);
+  if (!row) {
+    throw new HTTPException(404, { message: `Entity not found: ${params.data.id}` });
+  }
+  return c.json(row);
+}
+
+export async function createEntity(c: Context<AppEnv>): Promise<Response> {
+  const body = await readJson(c);
+  const parsed = createEntityInputSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, { message: 'Invalid body', cause: z.flattenError(parsed.error) });
+  }
+  return c.json(await c.var.context.entityDao.create(parsed.data), 201);
+}
+
+export async function updateEntity(c: Context<AppEnv>): Promise<Response> {
+  const body = await readJson(c);
+  const parsed = updateEntityInputSchema.safeParse({ ...(typeof body === 'object' ? body : {}), id: c.req.param('id') });
+  if (!parsed.success) {
+    const idIssue = parsed.error.issues.some((issue) => issue.path[0] === 'id');
+    throw new HTTPException(400, { message: idIssue ? 'Invalid id' : 'Invalid body', cause: z.flattenError(parsed.error) });
+  }
+  try {
+    return c.json(await c.var.context.entityDao.update(parsed.data));
+  } catch (error) {
+    throw mapNotFound(error);
+  }
+}
+
+export async function deleteEntity(c: Context<AppEnv>): Promise<Response> {
+  const params = entityIdInputSchema.safeParse({ id: c.req.param('id') });
+  if (!params.success) {
+    throw new HTTPException(400, { message: 'Invalid id', cause: z.flattenError(params.error) });
+  }
+  try {
+    await c.var.context.entityDao.delete(params.data);
+  } catch (error) {
+    throw mapNotFound(error);
+  }
+  return c.body(null, 204);
+}
+
+async function readJson(c: Context<AppEnv>): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch (error) {
+    throw new HTTPException(400, { message: 'Malformed JSON body', cause: error });
+  }
+}
+
+function mapNotFound(error: unknown): unknown {
+  return error instanceof NotFoundError ? new HTTPException(404, { message: error.message, cause: error }) : error;
+}
+```
+
+`src/controllers/health.controller.ts`:
+
+```ts
+import { sql } from 'drizzle-orm';
+import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import type { AppEnv } from '../models/app-context.model.js';
+
+export async function getHealth(c: Context<AppEnv>): Promise<Response> {
+  const start = performance.now();
+  try {
+    await c.var.context.db.execute(sql`SELECT 1`);
+  } catch (error) {
+    throw new HTTPException(503, { message: 'Database connection failed', cause: error });
+  }
+  return c.json({ status: 'ok', db: 'up', latencyMs: Math.round(performance.now() - start), timestamp: new Date().toISOString() });
+}
+```
+
+`tests/utils/test-server.ts`: the real app on an ephemeral port for API tests.
+
+```ts
+import type { AddressInfo } from 'node:net';
+import { serve } from '@hono/node-server';
+import type { Hono } from 'hono';
+import type { AppEnv } from '../../src/models/app-context.model.js';
+
+export interface TestServer {
+  readonly baseUrl: string;
+  readonly close: () => Promise<void>;
+}
+
+/** Serves the app on an ephemeral port. */
+export function serveApp(app: Hono<AppEnv>): Promise<TestServer> {
+  return new Promise((resolve) => {
+    const server = serve({ fetch: app.fetch, port: 0 }, (info: AddressInfo) => {
+      resolve({
+        baseUrl: `http://localhost:${String(info.port)}`,
+        close: () =>
+          new Promise<void>((done, fail) => {
+            server.close((error) => {
+              if (error) {
+                fail(error);
+              } else {
+                done();
+              }
+            });
+          })
+      });
+    });
+  });
+}
+```
+
 ## Pitfalls
 
 - **`c.req.json()` throws on a malformed body**: catch it in the handler and throw a 400 `HTTPException`, or it
