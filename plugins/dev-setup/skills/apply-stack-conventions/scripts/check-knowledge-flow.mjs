@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Checks that knowledge flows one way: architecture ← technologies ← integrations ← examples ← stacks.
 //
-//   node scripts/check-knowledge-flow.mjs [<references dir>]
+//   node check-knowledge-flow.mjs [<references dir>]
 //
-// The references dir defaults to the apply-stack-conventions skill's.
+// The references dir defaults to this skill's.
 //
 // A technology doc names no other technology that has a doc, and links to no other technology or integration doc; an
 // architecture doc names no technology and links to no technology, integration or example doc. Both may link up to an
@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins/dev-setup/skills/apply-stack-conventions/references'));
+const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'references'));
 
 /** How each technology with a doc is recognised in text, keyed by its doc's base name. */
 const names = {
