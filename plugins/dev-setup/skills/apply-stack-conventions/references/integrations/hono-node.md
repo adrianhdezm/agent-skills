@@ -1,13 +1,15 @@
 # Hono + Node
 
-A Hono app served by Node through `@hono/node-server`: Vite's middleware mode in development, the build behind
-`serveStatic` in production. React Router on Node uses it, with `server.ts` running `workers/app.ts`.
+A Hono app served by Node through `@hono/node-server`. React Router on Node uses it with `server.ts` running
+`workers/app.ts`: Vite's middleware mode in development, the build behind `serveStatic` in production. Hono API on
+Node uses it with `src/server.ts` serving `createApp(context)`, compiled by `tsc` like any API.
 
 ## The seam
 
 ```
 development:  node --env-file=.env server.ts ─► Vite middleware ─► ssrLoadModule('./workers/app.ts') ─► getRequestListener(fetch)
 production:   node server.ts ─► Hono ─► serveStatic(build/client) ─► app.fetch from build/server/index.js
+an API:       node dist/server.js ─► the pool, the DAOs ─► createApp(context) ─► serve({ fetch: app.fetch, port }); shutdown on SIGTERM
 ```
 
 - **`server.ts` runs the Hono app; the app never serves itself.** The app module exports its `fetch` and nothing more.
@@ -21,11 +23,12 @@ production:   node server.ts ─► Hono ─► serveStatic(build/client) ─►
 
 ## Where it lives
 
-| File             | Holds                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| `server.ts`      | the dev and production branches, chosen by `NODE_ENV === 'development'`                |
-| `vite.config.ts` | the `ssr` environment's `input: './workers/app.ts'`                                    |
-| `Dockerfile`     | the runtime stage copies `build/` and `server.ts`, installs `--prod`, `node server.ts` |
+| File             | Holds                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| `server.ts`      | the dev and production branches, chosen by `NODE_ENV === 'development'`                        |
+| `vite.config.ts` | the `ssr` environment's `input: './workers/app.ts'`                                            |
+| `Dockerfile`     | the runtime stage copies `build/` and `server.ts`, installs `--prod`, `node server.ts`         |
+| `src/server.ts`  | in an API: the composition root, `serve()`, and closing the server, then the pool, on a signal |
 
 `@hono/node-server` is a dependency; `vite` is only reached from the dev branch.
 
@@ -129,6 +132,52 @@ await (DEV ? startDev() : startProduction());
 - **`vite` is imported only in the dev branch**, so the production image runs without dev dependencies.
 - **The build path is a variable**: `build/` does not exist before the first build, and `tsc` must not resolve it.
 - **Cache headers are set in `onFound`**, because nothing after `serveStatic` runs for a file it served.
+
+**`src/server.ts`** in an API: reads its two settings and fails loudly, builds the context, serves, and on `SIGINT` or
+`SIGTERM` closes the server and then the pool.
+
+```ts
+import { serve } from '@hono/node-server';
+import { createApp } from './app.js';
+import { createDbClient } from './db/client.js';
+import { EntityDao } from './daos/entity.dao.js';
+import { logger } from './logger.js';
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required');
+}
+const port = Number(process.env.PORT);
+if (!Number.isInteger(port) || port <= 0) {
+  throw new Error('PORT is required');
+}
+
+const { pool, db } = createDbClient(databaseUrl);
+const app = createApp({ db, entityDao: new EntityDao(db) });
+const server = serve({ fetch: app.fetch, port }, (info) => {
+  logger.info(`Listening on port ${String(info.port)}`);
+});
+
+function shutdown(signal: string): void {
+  logger.info(`${signal} received, shutting down`);
+  server.close(() => {
+    pool.end().then(
+      () => process.exit(0),
+      (error: unknown) => {
+        logger.error({ err: error }, 'Pool did not close cleanly');
+        process.exit(1);
+      }
+    );
+  });
+}
+
+process.on('SIGINT', () => {
+  shutdown('SIGINT');
+});
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM');
+});
+```
 
 ## Conventions
 
