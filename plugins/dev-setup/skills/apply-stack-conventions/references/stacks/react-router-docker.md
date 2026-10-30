@@ -81,22 +81,255 @@ my-app/
 
 ## Required values
 
-| What                 | Value                                                                                                                                                                                                                                                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000)                                                                                                                                                                                               |
-| scripts              | `dev` `node --env-file=.env server.ts`; `build` `react-router build`; `start` `node server.ts` (production gets its environment from Compose); `typecheck` `react-router typegen && tsc -b`; `lint`, `test`, `format`, `format:check`, `compose:up`, `compose:down` |
-| `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                           |
-| dependencies         | the React Router set and the shadcn/ui packages from their docs; `hono`, `@hono/node-server`                                                                                                                                                                        |
-| devDependencies      | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `@types/node@24`, and the pinned `typescript`   |
-| `vite.config.ts`     | `tailwindcss()`, `reactRouter()`, `resolve.tsconfigPaths`, and the SSR input from the Hono + Node integration                                                                                                                                                       |
-| `tsconfig.app.json`  | includes `.react-router/types/**/*`, `app`, `workers`; `types: ["node", "vite/client"]`                                                                                                                                                                             |
-| `tsconfig.node.json` | also includes `server.ts`, with Node's rules: `module: "NodeNext"`, `allowImportingTsExtensions`, `types: ["node"]`                                                                                                                                                 |
-| `.env.example`       | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `NODE_ENV=development`, `APP_NAME=<App name>`                                                                                                                                  |
-| `docker-compose.yml` | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the React Router + Docker Compose `app` service                                                                                                                                        |
-| `Dockerfile`         | React Router + Docker Compose's two stages                                                                                                                                                                                                                          |
-| `.gitignore`         | `node_modules/`, `build/`, `.react-router/`, `.env`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                   |
-| `.prettierignore`    | `pnpm-lock.yaml`, `db/data`                                                                                                                                                                                                                                         |
-| `.dockerignore`      | React Router + Docker Compose's, with `db` as the data folder                                                                                                                                                                                                       |
+| What                 | Value                                                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000)                                                                                                                                                                                                                |
+| scripts              | `dev` `node --env-file=.env server.ts`; `build` `react-router build`; `start` `node server.ts` (production gets its environment from Compose); `typecheck` `react-router typegen && tsc -b`; `lint`, `test`, `format`, `format:check`, `compose:up`, `compose:down`                  |
+| `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                                            |
+| dependencies         | the React Router set and the shadcn/ui packages from their docs; `hono`, `@hono/node-server`                                                                                                                                                                                         |
+| devDependencies      | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `@types/node@24`, and the pinned `typescript`                    |
+| configs              | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; `tsconfig.node.json` also holds `server.ts`, under Node's rules (`module: "NodeNext"`, `allowImportingTsExtensions`), and Vite takes the SSR input from the Hono + Node integration |
+| `.env.example`       | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `NODE_ENV=development`, `APP_NAME=<App name>`                                                                                                                                                   |
+| `docker-compose.yml` | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the React Router + Docker Compose `app` service                                                                                                                                                         |
+| `Dockerfile`         | React Router + Docker Compose's two stages                                                                                                                                                                                                                                           |
+| `.gitignore`         | `node_modules/`, `build/`, `.react-router/`, `.env`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                                    |
+| `.prettierignore`    | `pnpm-lock.yaml`, `db/data`                                                                                                                                                                                                                                                          |
+| `.dockerignore`      | React Router + Docker Compose's, with `db` as the data folder                                                                                                                                                                                                                        |
+
+## Reference code
+
+The config files as a fresh scaffold writes them, before any optional entry adds to them; the tables above say why each value is there.
+
+`tsconfig.json`:
+
+```jsonc
+{
+  // Solution file: no compiler options, except `paths`, which the shadcn CLI reads from here.
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }, { "path": "./tsconfig.test.json" }],
+  "compilerOptions": {
+    "paths": { "~/*": ["./app/*"] }
+  }
+}
+```
+
+`tsconfig.app.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "rootDirs": [".", "./.react-router/types"],
+    "paths": { "~/*": ["./app/*"] },
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [".react-router/types/**/*", "app", "workers"]
+}
+```
+
+`tsconfig.node.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "types": ["node"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["server.ts", "vite.config.ts", "vitest.config.ts", "react-router.config.ts"]
+}
+```
+
+`tsconfig.test.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vite/client"]
+  },
+  "include": [".react-router/types/**/*", "app", "workers", "tests"]
+}
+```
+
+`eslint.config.js`:
+
+```js
+import js from '@eslint/js';
+import prettier from 'eslint-config-prettier/flat';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig([
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'build',
+    'public',
+    '.react-router',
+    'db/data',
+    // No TypeScript project includes the ESLint config itself.
+    'eslint.config.js'
+  ]),
+  js.configs.recommended,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    },
+    settings: { react: { version: 'detect' } }
+  },
+  react.configs.flat.recommended,
+  react.configs.flat['jsx-runtime'],
+  reactHooks.configs.flat.recommended,
+  jsxA11y.flatConfigs.recommended,
+  prettier,
+  {
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // The shadcn primitives are the registry's code: they forward props and import React as a namespace.
+    files: ['app/components/ui/**'],
+    rules: {
+      'jsx-a11y/label-has-associated-control': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off'
+    }
+  },
+  {
+    // Loaders and actions throw Responses; the top-level Conform package has a v4 entry point.
+    files: ['app/routes/**'],
+    rules: {
+      '@typescript-eslint/only-throw-error': 'off',
+      'no-restricted-imports': ['error', { paths: [{ name: '@conform-to/zod', message: 'Use @conform-to/zod/v4.' }] }]
+    }
+  },
+  {
+    // A describe holds every case for one module; createRoutesStub returns loosely typed values.
+    files: ['tests/**'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'max-statements': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      'no-restricted-imports': ['error', { paths: [{ name: '@vitest/browser/context', message: 'Use vitest/browser.' }] }]
+    }
+  }
+]);
+```
+
+`vite.config.ts`:
+
+```ts
+import { reactRouter } from '@react-router/dev/vite';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [tailwindcss(), reactRouter()],
+  resolve: { tsconfigPaths: true },
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: { input: './workers/app.ts' }
+      }
+    }
+  }
+});
+```
+
+`vitest.config.ts`:
+
+```ts
+import react from '@vitejs/plugin-react';
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        plugins: [react()],
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.{ts,tsx}'],
+          setupFiles: ['tests/setup.ts'],
+          browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] }
+        }
+      }
+    ]
+  }
+});
+```
 
 ## Scaffold
 
