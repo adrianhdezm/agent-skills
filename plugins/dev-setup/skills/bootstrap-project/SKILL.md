@@ -80,7 +80,7 @@ Copy this checklist and tick it off:
 5. **Assemble the conventions**, then `pnpm format` and every check:
 
    ```sh
-   # with a blueprint; add --with <name> for each optional entry the project has (the groups database, authentication, file-storage, or angular-fundamental-ngx)
+   # with a blueprint; add --with <name> for each optional entry the project has (the groups database, authentication, file-storage, storybook, or angular-fundamental-ngx)
    node <conventions-dir>/scripts/assemble-conventions.mjs <conventions-dir>/references/stacks/<stack>.md > coding-conventions.md
    # without one: the docs from step 2, in the order code style, pnpm, TypeScript, concepts, runtime and frameworks, integrations, tooling
    node <conventions-dir>/scripts/assemble-conventions.mjs --compose "<what it is>" <doc>... > coding-conventions.md

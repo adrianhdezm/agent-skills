@@ -65,6 +65,8 @@ Demonstrates table names the concepts it shows, so which docs realise a concept 
 | [React Router](references/technologies/react-router.md)             | framework mode, the context, routes, route tests                                          | `react-router.config.ts`                |
 | [Tailwind](references/technologies/tailwind.md)                     | utilities only, one global stylesheet with the theme, the build wiring per framework      | `tailwindcss` in dependencies           |
 | [shadcn](references/technologies/shadcn.md)                         | the CLI, registries, `components.json` aliases and the `paths` they need                  | `components.json`                       |
+| [Storybook](references/technologies/storybook.md)                   | a story file beside every component, one story per state, on the app's Vite builder       | `.storybook/`                           |
+| [Nginx](references/technologies/nginx.md)                           | static files with an SPA fallback and no proxy                                            | `nginx.conf`                            |
 | [Angular](references/technologies/angular.md)                       | the CLI and its cleanup, signal components, the Analog tests, Storybook                   | `angular.json`                          |
 | [NgRx](references/technologies/ngrx.md)                             | route-driven state and the request rules                                                  | `@ngrx/store` in dependencies           |
 | [Express](references/technologies/express.md)                       | the app factory, controllers, the error shape, Pino                                       | `express` in dependencies               |
@@ -101,6 +103,9 @@ Each has **Use it like this** (the principles, each with its reason), **Required
 | [Angular + Prettier](references/integrations/angular-prettier.md)                   | the Angular parser for HTML                                                               | `angular.json` and `.prettierrc`                   |
 | [Angular + Vitest](references/integrations/angular-vitest.md)                       | Analog's builder, the `unit` and `browser` projects, `tsconfig.spec.json`                 | `@analogjs/vitest-angular`                         |
 | [Angular + Tailwind](references/integrations/angular-tailwind.md)                   | PostCSS wiring, the layer imports, utilities plus a `host` class                          | `angular.json` and `.postcssrc.json`               |
+| [Angular + Storybook](references/integrations/angular-storybook.md)                 | `@storybook/angular-vite` through Analog, `angular.json` targets, zoneless                | `@storybook/angular-vite`                          |
+| [Angular + Nginx](references/integrations/angular-nginx.md)                         | `dist/<name>/browser` in the Nginx image, the router behind the SPA fallback              | `angular.json` and `nginx.conf`                    |
+| [React Router + Storybook](references/integrations/react-router-storybook.md)       | `@storybook/react-vite` over the app's config without the React Router plugin             | `@storybook/react-vite`                            |
 | [Cloudflare Workers + Vitest](references/integrations/cloudflare-workers-vitest.md) | tests in workerd through `cloudflare:workers`                                             | `@cloudflare/vitest-plugin`                        |
 | [Postgres + Docker Compose](references/integrations/postgres-docker-compose.md)     | the `db` service, its healthcheck, `init.sql`, host `db`                                  | a `db` service on a Postgres image                 |
 | [Drizzle + Postgres](references/integrations/drizzle-postgres.md)                   | the client on the pool, the `postgresql` dialect, Testcontainers                          | `drizzle-orm` and `pg`                             |
@@ -159,7 +164,7 @@ the project's own files.
      wired. Do not fix anything. Also re-assemble the conventions into the scratchpad
      (`node <skill-dir>/scripts/assemble-conventions.mjs <skill-dir>/references/stacks/<stack>.md [--with <optional entry>] > <scratchpad>/coding-conventions.md`)
      with a `--with` for each optional entry the project has (the groups `database`,
-     `authentication`, `file-storage`, or `angular-fundamental-ngx`), and diff it against the project's `coding-conventions.md`: a difference means one of the two moved, and the user
+     `authentication`, `file-storage`, `storybook`, or `angular-fundamental-ngx`), and diff it against the project's `coding-conventions.md`: a difference means one of the two moved, and the user
      decides which is right.
    - **Explain the wiring.** For each seam the question touches, walk the integration's diagram through the project's
      own files, with `file:line` at each hop, and say where the project departs from the doc.
