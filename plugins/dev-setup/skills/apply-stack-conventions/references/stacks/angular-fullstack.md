@@ -383,6 +383,422 @@ export default defineConfig([
 }
 ```
 
+`api/Dockerfile`: the compiled API image inside the workspace: both manifests copied so the frozen lockfile resolves, `--filter api`, and the runtime working directory `/app/api`, so `dist/migrate.js` finds `../db/migrations`:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter api --frozen-lockfile --ignore-scripts
+COPY api/tsconfig.json api/tsconfig.app.json ./api/
+COPY api/src ./api/src
+RUN pnpm --filter api build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter api --prod --frozen-lockfile --ignore-scripts
+COPY --from=build /app/api/dist ./api/dist
+COPY api/db/migrations ./api/db/migrations
+WORKDIR /app/api
+ENV NODE_ENV=production
+USER node
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+`web/Dockerfile`: a Node build of the web, then Nginx serving it:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter web --frozen-lockfile
+COPY web ./web
+RUN pnpm --filter web build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/web/dist/web/browser /usr/share/nginx/html
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+The `migrate`, `api` and `web` services, beside the `db` service:
+
+```yaml
+  migrate:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: ['node', 'dist/migrate.js']
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+      PORT: '3000'
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health >/dev/null || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-4200}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+```
+
+`web/angular.json`:
+
+```jsonc
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "pnpm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "web": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "css"
+        }
+      },
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "inlineStyleLanguage": "css",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": ["src/styles.css"]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "4mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.development.ts"
+                }
+              ]
+            },
+            "e2e": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.e2e.ts"
+                }
+              ]
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "web:build:production"
+            },
+            "development": {
+              "buildTarget": "web:build:development"
+            },
+            "e2e": {
+              "buildTarget": "web:build:e2e"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@analogjs/vitest-angular:test",
+          "options": {
+            "project": ["unit"]
+          },
+          "configurations": {
+            "browser": {
+              "project": ["browser"]
+            }
+          }
+        },
+        "storybook": {
+          "builder": "@storybook/angular-vite:start-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "web:build",
+            "port": 6006
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular-vite:build-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "web:build",
+            "outputDir": "storybook-static"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`web/playwright.config.ts`:
+
+```ts
+import { defineConfig } from '@playwright/test';
+import { E2E_API_PORT, E2E_DATABASE_URL, E2E_WEB_PORT, ROOT } from './e2e/utils/env';
+
+// The e2e ports live here and in src/environments/environment.e2e.ts (the API), and change together.
+export default defineConfig({
+  testDir: './e2e/pages',
+  // One worker: the specs share one database.
+  workers: 1,
+  fullyParallel: false,
+  reporter: [['list']],
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
+  use: { baseURL: `http://localhost:${String(E2E_WEB_PORT)}`, trace: 'retain-on-failure' },
+  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  webServer: [
+    {
+      command: 'pnpm --filter api dev',
+      cwd: ROOT,
+      env: { PORT: String(E2E_API_PORT), DATABASE_URL: E2E_DATABASE_URL },
+      url: `http://localhost:${String(E2E_API_PORT)}/`,
+      reuseExistingServer: false,
+      timeout: 60_000
+    },
+    {
+      command: `pnpm --filter web exec ng serve -c e2e --port ${String(E2E_WEB_PORT)}`,
+      cwd: ROOT,
+      url: `http://localhost:${String(E2E_WEB_PORT)}/`,
+      reuseExistingServer: false,
+      timeout: 180_000
+    }
+  ]
+});
+```
+
+`web/e2e/utils/env.ts`, the e2e ports and database:
+
+```ts
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseEnv } from 'node:util';
+
+// Playwright loads this as CommonJS, where `import.meta` throws: __dirname locates the repo root.
+export const ROOT = resolve(__dirname, '../../..');
+
+export const E2E_API_PORT = 3100;
+export const E2E_WEB_PORT = 4300;
+export const E2E_API_URL = `http://localhost:${String(E2E_API_PORT)}`;
+export const E2E_DATABASE_NAME = 'app_e2e';
+
+// The root .env is parsed, never loaded: loading it would leak `PORT` into `ng serve`.
+const rootEnv = parseEnv(readFileSync(resolve(ROOT, '.env'), 'utf8'));
+
+function required(name: string): string {
+  const value = rootEnv[name];
+  if (!value) {
+    throw new Error(`${name} is not set in .env`);
+  }
+  return value;
+}
+
+export const E2E_DATABASE_URL = `postgres://postgres:${required('DB_PASSWORD')}@localhost:${required('DB_PORT')}/${E2E_DATABASE_NAME}`;
+```
+
+`web/e2e/global-setup.ts`:
+
+```ts
+import { execFileSync } from 'node:child_process';
+import { E2E_DATABASE_NAME, E2E_DATABASE_URL, ROOT } from './utils/env';
+
+function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.env): string {
+  return execFileSync(command, args, { cwd: ROOT, env, encoding: 'utf8' });
+}
+
+function psql(database: string, sql: string): string {
+  return run('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'postgres', '-d', database, '-tAc', sql]).trim();
+}
+
+// Starts the Compose Postgres if needed, creates and migrates the e2e database, and empties `entity`.
+export default function globalSetup(): void {
+  const running = run('docker', ['compose', 'ps', '--status', 'running', '--services']).split('\n');
+  if (!running.includes('db')) {
+    run('docker', ['compose', 'up', '-d', '--wait', 'db']);
+    process.env['E2E_STARTED_DB'] = '1';
+  }
+  if (psql('postgres', `SELECT 1 FROM pg_database WHERE datname = '${E2E_DATABASE_NAME}'`) !== '1') {
+    psql('postgres', `CREATE DATABASE ${E2E_DATABASE_NAME}`);
+  }
+  run('pnpm', ['--filter', 'api', 'db:migrate'], { ...process.env, DATABASE_URL: E2E_DATABASE_URL });
+  psql(E2E_DATABASE_NAME, 'TRUNCATE entity');
+}
+```
+
+`web/e2e/global-teardown.ts`:
+
+```ts
+import { execFileSync } from 'node:child_process';
+import { ROOT } from './utils/env';
+
+// Stops `db` only if the setup started it, so a stack the developer was running keeps running.
+export default function globalTeardown(): void {
+  if (process.env['E2E_STARTED_DB'] === '1') {
+    execFileSync('docker', ['compose', 'stop', 'db'], { cwd: ROOT, stdio: 'ignore' });
+  }
+}
+```
+
+`web/e2e/utils/api.ts`:
+
+```ts
+import { type APIRequestContext, expect } from '@playwright/test';
+import { E2E_API_URL } from './env';
+
+export interface SeededEntity {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/** Creates an entity through the real API. */
+export async function seedEntity(request: APIRequestContext, name: string, description: string | null = null): Promise<SeededEntity> {
+  const res = await request.post(`${E2E_API_URL}/entities`, { data: { name, description } });
+  expect(res.status()).toBe(201);
+  return (await res.json()) as SeededEntity;
+}
+
+/** A name prefix no other run shares, so a spec filters to its own rows. */
+export function uniquePrefix(label: string): string {
+  return `${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function listUrl(prefix: string, params: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ filter: JSON.stringify({ name: { contains: prefix } }), ...params });
+  return `/entities?${query.toString()}`;
+}
+```
+
+`web/e2e/tsconfig.json`:
+
+```jsonc
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.e2e.tsbuildinfo"
+  },
+  "include": ["./**/*.ts"]
+}
+```
+
+`api/tests/utils/entity-seed.ts`:
+
+```ts
+import type { DbClient } from '../../src/db/client.js';
+import { entity } from '../../src/db/schemas/entity.schema.js';
+
+/** A fixed UTC day in 2026, so tests control timestamps. */
+export function day(n: number): Date {
+  return new Date(Date.UTC(2026, 0, n, 12, 0, 0));
+}
+
+export interface SeedEntity {
+  readonly name: string;
+  readonly description?: string | null;
+  readonly createdAt?: Date;
+  readonly updatedAt?: Date;
+}
+
+/** Insert rows directly, bypassing the DAO, so timestamps are the test's own. */
+export async function seedEntities(db: DbClient, rows: readonly SeedEntity[]) {
+  if (rows.length === 0) {
+    return [];
+  }
+  return db
+    .insert(entity)
+    .values(rows.map((row) => ({ ...row, updatedAt: row.updatedAt ?? row.createdAt })))
+    .returning();
+}
+
+/** `alpha` to `echo` on consecutive days; `charlie` has a null description. */
+export async function seedCanonical(db: DbClient) {
+  return seedEntities(db, [
+    { name: 'alpha', description: 'first letter', createdAt: day(1) },
+    { name: 'bravo', description: 'second letter', createdAt: day(2) },
+    { name: 'charlie', description: null, createdAt: day(3) },
+    { name: 'delta', description: 'fourth letter', createdAt: day(4) },
+    { name: 'echo', description: 'fifth letter', createdAt: day(5) }
+  ]);
+}
+```
+
 ## Scaffold
 
 - **Check every port first**; stop with the user if one is taken.
@@ -442,7 +858,7 @@ The web has no runtime environment: its API base URL is build-time, in `web/src/
 from the page's host on port 3000, development and e2e name `localhost:3000` and `localhost:3100`). So `PORT` moves the
 API in development only: the production image calls port 3000, and moving the published API port means changing the
 production environment file too. The e2e ports live in two files, `web/src/environments/environment.e2e.ts` (the API)
-and `web/playwright.config.ts` (both servers), and change together.
+and `web/e2e/utils/env.ts` (both servers, which `playwright.config.ts` reads), and change together.
 
 ### HTTP contract
 
