@@ -37,7 +37,7 @@ changing a stack touches nothing outside this skill.
   technology; a technology doc names no other technology that has a doc, and links only up to the concepts it realises
   (tools without a doc of their own, such as Vite or Storybook, belong to the doc that uses them; `pnpm`, `node` and
   `tsconfig` file names may appear in code as notation). Anything about two or more technologies is an integration, an
-  example or a blueprint. `node scripts/check-knowledge-flow.mjs`, from the repo root, checks it.
+  example or a blueprint. `node scripts/check-knowledge-flow.mjs`, from this skill's directory, checks it.
 - **An example states outcomes, not files**: the data and names it depends on, the behaviour and contracts tests rely
   on, the behaviours each test tier covers, and the doc each part applies. A rule that any later code should follow
   belongs in a doc, not in an example; exact code belongs in a doc's Reference code.
@@ -51,5 +51,5 @@ changing a stack touches nothing outside this skill.
 
   ```sh
   for stack in references/stacks/*.md; do node scripts/assemble-conventions.mjs "$stack" > /dev/null || echo "broken: $stack"; done
-  node ../../../../scripts/check-knowledge-flow.mjs
+  node scripts/check-knowledge-flow.mjs
   ```
