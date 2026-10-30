@@ -15,8 +15,7 @@ How apps and the services they need run in containers: one Compose file at the r
   network a service is reached by its service name, not `localhost`, so an app service sets its own URLs.
 - **Images are multi-stage on `node:24-alpine`**: a build stage installs with `--frozen-lockfile` and builds, a
   runtime stage installs production dependencies only and copies the build. `corepack enable` takes the package
-  manager's version from the root `packageManager`, so no Dockerfile names it. A static web app ends in
-  `nginx:1.27-alpine`.
+  manager's version from the root `packageManager`, so no Dockerfile names it.
 - **In a workspace, every image builds from the repo root** (`context: .`, `dockerfile: <pkg>/Dockerfile`), because
   `catalog:` entries resolve only against the root `pnpm-workspace.yaml` and lockfile. It copies the root manifests
   plus its own, and installs with `--filter <pkg>`. One root `.dockerignore` serves every image.
@@ -29,7 +28,7 @@ How apps and the services they need run in containers: one Compose file at the r
 
 | What            | Value                                                                                                     |
 | --------------- | --------------------------------------------------------------------------------------------------------- |
-| base images     | `node:24-alpine` to build and run; `nginx:1.27-alpine` for static files                                   |
+| base images     | `node:24-alpine` to build and run                                                                         |
 | scripts         | `compose:up` `docker compose up --build -d --wait`; `compose:down` `docker compose down`                  |
 | `.dockerignore` | `node_modules` and build output at any depth, `.git`, `.env`, every bind-mounted data folder, test output |
 

@@ -19,6 +19,10 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [NgRx](../technologies/ngrx.md)
 - [Tailwind](../technologies/tailwind.md)
 - [Angular + Tailwind](../integrations/angular-tailwind.md)
+- [Storybook](../technologies/storybook.md)
+- [Angular + Storybook](../integrations/angular-storybook.md)
+- [Nginx](../technologies/nginx.md)
+- [Angular + Nginx](../integrations/angular-nginx.md)
 - [Angular + Fundamental NGX](../integrations/angular-fundamental-ngx.md) — optional
 - [Angular + the API contract](../integrations/angular-api-contract.md)
 - [ESLint](../technologies/eslint.md)

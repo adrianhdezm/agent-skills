@@ -26,6 +26,8 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [React Router + shadcn/ui](../integrations/react-router-shadcn.md)
 - [Hono](../technologies/hono.md)
 - [Hono + React Router](../integrations/hono-react-router.md)
+- [Storybook](../technologies/storybook.md) — optional (storybook)
+- [React Router + Storybook](../integrations/react-router-storybook.md) — optional (storybook)
 - [Cloudflare Workers](../technologies/cloudflare-workers.md)
 - [Hono + Cloudflare Workers](../integrations/hono-cloudflare-workers.md)
 - [React Router + Drizzle](../integrations/react-router-drizzle.md)

@@ -1,7 +1,7 @@
 # Angular
 
 Angular 22 as a single-page app: the CLI scaffold and its cleanup, standalone signal components with inline templates,
-two tiers of tests, Storybook for building components, and static serving.
+two tiers of tests, and a static build.
 
 ## Use it like this
 
@@ -20,7 +20,7 @@ two tiers of tests, Storybook for building components, and static serving.
 
 - **Standalone, zoneless, signal components.** Every component takes signal `input()` / `output()`, never `@Input()`;
   none sets `changeDetection`, because `OnPush` is Angular 22's default and writing it on one makes the others look
-  eager. No `zone.js` anywhere: the app, the tests and Storybook run zoneless.
+  eager. No `zone.js` anywhere: the app and everything that renders its components run zoneless.
 - **One file per component**: inline `template`, no `.html` or `.scss` siblings, styled through its `host` and its
   template's classes. Files sit flat in their folder with the `.component.ts` suffix
   (`pages/entity-list-page.component.ts`), classes have no suffix (`EntityListPage`), and the one nested component
@@ -34,33 +34,24 @@ two tiers of tests, Storybook for building components, and static serving.
   state.
 - **Two tiers of tests**: `unit` for services, state and helpers (the required `test` check), `browser` for components
   and pages in a real browser (`test:browser`). The test runner's integration says how they are wired.
-- **Storybook develops the components**, on `@storybook/angular-vite` with `@analogjs/vite-plugin-angular`, not the
-  webpack `@storybook/angular`, so it shares the app's compile path. Every component in `components/` and
-  `components/ui/` has a `*.stories.ts` beside it. Storybook is not a test runner.
-- **Static serving**: the production build is static files, `dist/<name>/browser`, served by Nginx with an SPA fallback
-  (`try_files $uri $uri/ /index.html`) and no `/api` proxy: the API URL is build-time configuration.
+- **A static build**: the production build is static files in `dist/<name>/browser`, served by a static server with an
+  SPA fallback; the API URL is build-time configuration, so nothing is proxied.
 - **The checks**: `build` (`ng build`, the check for templates), `typecheck` (what `ng build` does not compile: the
   specs and setup files, and the e2e suite where there is one), `test`, `lint`, `format:check`.
 
 ## Required values
 
-| What                     | Value                                                                                                                                                                                                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Storybook                | dev `storybook@10`, `@storybook/angular-vite@10`, `@analogjs/vite-plugin-angular@2`, `vite`, `@angular/animations`, `@angular-devkit/architect`, `@angular-devkit/core`                                                                                                                                                                |
-| `angular.json` build     | `schematics["@schematics/angular:component"].style: "css"`; `styles: ["src/styles.css"]`, `inlineStyleLanguage: "css"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts`                                         |
-| `angular.json` Storybook | targets `storybook` (`@storybook/angular-vite:start-storybook`, `configDir: ".storybook"`, `browserTarget: "<name>:build"`, `port: 6006`) and `build-storybook` (`…:build-storybook`, `outputDir: "storybook-static"`)                                                                                                                 |
-| scripts                  | the CLI's `ng`, `start`, `build`, `watch`; `storybook` `ng run <name>:storybook`; `build-storybook` `ng run <name>:build-storybook`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit`                                                                                                             |
-| `.storybook/`            | `main.ts` (stories `../src/**/*.stories.ts`, `framework: '@storybook/angular-vite'`); `preview.ts` importing `../src/styles.css`; `tsconfig.json` extending `../tsconfig.app.json` with `types: ["node"]`, `moduleResolution: "bundler"`, including the sources, the stories and the two config files; `typings.d.ts` declaring `*.md` |
-| `.gitignore` additions   | `*storybook.log`, `storybook-static`                                                                                                                                                                                                                                                                                                   |
-| Nginx                    | `nginx.conf`: `listen 80`, `root /usr/share/nginx/html`, `location / { try_files $uri $uri/ /index.html; }`                                                                                                                                                                                                                            |
+| What                 | Value                                                                                                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `angular.json` build | `schematics["@schematics/angular:component"].style: "css"`; `styles: ["src/styles.css"]`, `inlineStyleLanguage: "css"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts` |
+| scripts              | the CLI's `ng`, `start`, `build`, `watch`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit`                                                                                                                                                               |
 
 ## Pitfalls
 
 - **A component with `input.required()` cannot be mounted by a helper that starts change detection at once**
   (`NG0950`): mount it by hand, `TestBed.createComponent` → `setInput` for each required input → append to
   `document.body` → `autoDetectChanges()`.
-- **`@angular/animations` is a required peer of `@storybook/angular-vite`**, so every install prints its deprecation
-  warning; that is expected. `zone.js` is only an optional peer: do not install it.
+- **A library listing `zone.js` as an optional peer** does not need it: never install it.
 - **A `[value]` on a native `<select>` is applied before `@for` renders the options**, so it does not take: reflect the
   value with `[selected]` on each `<option>`. A wrapping `<label>` folds the option text into the select's name: use
   `<label for>` and an `id`.
@@ -88,24 +79,16 @@ two tiers of tests, Storybook for building components, and static serving.
 | primitive               | `components/ui/<name>.component.ts`, selector `ui-<name>`, class `Ui<Name>`                | `UiDialog`                            |
 | app component           | `components/<name>.component.ts`, selector `app-<name>`                                    | `DeleteDialog`                        |
 | service, helper, model  | `services/<resource>.service.ts`, `helpers/<name>.helper.ts`, `models/<resource>.model.ts` | `entity.service.ts`                   |
-| story                   | `<name>.stories.ts` beside the component                                                   | `delete-dialog.stories.ts`            |
 | unit / browser spec     | `<file>.spec.ts` / `<file>.browser.spec.ts` beside the file                                | `entity.service.spec.ts`              |
 
 Selector prefixes follow the folder: `ui` under `components/ui/`, `app` everywhere else.
 
-### Storybook
-
-- **Every component has a story file beside it**, one story per meaningful state, `args` for its inputs and `fn()` for
-  its outputs, titled `UI/<Name>` for a primitive and `Components/<Name>` for an app component. A primitive with
-  projected content renders through a `template`.
-- **Storybook is where components are built and reviewed, not a test**: behaviour is tested by browser specs.
-
 ### Testing the web app
 
-| Tier    | Answers                                                          | Real                                 | Stubbed                        | Lives in                            | Run                 |
-| ------- | ---------------------------------------------------------------- | ------------------------------------ | ------------------------------ | ----------------------------------- | ------------------- |
-| unit    | is this service, slice, effect or helper right?                  | the unit, `TestBed`                  | HTTP, store, actions, services | `*.spec.ts` beside the file         | `pnpm test`         |
-| browser | does this component or page render and behave in a real browser? | the component, Chromium, real styles | the store (mock), the router   | `*.browser.spec.ts` beside the file | `pnpm test:browser` |
+| Tier    | Answers                                                          | Real                                       | Stubbed                        | Lives in                            | Run                 |
+| ------- | ---------------------------------------------------------------- | ------------------------------------------ | ------------------------------ | ----------------------------------- | ------------------- |
+| unit    | is this service, slice, effect or helper right?                  | the unit, `TestBed`                        | HTTP, store, actions, services | `*.spec.ts` beside the file         | `pnpm test`         |
+| browser | does this component or page render and behave in a real browser? | the component, a real browser, real styles | the store (mock), the router   | `*.browser.spec.ts` beside the file | `pnpm test:browser` |
 
 - **Services** run against `provideHttpClient()` + `provideHttpClientTesting()` and assert method, URL, params and body.
 - **Helpers** get a happy case and an edge case each.

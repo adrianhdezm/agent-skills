@@ -26,6 +26,7 @@ const names = {
   express: [/\bExpress\b/, /\bexpress\(\)/, /`express`/],
   hono: [/\bHono\b/, /\bhono\b/],
   ngrx: [/\bNgRx\b/, /@ngrx\//],
+  nginx: [/\bNginx\b/, /\bnginx\b/],
   node: [/\bNode\b/],
   pnpm: [/\bpnpm\b/],
   postgres: [/\bPostgres(?:QL)?\b/, /\bpostgres:/, /`pg`/],
@@ -33,6 +34,7 @@ const names = {
   'react-router': [/\bReact Router\b/, /\breact-router\b/, /\breactRouter\(/],
   's3-storage': [/\bRustFS\b/, /\bS3\b/],
   shadcn: [/\bshadcn\b/],
+  storybook: [/\bStorybook\b/, /@storybook\//, /\bstorybook@/],
   tailwind: [/\bTailwind\b/, /\btailwindcss\b/],
   typescript: [/\bTypeScript\b/],
   vitest: [/\bVitest\b/, /\bvitest\b/]
