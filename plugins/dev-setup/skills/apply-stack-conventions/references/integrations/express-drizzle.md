@@ -274,6 +274,20 @@ export async function deleteEntity(req: Request, res: Response, next: NextFuncti
 }
 ```
 
+`src/controllers/home.controller.ts`:
+
+```ts
+import type { NextFunction, Request, Response } from 'express';
+
+export async function getHome(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    res.status(200).json({ service: 'api', status: 'running' });
+  } catch (err) {
+    next(err);
+  }
+}
+```
+
 `src/controllers/health.controller.ts`:
 
 ```ts

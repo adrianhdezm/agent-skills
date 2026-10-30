@@ -27,8 +27,10 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 
 ## Reference code
 
-`src/db/client.ts` (`app/db/client.ts` in React Router, with `~/` imports): the one pool, its idle-error listener, and
-the Drizzle client on it; the caller keeps `pool` to close it on shutdown.
+The one pool, its idle-error listener, and the Drizzle client on it; the caller keeps `pool` to close it on shutdown
+(`app/db/client.ts` in React Router, with `~/` imports).
+
+`src/db/client.ts`:
 
 ```ts
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -48,8 +50,10 @@ export function createDbClient(connectionString: string): { pool: Pool; db: DbCl
 }
 ```
 
-`src/migrate.ts`, which applies the committed migrations with drizzle-orm's own migrator, a production dependency, so
-the image needs no drizzle-kit; the engine's Compose integration runs it before the app:
+The migration entry applies the committed migrations with drizzle-orm's own migrator, a production dependency, so the
+image needs no drizzle-kit; the engine's Compose integration runs it before the app.
+
+`src/migrate.ts`:
 
 ```ts
 import { fileURLToPath } from 'node:url';
