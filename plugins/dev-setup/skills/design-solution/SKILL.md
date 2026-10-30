@@ -28,7 +28,7 @@ It is grounded in the real code and the project's conventions, not in a framewor
   `bootstrap-project` for every stack), `CLAUDE.md` or `AGENTS.md`, whichever the project has. Follow its architecture, its recipe
   for adding a resource, its naming and its test tiers. Where there is no such file, follow the patterns in the code
   and record each one you relied on under **Conventions used**. For how two technologies of the stack connect, or the
-  reason behind a rule, use the `apply-stack-conventions` skill's docs for that stack.
+  reason behind a rule, use the `apply-stack-conventions` skill's docs for that stack (its `references/catalog.md` lists them).
 - `CONSTRAINTS.md`, if the project has one: its checks, its Done means and its Boundaries. A design that needs an
   "Ask first" item (a new dependency, a schema change on existing data) names it as a decision.
 - The code itself: open the files the design will touch, and copy real paths and lines.

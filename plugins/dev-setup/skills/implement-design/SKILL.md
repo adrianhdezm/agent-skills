@@ -51,7 +51,7 @@ first, so each slice's work stays separate from theirs.
 3. **Build, item by item.** Tick each item when it lands. Add any new task you find as a new item.
    - Follow the conventions file: its architecture, its recipe for adding a resource, its naming and its test tiers.
      Copy the shape of the nearest existing example. Where a seam between two technologies is not spelled out there,
-     the `apply-stack-conventions` skill's integration doc for it is.
+     the `apply-stack-conventions` skill's integration doc for it is (its `references/catalog.md` lists them).
    - For each criterion, write the test in the tier the design gives it. Start the test title with the criterion ID, so
      verification can trace it: `it("B1.2 rejects a second claim on a taken slot", …)`. Write the test before or with
      the code, and see it fail once for the right reason.
