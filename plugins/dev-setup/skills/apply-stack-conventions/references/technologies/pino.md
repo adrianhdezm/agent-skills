@@ -19,13 +19,13 @@ the platform runs each request, its console is the log.
 
 ## Required values
 
-| What            | Value                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| dependencies    | `pino`                                                                                      |
-| devDependencies | `pino-pretty`                                                                               |
-| `dev` pipe      | `\| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname` |
-| tests           | `env: { LOG_LEVEL: 'silent' }` at the root of the test runner's config                      |
-| `.env.example`  | a commented `# LOG_LEVEL=debug`                                                             |
+| What            | Value                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| dependencies    | `pino`                                                                                                                                                 |
+| devDependencies | `pino-pretty`                                                                                                                                          |
+| `dev` pipe      | `\| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname`; a framework's request logger may add fields to `--ignore` |
+| tests           | `env: { LOG_LEVEL: 'silent' }` at the root of the test runner's config                                                                                 |
+| `.env.example`  | a commented `# LOG_LEVEL=debug`                                                                                                                        |
 
 ## Pitfalls
 
