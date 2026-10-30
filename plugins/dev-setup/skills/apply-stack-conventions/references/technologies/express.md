@@ -1,7 +1,7 @@
 # Express
 
 Express 5 as an HTTP API: an app factory, a context singleton, controllers that validate with zod and call the data
-layer, one error shape, and Pino logs.
+layer, and one error shape.
 
 **Realises:** [REST API](../architecture/rest-api.md)
 
@@ -11,7 +11,7 @@ layer, one error shape, and Pino logs.
   calls `createApp(context)`, starts the HTTP listener, and on `SIGINT` / `SIGTERM` closes the server and then the
   database pool. It is the only place that opens connections.
 - **`app.ts` is a pure factory.** `createApp(context)` stores the context once on `app.locals.context` (a singleton,
-  not a middleware: it does not vary per request), registers `pinoHttp({ logger })`, `cors()` and `express.json()`,
+  not a middleware: it does not vary per request), registers the request logger, `cors()` and `express.json()`,
   mounts every handler directly on the app, and ends with `notFoundHandler` then `errorHandler`. It reads no
   environment and opens no connection, so tests build an app around any context.
 - **No routers**: `app.get('/entities', listEntities)` on the app reads clearer at this size. The context type reaches
@@ -27,11 +27,9 @@ layer, one error shape, and Pino logs.
   `Internal Server Error` for anything else. It logs 5xx at `error` and 4xx at `warn`, so routine client mistakes do
   not bury real faults, and hands on to Express's `next` when the headers already went out. `notFoundHandler` forwards
   `createError(404, 'Not Found: <METHOD> <path>')`.
-- **Pino logs plain JSON**, at `LOG_LEVEL` (default `debug`, `info` when `NODE_ENV=production`). `pino-pretty` is a
-  pipe in the `dev` script only, never an import or a `transport`, so the logger never depends on a dev dependency.
 - **Built with `tsc` to `dist/`**: `build` is `tsc -p tsconfig.app.json`, `start` is
   `node --env-file=<root .env> dist/server.js`, and `dev` is
-  `node --env-file=<root .env> --import=tsx --watch src/server.ts | pino-pretty …`, where `<root .env>` is `.env` in a
+  `node --env-file=<root .env> --import=tsx --watch src/server.ts`, piped through the logger's pretty printer, where `<root .env>` is `.env` in a
   single package and `../.env` in a workspace package. Sources import with the `.js` extension.
 - **Tests at two tiers.** Unit tests call each controller and middleware as a plain function with a mock `req` (a stub
   DAO on `req.app.locals.context`), a spy `res` and a spy `next`: every validation, error-mapping and logging branch is
@@ -43,8 +41,8 @@ layer, one error shape, and Pino logs.
 
 | What                    | Value                                                                                                                                                                                                                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies            | `express`, `cors`, `http-errors`, `pino`, `pino-http`, `zod`                                                                                                                                                                                                                    |
-| devDependencies         | `@types/express`, `@types/cors`, `@types/http-errors`, `pino-pretty`, `tsx`                                                                                                                                                                                                     |
+| dependencies            | `express`, `cors`, `http-errors`, `zod`                                                                                                                                                                                                                                         |
+| devDependencies         | `@types/express`, `@types/cors`, `@types/http-errors`, `tsx`                                                                                                                                                                                                                    |
 | `tsconfig.app.json`     | `module`/`moduleResolution` `"NodeNext"`, `lib`/`target` `"ES2024"`, `outDir: "dist"`, `rootDir: "src"`, `types: ["node"]`, `strict`, `skipLibCheck`, `sourceMap`, `composite: true` with its own `tsBuildInfoFile`, `include: ["src/**/*.ts"]` (which picks up `express.d.ts`) |
 | `tsconfig.node.json`    | extends the app project with `composite: false`, `noEmit: true`, `rootDir: "."`, its own `tsBuildInfoFile`; includes the config files and `tests/**/*.ts`                                                                                                                       |
 | `typecheck`             | `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`                                                                                                                                                                                                                |
@@ -67,7 +65,7 @@ layer, one error shape, and Pino logs.
 server.ts  builds the AppContext once: { db, <resource>Dao: new <Resource>Dao(db), … }
    │
 createApp(context)   app.ts sets app.locals.context, then:
-request ─► pino-http ─► cors ─► express.json() ─► route ─► controller ─► DAO ─► Postgres
+request ─► request log ─► cors ─► express.json() ─► route ─► controller ─► DAO ─► Postgres
 errors:  any throw ─► next(err) ─► notFoundHandler (no route) ─► errorHandler ─► { status: 'error', message }
 ```
 
@@ -84,7 +82,6 @@ errors:  any throw ─► next(err) ─► notFoundHandler (no route) ─► err
 | controller | `controllers/<resource>.controller.ts`         | one exported `async (req, res, next)` per route | import the ORM or a DAO class, build SQL, log errors itself |
 | middleware | `middlewares/<name>.middleware.ts`             | `errorHandler` (terminal) and `notFoundHandler` | call a DAO                                                  |
 | context    | `models/app-context.model.ts` + `express.d.ts` | `AppContext` and its typing on `Express.Locals` | —                                                           |
-| logger     | `logger.ts`                                    | one Pino instance emitting JSON                 | import `pino-pretty`                                        |
 | helper     | `helpers/<name>.helper.ts`                     | transport-agnostic functions                    | take an Express `Request`                                   |
 | model      | `models/<name>.model.ts`                       | types and error classes                         | contain logic                                               |
 
@@ -97,7 +94,6 @@ errors:  any throw ─► next(err) ─► notFoundHandler (no route) ─► err
   only when the error is exposed, and logs 5xx at `error` and 4xx at `warn`.
 - **Naming**: handlers are verb + resource (`listEntities`, `getEntity`), never `entityController`; middlewares end in
   `Handler`. Folders are plural, files keep the singular suffix (`controllers/entity.controller.ts`).
-- **Logs are JSON**; `pnpm dev` pipes them through `pino-pretty`.
 
 ### Testing the API
 
