@@ -41,16 +41,141 @@ my-project/
 
 ## Required values
 
-| What                 | Value                                                                                                                                                                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| scripts              | `start` `node --env-file=.env src/main.ts`; `dev` `node --import=tsx --watch --env-file=.env src/main.ts`; `typecheck` `tsc -b`; `lint` `eslint . --max-warnings 0`; `test` `vitest run`; `format`, `format:check`                                                                    |
-| `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                                             |
-| devDependencies      | `@types/node@24`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, `tsx`, `vitest@5`, and the pinned `typescript`                                                                                                                                   |
-| `tsconfig.app.json`  | includes `src`; the shared options with `lib`/`target` `ES2024`, `module: "NodeNext"`, `types: ["node"]`, `allowImportingTsExtensions`, `noImplicitOverride`                                                                                                                          |
-| `tsconfig.node.json` | extends the app project, with a leading comment that only the file set and the JavaScript switches differ: `allowJs`, `checkJs`, its own `tsBuildInfoFile`, `include: ["tests", "eslint.config.js"]`                                                                                  |
-| `eslint.config.js`   | `strictTypeChecked` and `stylisticTypeChecked`; correctness adds `consistent-type-assertions: never` and `max-classes-per-file: 1`; `consistent-type-imports` takes `{ prefer: 'type-imports' }` alone (Node + TypeScript says why); tests allow assertions; ignoring `**/dist/**`    |
-| `.prettierignore`    | `node_modules`, `dist`, `pnpm-lock.yaml`                                                                                                                                                                                                                                              |
-| `.gitignore`         | one comment per group: dependencies (`node_modules`); output (`out`, `dist`, `*.tgz`); coverage (`coverage`, `*.lcov`); logs (`logs`, `*.log`); dotenv (`.env`, `.env.*.local`, `.env.local`); caches (`.eslintcache`, `.cache`, `*.tsbuildinfo`); IDEs and OS (`.idea`, `.DS_Store`) |
+| What              | Value                                                                                                                                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scripts           | `start` `node --env-file=.env src/main.ts`; `dev` `node --import=tsx --watch --env-file=.env src/main.ts`; `typecheck` `tsc -b`; `lint` `eslint . --max-warnings 0`; `test` `vitest run`; `format`, `format:check`                                                                    |
+| `allowBuilds`     | `esbuild`                                                                                                                                                                                                                                                                             |
+| devDependencies   | `@types/node@24`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, `tsx`, `vitest@5`, and the pinned `typescript`                                                                                                                                   |
+| configs           | the tsconfigs and `eslint.config.js` under Reference code; past the shared rules, ESLint adds `consistent-type-assertions: never` and `max-classes-per-file: 1`, and `consistent-type-imports` takes `{ prefer: 'type-imports' }` alone (Node + TypeScript says why)                  |
+| `.prettierignore` | `node_modules`, `dist`, `pnpm-lock.yaml`                                                                                                                                                                                                                                              |
+| `.gitignore`      | one comment per group: dependencies (`node_modules`); output (`out`, `dist`, `*.tgz`); coverage (`coverage`, `*.lcov`); logs (`logs`, `*.log`); dotenv (`.env`, `.env.*.local`, `.env.local`); caches (`.eslintcache`, `.cache`, `*.tsbuildinfo`); IDEs and OS (`.idea`, `.DS_Store`) |
+
+## Reference code
+
+The config files as a fresh scaffold writes them; the tables above say why each value is there.
+
+`tsconfig.json`:
+
+```jsonc
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}
+```
+
+`tsconfig.app.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "lib": ["ES2024"],
+    "target": "ES2024",
+    "types": ["node"],
+    "module": "NodeNext",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
+  },
+  "include": ["src"]
+}
+```
+
+`tsconfig.node.json`:
+
+```jsonc
+{
+  // Extends the app project: only the file set and the JavaScript switches differ.
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["tests", "eslint.config.js"]
+}
+```
+
+`eslint.config.js`:
+
+```js
+import js from '@eslint/js';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import prettier from 'eslint-config-prettier/flat';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig(
+  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', '**/dist/**']),
+  js.configs.recommended,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      parserOptions: {
+        // src/ belongs to tsconfig.app.json; tests/ and this file to tsconfig.node.json.
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    }
+  },
+  prettier,
+  {
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+      'max-classes-per-file': ['error', 1],
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          ignoreRestSiblings: true
+        }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // A describe holds every case for one module, so the size guardrails do not apply, and tests may assert.
+    files: ['tests/**/*.ts'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'max-statements': 'off',
+      '@typescript-eslint/consistent-type-assertions': 'off'
+    }
+  }
+);
+```
 
 ## Scaffold
 
