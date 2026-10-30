@@ -448,7 +448,11 @@ import type { Dao, IdInput, PaginatedResult } from '../models/dao.model.js';
 import { NotFoundError } from '../models/error.model.js';
 
 export class EntityDao implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput> {
-  constructor(private readonly db: DbClient) {}
+  private readonly db: DbClient;
+
+  constructor(db: DbClient) {
+    this.db = db;
+  }
 
   async get({ id }: IdInput): Promise<Entity | null> {
     const [row] = await this.db.select().from(entity).where(eq(entity.id, id)).limit(1);
