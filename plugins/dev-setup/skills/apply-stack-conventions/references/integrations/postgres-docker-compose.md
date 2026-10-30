@@ -19,7 +19,7 @@ host apps ─► localhost:5432          app services ─► db:5432 (their own 
 | `docker-compose.yml`          | the `db` service                               |
 | `<owner>/db/scripts/init.sql` | `CREATE DATABASE app;` and its grant           |
 | `<owner>/db/data/`            | the bind-mounted data, git- and docker-ignored |
-| `.env`, `.env.example`        | `DB_PASSWORD`, `DATABASE_URL`                  |
+| `.env`, `.env.example`        | `DB_PASSWORD`, `DB_PORT`, `DATABASE_URL`       |
 
 ## Required values
 
@@ -32,18 +32,19 @@ db:
   environment:
     - POSTGRES_PASSWORD=${DB_PASSWORD:-s3cr3t}
   ports:
-    - '5432:5432'
+    - "${DB_PORT:-5432}:5432"
   volumes:
     - ./<owner>/db/data:/var/lib/postgresql/data # Persist data (host-bound)
     - ./<owner>/db/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql # Run init script on first start
   healthcheck:
-    test: ['CMD-SHELL', 'pg_isready -U postgres -d app']
+    test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
     interval: 5s
     timeout: 5s
     retries: 10
 ```
 
-The database name `app` appears in `init.sql`, the healthcheck and the URLs: change all together.
+The database name `app` appears in `init.sql`, the healthcheck and the URLs: change all together. `DB_PORT` moves only
+the host port: the host's `DATABASE_URL` uses it, while services inside Compose keep `db:5432`.
 
 ## Pitfalls
 
