@@ -29,8 +29,8 @@ it when authentication is picked; it builds on React Router home and needs the d
 ## Behaviour
 
 - An anonymous request for `/account` redirects to `/login?redirectTo=%2Faccount`.
-- Signing up creates the user and redirects to `/login` (no automatic sign-in); an email already taken shows the
-  library's message on the form.
+- Signing up creates the user and redirects to `/login` (no automatic sign-in). An email already taken also redirects
+  to `/login`, as Better Auth answers it with automatic sign-in off, so sign-up does not reveal which emails exist.
 - A right password redirects to the safe `redirectTo` (or `/`) with the session cookie set; a wrong one answers the
   login page again with "Invalid email or password" and no password in its HTML.
 - A `redirectTo` that is absolute or starts with `//` is ignored: the redirect goes to `/`.
