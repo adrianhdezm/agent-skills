@@ -338,6 +338,12 @@ export default defineConfig({
 });
 ```
 
+`tests/setup.ts`, the unit project's setup file, loading the app's stylesheet so browser tests render with its styles:
+
+```ts
+import '../app/app.css';
+```
+
 ## Scaffold
 
 - **Check the ports first**; stop with the user if one is taken, or set another `PORT` in `.env`.
