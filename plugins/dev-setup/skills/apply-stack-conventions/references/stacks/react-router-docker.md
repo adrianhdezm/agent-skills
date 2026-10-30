@@ -134,8 +134,11 @@ required checks.
 
 ## Smoke test
 
-- **Production**: `PORT=<port> node server.ts` serves the welcome heading, the stylesheet under `/assets/` with
-  `cache-control: public, max-age=31536000, immutable`, and a 404 for an unknown path.
+- **Production**: after `pnpm build`, `NODE_ENV=production PORT=<port> node --env-file=.env server.ts` serves the
+  welcome heading, the stylesheet under `/assets/` with `cache-control: public, max-age=31536000, immutable`, and a 404
+  for an unknown path. Both prefixes are needed: `node server.ts` alone reads no `.env` (it fails on the first required
+  variable once a database is added), and `--env-file` never overrides a variable already set, so `.env`'s
+  `NODE_ENV=development` would otherwise start the dev server.
 - **Development**: `pnpm dev` serves the welcome heading.
 - **Compose**: `pnpm compose:up` brings `db` up healthy and then `app`; the app container serves the heading, and
   `docker compose exec -T db psql -U postgres -tAc "select datname from pg_database where datname='app'"` prints
