@@ -12,8 +12,10 @@ eslint.config.js ─► typescript-eslint preset + parserOptions { projectServic
 ```
 
 - **Type-checked rules**, through `projectService: true` and `tsconfigRootDir: import.meta.dirname`: a file in no
-  project is reported instead of being linted without types. `recommendedTypeChecked` catches floating and misused
-  promises and unsafe `any`; a stack may take the stricter `strictTypeChecked` plus `stylisticTypeChecked`.
+  project is reported instead of being linted without types. **`strictTypeChecked` plus `stylisticTypeChecked`** is the
+  preset: beyond floating and misused promises and unsafe `any`, it catches needless conditions, confusing `void`
+  returns and loose template expressions. A framework whose own idioms it rejects says so in that framework's ESLint
+  integration and takes `recommendedTypeChecked` instead.
 - **`defineConfig` from `eslint/config`**, not `tseslint.config()`, which is deprecated and reported by
   `@typescript-eslint/no-deprecated`.
 - **Config files are linted with types too**: they sit in `tsconfig.node.json`'s `include`, or in `globalIgnores` when
@@ -21,7 +23,8 @@ eslint.config.js ─► typescript-eslint preset + parserOptions { projectServic
 
 ## Required values
 
-The shared correctness rules typescript-eslint adds:
+The preset is `tseslint.configs.strictTypeChecked` and `tseslint.configs.stylisticTypeChecked`, after `js.configs.recommended`
+and before `eslint-config-prettier`. The shared correctness rules typescript-eslint adds:
 
 | Rule                                         | Setting                                                                                                                    |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -53,5 +56,6 @@ pnpm view typescript-eslint peerDependencies    # e.g. "typescript": "<6.1.0"
 
 ## Verify it is wired
 
-- `eslint.config.js` sets `projectService: true` and `tsconfigRootDir`, and uses a `…TypeChecked` preset.
+- `eslint.config.js` sets `projectService: true` and `tsconfigRootDir`, and uses `strictTypeChecked` and
+  `stylisticTypeChecked`, or the preset its framework's ESLint integration names.
 - `pnpm exec eslint --print-config <a config file>` succeeds, so the config files are in a project.
