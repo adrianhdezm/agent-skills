@@ -44,7 +44,7 @@ two tiers of tests, and a static build.
 | What                 | Value                                                                                                                                                                                                                                                                                          |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `angular.json` build | `schematics["@schematics/angular:component"].style: "css"`; `styles: ["src/styles.css"]`, `inlineStyleLanguage: "css"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts` |
-| scripts              | the CLI's `ng`, `start`, `build`, `watch`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit`                                                                                                                                                               |
+| scripts              | the CLI's `ng`, `start`, `build`, `watch`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit && tsc -p tsconfig.node.json --noEmit`                                                                                                                         |
 
 ## Pitfalls
 
