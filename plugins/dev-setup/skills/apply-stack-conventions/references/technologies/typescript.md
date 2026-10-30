@@ -12,7 +12,9 @@ How TypeScript is configured and pinned: one project per runtime, checked withou
   place. It holds no compiler options, except `paths` that a CLI reads from it, and says why.
 - **Check, never emit, unless something builds.** Each project sets `noEmit` and its own `tsBuildInfoFile` under
   `node_modules/.tmp/`. A package that compiles to `dist/` emits from its app project only.
-- **`typecheck` is `tsc -b`**, preceded by whatever generates types the code imports.
+- **`typecheck` is `tsc -b`**, preceded by whatever generates types the code imports. A package that emits checks with
+  `tsc -p <project> --noEmit` per project instead, since `tsc -b` would build it; such projects leave `tsBuildInfoFile`
+  out, which TypeScript accepts only beside `incremental` or `composite`.
 - **Module resolution follows who turns the code into JavaScript**:
 
 | The code is                                 | `module` / `moduleResolution`                 | Imports      |
@@ -42,7 +44,10 @@ The options every project sets, under the line comments `// Environment, modules
 | `strict`                     | `true`                                              | the TypeScript 6 default, written out                                                 |
 | `noUncheckedIndexedAccess`   | `true`                                              | `array[0]` is `T \| undefined`                                                        |
 | `noFallthroughCasesInSwitch` | `true`                                              |                                                                                       |
-| `lib`, `target`              | `ES2024`                                            | what the runtime implements; add `DOM` only where code runs in a browser              |
+| `lib`, `target`              | `ES2024`, in every stack                            | what the server runtime and the browsers implement; add `DOM` only for browser code   |
+
+Where a blueprint's Required values give a different value for one of these, the blueprint's wins: it records an
+exception its stack needs.
 
 Pin TypeScript after checking the peer ranges of the tools that read it:
 
