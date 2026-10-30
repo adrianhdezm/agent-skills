@@ -142,7 +142,7 @@ button.ghost:hover { color: var(--accent); }
     <textarea id="out" readonly aria-label="Response to paste back"></textarea>
     <div class="sheet-foot">
       <span id="copied">Copy this and paste it back into the chat.</span>
-      <span class="m-row"><button type="button" id="close">Close</button><button type="button" class="primary" id="copy">Copy response</button></span>
+      <span class="m-row"><button type="button" id="close">Close</button><button type="button" id="send" hidden>Send to Claude</button><button type="button" class="primary" id="copy">Copy response</button></span>
     </div>
   </div>
 </div>
@@ -351,9 +351,39 @@ button.ghost:hover { color: var(--accent); }
   }
 
   var sheet = document.getElementById("sheet"), outEl = document.getElementById("out"), copied = document.getElementById("copied");
+  var send = document.getElementById("send"), store = null, by = null;
+  function hint() { return store ? "Send it to Claude, or copy it and paste it into the chat." : "Copy this and paste it back into the chat."; }
+  // When the published page is granted the db capability, a response can be saved for Claude to read back.
+  // Without it (a file opened from disk, a viewer who cannot write) the page keeps copy and paste only.
+  if (window.claude && typeof window.claude.use === "function") {
+    Promise.all([window.claude.use("db"), window.claude.use("user")]).then(function (r) {
+      var db = r[0], user = r[1];
+      if (!db) return;
+      function ready() { store = db; send.hidden = false; if (!sheet.hidden) copied.textContent = hint(); }
+      if (!user) return ready();
+      user.can("data.write").then(function (ok) {
+        if (ok === false) return;
+        return user.id().then(function (id) { by = id; ready(); });
+      }).catch(ready);
+    }, function () {});
+  }
+  send.addEventListener("click", function () {
+    if (!store) return;
+    send.disabled = true;
+    copied.textContent = "Sending…";
+    store.collection("responses").add({ markdown: outEl.value, plan: plan.title, at: new Date().toISOString(), by: by }).then(function () {
+      copied.textContent = "Sent. Tell Claude in the chat that you responded.";
+    }, function (e) {
+      var denied = e && e.code === "invalid_argument";
+      send.disabled = false;
+      if (denied) { send.hidden = true; store = null; }
+      copied.textContent = (denied ? "This view cannot send." : "Could not send.") + " Copy the response and paste it into the chat.";
+    });
+  });
   document.getElementById("respond").addEventListener("click", function () {
     outEl.value = response();
-    copied.textContent = "Copy this and paste it back into the chat.";
+    send.disabled = false;
+    copied.textContent = hint();
     sheet.hidden = false;
     document.getElementById("copy").focus();
   });

@@ -13,8 +13,9 @@ progress file is the memory of the run: it survives a compacted context and a ne
 instead of the scrollback.
 
 **Done means, for each slice:** every item on its checklist is ticked, each of its criteria has a passing test whose
-title starts with the criterion ID, all the project's checks pass, the guard is clean, and the Done means list in
-`CONSTRAINTS.md` holds.
+title starts with the criterion ID, the tests of every tier the design gives those criteria have run and pass, all the
+project's checks pass, the guard is clean against the design's base, and the Done means list in `CONSTRAINTS.md`
+holds.
 
 ## When not to use
 
@@ -23,12 +24,20 @@ title starts with the criterion ID, all the project's checks pass, the guard is 
 
 ## Input
 
-`/implement-design <slug> [S2 | all]`. With no slice, take the first slice that is not done in `04-progress.md`.
-With `all`, run every remaining slice in order. If `03-design.md` does not say `Status: Approved`, stop and point to
-`/design-solution`.
+`/implement-design <slug> [S2 | fixes | all]`. With no slice, take what `progress.mjs` names next: the open
+**Fixes from verification** section first, then the first slice that is not done. `fixes` takes the fixes section.
+`all` takes the fixes section if it is open, then every remaining slice in order. If `03-design.md` does not say
+`Status: Approved`, or has no `Base:` on its header line, stop and point to `/design-solution`.
 
-Before `all`, check `git status`. If there are changes outside `docs/<slug>/`, ask the user to commit or stash them
-first, so each slice's work stays separate from theirs.
+```bash
+node <skill-dir>/scripts/progress.mjs docs/<slug>
+```
+
+`<skill-dir>` is this skill's base directory. The script prints the Status line of each phase file, each slice's
+state and open items, and what comes next. It exits 1 when a slice marked done still has an unticked item.
+
+Before each slice, check `git status`. If there are changes outside `docs/<slug>/` that this run did not make, ask the
+user to commit or stash them first, so each slice's work stays separate from theirs.
 
 ## Workflow
 
@@ -40,13 +49,14 @@ first, so each slice's work stays separate from theirs.
 - [ ] 5. Slice marked done; next slice or end of run
 ```
 
-1. **Read the context.** Read `03-design.md` (the slice, the decisions, the data and the contracts), the criteria text
-   in `02-analysis.md`, `04-progress.md` if it exists, the conventions file the design names, and `CONSTRAINTS.md`.
-   Then open every file the slice touches.
+1. **Read the context.** Read `03-design.md` (the slice, the decisions, the data, the contracts and the Base), the
+   criteria text in `02-analysis.md`, `04-progress.md` if it exists, the conventions file the design names, and
+   `CONSTRAINTS.md`. Then open every file the slice touches.
 
 2. **Write the slice's checklist** into `docs/<slug>/04-progress.md` before you write code. Use one item for each file
    change the design lists, one for each criterion's test and one for the checks. Add the section if it is missing.
-   Never rewrite a slice that is already done.
+   Never rewrite a slice that is already done. The fixes section already has its items, one per failure: work it like
+   a slice, and add a test item for any fix whose criterion had no test.
 
 3. **Build, item by item.** Tick each item when it lands. Add any new task you find as a new item.
    - Follow the conventions file: its architecture, its recipe for adding a resource, its naming and its test tiers.
@@ -65,20 +75,29 @@ first, so each slice's work stays separate from theirs.
      change anything else.
 
 4. **Run every check** the project defines: `check:task` if `CONSTRAINTS.md` defines it, otherwise the `package.json`
-   scripts or the conventions file (typically `typecheck`, `lint`, `test`, `build`, `format:check`). Then run the guard
-   from the `define-constraints` skill:
+   scripts or the conventions file (typically `typecheck`, `lint`, `test`, `build`, `format:check`).
+
+   `check:task` leaves the slow tiers to `check:full`. So also run the tests of every tier the design gives this
+   slice's criteria, filtered to the slice's IDs with the runner's name filter (`vitest run -t "B3\."`,
+   `playwright test --grep "B3\."`). An end-to-end criterion is proven when its slice closes, not first in
+   verification. Then check that every criterion of the slice has a test titled with its ID, and run the guard against
+   the design's base:
 
    ```bash
-   node <skill-dir>/../define-constraints/scripts/guard.mjs
+   node <skill-dir>/../verify-build/scripts/trace.mjs docs/<slug>/02-analysis.md \
+     --design docs/<slug>/03-design.md --slice S2
+   node <skill-dir>/../define-constraints/scripts/guard.mjs --base <Base from 03-design.md>
    ```
 
    Fix the code until everything passes. Never add a suppression, skip or delete a test, remove an assertion, leave a
    stub or edit `CONSTRAINTS.md` to get to green. If you cannot make a check pass, record it under **Blocked on me**.
 
 5. **Close the slice.** If the code works but is heavier than it needs to be, run the `simplify-code` skill on the
-   slice, with the checks green before and after. Mark the slice `done` in the progress file. Commit only if the user
-   asked for commits in this run: one commit per slice (and a separate one for simplifications), staging only the files
-   the slice touched plus `04-progress.md`. Never `git add -A`. With `all`, go on to the next slice.
+   slice, with the checks green before and after. Run `progress.mjs docs/<slug> --slice S2`: it exits 1 while any
+   item of the slice is unticked. Then mark the slice `done` in the progress file. Commit the slice unless the user
+   said not to ("no commits"): one commit per slice (and a separate one for simplifications), staging only the files
+   the slice touched plus `04-progress.md`. Never `git add -A`. Without commits the guard still sees the work, because
+   it compares the working tree with the base. With `all`, go on to the next slice.
 
 ## Keep going, or stop
 
@@ -98,6 +117,8 @@ A small departure that changes no behaviour or contract does not stop the run. R
 
 ```markdown
 # <Name>: Progress
+
+Status: In progress
 
 ## S1: <title> · done
 
@@ -124,8 +145,9 @@ A small departure that changes no behaviour or contract does not stop the run. R
 - [ ] …
 ```
 
-Leave out an empty notes heading. Verification adds a **Fixes from verification** section. Treat its items as the
-first items of the next run.
+Leave out an empty notes heading. Verification adds or reopens a `## Fixes from verification · in progress` section
+with one checklist item per failure. `progress.mjs` names it next until every item is ticked; then mark it `done`.
+Set the file's `Status:` to `Done <YYYY-MM-DD>` when every slice and the fixes section are done.
 
 ## End of the run
 
@@ -140,14 +162,19 @@ next step: `/implement-design <slug>` for the next slice, or `/verify-build <slu
 - A second fix attempt without understanding why the first one failed
 - An abstraction with one user
 - `git add -A` with other people's changes in the tree
+- A slice closed while one of its criteria's tiers never ran
+- The guard run without `--base`
 
 ## Review Checklist
 
 - [ ] The checklist was written before the code and ticked as work landed
-- [ ] Every criterion of the slice has a test titled with its ID, in the tier the design gives it
+- [ ] Every criterion of the slice has a test titled with its ID, in the tier the design gives it, and the slice's trace
+      has no gap
+- [ ] The tests of every tier the slice's criteria use ran and pass, not only `check:task`
 - [ ] Code follows the conventions file and the nearest existing example
 - [ ] Every project check passes and the guard is clean. Nothing was weakened or skipped
 - [ ] Anything noticed outside the slice is under Found, not fixed
 - [ ] A change to behaviour, contract or data stopped the run and updated the design. Small departures are recorded as
       deviations
-- [ ] Commits only when the user asked for them
+- [ ] `progress.mjs --slice` passed before the slice was marked done
+- [ ] One commit per slice, staging only its files, unless the user said no commits
