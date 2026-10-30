@@ -33,6 +33,7 @@ const names = {
   pnpm: [/\bpnpm\b/],
   postgres: [/\bPostgres(?:QL)?\b/, /\bpostgres:/, /`pg`/],
   prettier: [/\bPrettier\b/, /\bprettier\b/],
+  pino: [/\bPino\b/, /\bpino\b/],
   'react-router': [/\bReact Router\b/, /\breact-router\b/, /\breactRouter\(/],
   's3-storage': [/\bRustFS\b/, /\bS3\b/],
   shadcn: [/\bshadcn\b/],

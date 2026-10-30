@@ -9,7 +9,8 @@ Node 24 as a runtime: loading the environment, configuration that fails loudly, 
   created where nothing needs a value yet. `start` in production gets its environment from the platform, not from a
   file. `.env` is git-ignored; `.env.example` is committed.
 - **Configuration is read once and fails loudly**: code that needs a variable throws when it is unset, with no fallback
-  value, so a misconfiguration is never masked and no credential sits in source.
+  value, so a misconfiguration is never masked and no credential sits in source. A log level is the one exception: it
+  changes only what is printed, so it may default.
 - **One file has side effects**: the entry point reads the environment, builds what it needs and runs; every other
   module exports functions or classes, and is what the tests import.
 
