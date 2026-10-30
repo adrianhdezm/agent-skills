@@ -36,6 +36,77 @@ docker-compose.yml: migrate (same image, node migrate.ts; once a database is add
 - **A new environment variable missing from the service** works on the host, where `.env` is loaded, and is `undefined`
   in the container.
 
+## Reference code
+
+The `Dockerfile` with the database entry (without it, drop `migrate.ts` and `db/migrations`):
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY . .
+RUN pnpm build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+COPY --from=build /app/build ./build
+COPY server.ts migrate.ts ./
+COPY db/migrations ./db/migrations
+ENV NODE_ENV=production
+USER node
+EXPOSE 3000
+CMD ["node", "server.ts"]
+```
+
+The `migrate` and `app` services with every optional entry, beside the `db` and `rustfs` services; `app` reports
+healthy once it serves its home page, so `up --wait` returns only when the app answers:
+
+```yaml
+  migrate:
+    build: .
+    command: ['node', 'migrate.ts']
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+      APP_NAME: ${APP_NAME}
+      PORT: '3000'
+      AUTH_SECRET: ${AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-app-files}
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rustfs:
+        condition: service_started
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ >/dev/null || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+```
+
+The server keeps its database pool for the life of the process and closes nothing on shutdown: `SIGTERM` ends the
+process, and Postgres drops its connections.
+
 ## Conventions
 
 - **The app image runs `node server.ts` over the build with production dependencies only.**
