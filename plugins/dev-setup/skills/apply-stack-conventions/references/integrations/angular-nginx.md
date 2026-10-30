@@ -11,10 +11,10 @@ ng build ─► dist/<name>/browser ─► image: nginx:1.27-alpine /usr/share/n
 
 ## Required values
 
-| What         | Value                                                                                                                                                     |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dockerfile   | a build stage on `node:24-alpine` with Corepack running `ng build`; a runtime stage on `nginx:1.27-alpine` copying `dist/<name>/browser` and `nginx.conf` |
-| `nginx.conf` | the Nginx doc's, beside the package's `Dockerfile`                                                                                                        |
+| What         | Value                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| static build | `ng build`, whose output is `dist/<name>/browser`                                                 |
+| image        | Nginx + Docker Compose's two stages, copying `dist/<name>/browser` and the package's `nginx.conf` |
 
 ## Conventions
 
