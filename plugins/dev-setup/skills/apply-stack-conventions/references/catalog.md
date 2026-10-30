@@ -104,12 +104,14 @@ has something.
 
 ## Examples
 
-| Example                                            | What it must show                                                                 | Used by                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------ |
-| [Node module](examples/node-module.md)             | one exported function, its test, the entry point that runs it                     | Node package             |
-| [Hono hello](examples/hono-hello.md)               | one route answered by the Worker's real entry, tested in workerd                  | Hono Worker              |
-| [React Router home](examples/react-router-home.md) | a loader reading a server value from the context, a shadcn primitive, route tests | both React Router stacks |
-| [Entity CRUDL](examples/entity-crudl.md)           | one resource end to end: table, DAO, API, contract, slices, pages, tests, e2e     | both Angular stacks      |
+| Example                                            | What it must show                                                                        | Used by                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------- |
+| [Node module](examples/node-module.md)             | one exported function, its test, the entry point that runs it                            | Node package                                  |
+| [Hono hello](examples/hono-hello.md)               | one route answered by the Worker's real entry, tested in workerd                         | Hono Worker                                   |
+| [React Router home](examples/react-router-home.md) | a loader reading a server value from the context, a shadcn primitive, route tests        | both React Router stacks                      |
+| [Sign in](examples/sign-in.md)                     | sign up, log in, a protected page, log out; safe redirects and the wrong-password answer | both React Router stacks, with authentication |
+| [File upload](examples/file-upload.md)             | upload, list, download and delete per user; the object undone when the row fails         | both React Router stacks, with file storage   |
+| [Entity CRUDL](examples/entity-crudl.md)           | one resource end to end: table, DAO, API, contract, slices, pages, tests, e2e            | both Angular stacks                           |
 
 Each has **Demonstrates** (each part and the docs it applies), **Data** or **The resource** (the values it depends on),
 **Behaviour** (what it does, and the contracts tests rely on: routes, names, answers), **Tests** (the behaviours each
