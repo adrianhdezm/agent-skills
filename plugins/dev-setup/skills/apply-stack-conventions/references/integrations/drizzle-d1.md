@@ -24,8 +24,7 @@ tests: readMigrationFiles() at config time ─► a binding ─► applied in wo
 
 ## Reference code
 
-The data layer is [Drizzle](../technologies/drizzle.md)'s reference code with these changes, checked by running its DAO
-in workerd against a local D1 (paging and count, filters, update, a missing row):
+The data layer is [Drizzle](../technologies/drizzle.md)'s reference code with these changes:
 
 | In Drizzle's reference code                         | On D1                                                                                    |
 | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |

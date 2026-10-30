@@ -34,8 +34,7 @@ context.get(appContext).db   (built per request on Workers, once on Node, by the
 
 ## Reference code
 
-Drizzle's reference code applies here, laid out for React Router; the second-round React Router on Node run built
-it this way with every check passing:
+Drizzle's reference code applies here, laid out for React Router:
 
 | In Drizzle's reference code                                                 | In a React Router app                                                           |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
