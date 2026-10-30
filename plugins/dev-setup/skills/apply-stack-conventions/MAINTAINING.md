@@ -13,9 +13,10 @@ examples a kind of project is built from, its shape, its exact values and its ow
 
 A blueprint has **Composition** (its docs, in the order their conventions are assembled), **Examples** (what a fresh
 scaffold starts with), **Shape** (the files), **Required values** (scripts, ports, ignores and settings only this stack
-fixes), **Scaffold** (only where building it departs from the usual order), **Conventions** (only what is specific to
-the stack) and **Smoke test** (the live proof a fresh scaffold runs). The sections of the other layers are listed under
-each table in [references/catalog.md](references/catalog.md).
+fixes), **Reference code** (its tsconfigs, ESLint and Vitest configs exactly as a fresh scaffold writes them, each
+checked by scaffolding the stack), **Scaffold** (only where building it departs from the usual order), **Conventions**
+(only what is specific to the stack) and **Smoke test** (the live proof a fresh scaffold runs). The sections of the
+other layers are listed under each table in [references/catalog.md](references/catalog.md).
 
 **Composition** and **Examples** are read by `scripts/assemble-conventions.mjs`, so they hold only a bulleted list of
 links, one doc per line, with no text around it. An entry the project may leave out ends in ` — optional`, picked with
