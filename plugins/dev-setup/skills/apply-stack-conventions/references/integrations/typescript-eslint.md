@@ -26,6 +26,7 @@ The shared correctness rules typescript-eslint adds:
 | Rule                                         | Setting                                                                                                                    |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `@typescript-eslint/consistent-type-imports` | `error`, `{ prefer: 'type-imports', fixStyle: 'inline-type-imports' }`                                                     |
+| `no-unused-vars`                             | `off`: the base rule does not understand types, and reports type-only imports and overload signatures as unused            |
 | `@typescript-eslint/no-unused-vars`          | `error`, `argsIgnorePattern`, `varsIgnorePattern`, `destructuredArrayIgnorePattern` all `'^_'`, `ignoreRestSiblings: true` |
 | `@typescript-eslint/no-non-null-assertion`   | `error`                                                                                                                    |
 
@@ -39,6 +40,8 @@ pnpm view typescript-eslint peerDependencies    # e.g. "typescript": "<6.1.0"
 
 - **A config file in no TypeScript project** is reported as not part of any project: add it to `tsconfig.node.json`, or
   ignore it.
+- **The base `no-unused-vars` left on** beside `@typescript-eslint/no-unused-vars` reports the same variable twice, and
+  flags type-only imports the typed rule accepts: keep it `off`.
 - **A caret or `@latest` TypeScript** moves past typescript-eslint's ceiling on the next install and breaks the lint.
 
 ## Conventions
