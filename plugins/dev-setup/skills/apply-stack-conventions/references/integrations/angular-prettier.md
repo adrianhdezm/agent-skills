@@ -5,12 +5,12 @@ use it.
 
 ## Required values
 
-| What              | Value                                                                                           |
-| ----------------- | ----------------------------------------------------------------------------------------------- |
-| `.prettierrc`     | the shared values plus `overrides: [{ "files": "*.html", "options": { "parser": "angular" } }]` |
-| scripts           | `format` / `format:check` Prettier over `"**/*.{ts,js,mjs,html,css,json,md,yml,yaml}"`          |
-| `.prettierignore` | `node_modules`, `dist`, `.angular`                                                              |
-| package           | the CLI's `prettier` entry, kept (or the catalog's in a workspace)                              |
+| What              | Value                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `.prettierrc`     | the shared values plus `overrides: [{ "files": "*.html", "options": { "parser": "angular" } }]`        |
+| scripts           | `format` / `format:check` Prettier over `"**/*.{ts,js,mjs,html,css,json,md,yml,yaml}"`                 |
+| `.prettierignore` | `node_modules`, `dist`, `.angular`, `storybook-static`, `test-results`, `playwright-report`, `.vitest` |
+| package           | the CLI's `prettier` entry, kept (or the catalog's in a workspace)                                     |
 
 ## Conventions
 

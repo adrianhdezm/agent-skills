@@ -10,8 +10,9 @@ The formatter. Prettier owns formatting; nothing else does.
 - **`format` writes and `format:check` checks**, both over the whole package (`prettier --write .`,
   `prettier --check .`), and `format:check` is one of the required checks.
 - **`.prettierignore` lists the lockfile and the generated files the package commits**; Prettier already skips
-  `node_modules` and everything `.gitignore` lists. Vendored code a CLI writes and overwrites is ignored too, so an
-  update diffs cleanly.
+  `node_modules` and everything the `.gitignore` in the folder it runs from lists; a package inside a workspace does not
+  see the root `.gitignore`, so its own `.prettierignore` lists its generated folders. Vendored code a CLI writes and
+  overwrites is ignored too, so an update diffs cleanly.
 - **Format before checking**: `pnpm format`, then the checks.
 
 ## Required values
