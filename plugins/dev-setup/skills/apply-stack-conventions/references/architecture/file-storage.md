@@ -6,7 +6,8 @@ step. These rules apply from the moment a project stores files.
 ## Principles
 
 - **Bytes go to an object store; metadata goes to the database.** Never file contents in a table. The `files` table
-  holds what is queried: `id`, a unique `key`, `filename`, `contentType`, `size`, `createdAt`.
+  holds what is queried: `id`, a unique `key`, `filename`, `contentType`, `size`, `createdAt`. With sign-in it also
+  holds `ownerId`, indexed and referencing the user, so a download or delete can check ownership from the row.
 - **One service owns both sides.** `FilesService` writes the object and the row together, so it uses no DAO: every
   database call is paired with an object-store call. It is the one deliberate exception to one DAO per table.
 - **The object goes first, and is undone if the row fails.** Upload stores the object, then inserts the row; if the
@@ -16,8 +17,9 @@ step. These rules apply from the moment a project stores files.
   type is `application/octet-stream`.
 - **The server entry builds the service** with the database client and the store's client, and puts it on the app's
   context, like any capability.
-- **Uploads and downloads are endpoints like any other**: authenticated, ownership-checked, the response's
-  `Content-Type` set explicitly.
+- **Uploads and downloads are endpoints like any other**: authenticated, ownership-checked against the row's `ownerId`
+  (another user's file answers 404, not 403, so its existence is not revealed), the response's `Content-Type` set
+  explicitly.
 - **Store configuration is the runtime's**: a binding where the platform provides the store, connection settings in the
   env file otherwise, with a local compatible service for development.
 

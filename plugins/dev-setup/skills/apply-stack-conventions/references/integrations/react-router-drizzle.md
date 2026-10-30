@@ -46,7 +46,8 @@ Database`.
   (`db.query.*` with `with`), offering the contract's `get` and `list` and returning a `<Parent>With<Child>` type; no
   query-builder joins.
 - **A service per business workflow** in `app/services/`: anything that writes more than one table, needs atomic
-  writes, or composes DAOs and queries. Services import no tables and build no queries.
+  writes, or composes DAOs and queries. Services import no tables and build no queries, except `FilesService`, which
+  the file storage concept makes the one owner of the `files` table and the object store.
 - **The contract and its builders live in `app/db/data-access.ts`**: `Dao`, `RelationQuery`, `PaginatedResult`,
   `IdInput`, the list-input builders and the translator; `app/db/schema.ts` registers every table, both sides of every
   `relations()`, and exports `schema`.

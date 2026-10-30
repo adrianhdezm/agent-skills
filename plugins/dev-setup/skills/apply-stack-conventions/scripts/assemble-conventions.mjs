@@ -9,7 +9,7 @@
 // of links, in the order their conventions appear. An entry ending in " — optional" is included only when its file's
 // base name is passed with --with (`--with angular-fundamental-ngx`); one ending in " — optional (<group>)" when its
 // group is, so `--with authentication` brings in every entry of that group. Its "## Examples" section lists the
-// examples a fresh scaffold starts with, and the "ports" row of its "## Required values" the ports it binds.
+// examples a fresh scaffold starts with, an example marked " — optional (<group>)" only when its group is picked, and the "ports" row of its "## Required values" the ports it binds.
 // The conventions hold the stack's own "## Conventions" section first (none in --compose mode, where the project kind is
 // a noun phrase such as "Hono API on Node"), then each doc's "## Conventions" section under the doc's title. Without
 // --out they go to stdout. With --out they are written to that file, and stdout gets the hand-off block the skill
@@ -120,7 +120,9 @@ function fromStack(stackPath) {
       problems.push(`--with ${name}: not an optional entry of ${stackPath}`);
     }
   }
-  const examples = [...section(stackText, 'Examples', stackPath).matchAll(/^- \[[^\]]+\]\(([^)#\s]+\.md)\)/gm)];
+  const examples = [...section(stackText, 'Examples', stackPath).matchAll(/^- \[[^\]]+\]\(([^)#\s]+\.md)\)(?:[^\n]*? — optional \(([a-z0-9-]+)\))?/gm)].filter(
+    (m) => m[2] === undefined || opted.has(m[2])
+  );
   const ports = /^\| ports +\| (.+?) *\|$/m.exec(section(stackText, 'Required values', stackPath));
   return {
     kind: stackTitle,
