@@ -32,7 +32,7 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 | route        | `route('api/auth/*', 'routes/auth.tsx')`, a splat                                                   |
 | forms        | `parseWithZod` from `@conform-to/zod/v4`, `z` from `zod/v4`                                         |
 | middleware   | exported as an array, `Route.MiddlewareFunction[]`, from the layout that wraps the protected routes |
-| secret       | `.env` on Node; `.dev.vars` and `wrangler secret put` on Workers                                    |
+| secret       | `.env` locally; in production, the platform's secret store (`wrangler secret put` on Workers)       |
 
 ## Pitfalls
 

@@ -34,7 +34,7 @@ The test runner: one config of named projects, an environment per kind of test, 
 - **`@vitest/browser/context` is the old import**: `page` comes from `vitest/browser`.
 - **Loading the app's build config** (its framework or runtime plugins) makes Vitest reject options such as
   `resolve.external`, or start a second runtime.
-- **Browser mode caches under `node_modules/.vite` beside the config**: ignore `node_modules/` at any depth, not
+- **Browser mode caches inside a `node_modules/` beside the config**: ignore `node_modules/` at any depth, not
   `/node_modules/`.
 
 ## Conventions
