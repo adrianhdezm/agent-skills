@@ -50,7 +50,9 @@ const DEV = process.env.NODE_ENV === 'development';
 const PORT = Number(process.env.PORT) || 3000;
 
 /** The Hono app's request entry point, as workers/app.ts exports it. */
-type App = { fetch: (request: Request) => Response | Promise<Response> };
+interface App {
+  fetch: (request: Request) => Response | Promise<Response>;
+}
 
 /** Narrows a loaded module to one whose default export is the app. */
 function isAppModule(mod: unknown): mod is { default: App } {
@@ -80,7 +82,9 @@ async function startDev() {
           res.end();
         });
     });
-  }).listen(PORT, () => console.log(`Dev server at http://localhost:${PORT}`));
+  }).listen(PORT, () => {
+    console.log(`Dev server at http://localhost:${String(PORT)}`);
+  });
 }
 
 async function startProduction() {
@@ -95,11 +99,26 @@ async function startProduction() {
   // Fingerprinted assets never change; everything else in build/client may.
   server.use(
     '/assets/*',
-    serveStatic({ root: './build/client', onFound: (_path, c) => c.header('Cache-Control', 'public, max-age=31536000, immutable') })
+    serveStatic({
+      root: './build/client',
+      onFound: (_path, c) => {
+        c.header('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    })
   );
-  server.use('*', serveStatic({ root: './build/client', onFound: (_path, c) => c.header('Cache-Control', 'public, max-age=3600') }));
+  server.use(
+    '*',
+    serveStatic({
+      root: './build/client',
+      onFound: (_path, c) => {
+        c.header('Cache-Control', 'public, max-age=3600');
+      }
+    })
+  );
   server.all('*', (c) => app.fetch(c.req.raw));
-  serve({ fetch: server.fetch, port: PORT }, () => console.log(`Server running at http://localhost:${PORT}`));
+  serve({ fetch: server.fetch, port: PORT }, () => {
+    console.log(`Server running at http://localhost:${String(PORT)}`);
+  });
 }
 
 await (DEV ? startDev() : startProduction());
