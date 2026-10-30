@@ -1,9 +1,9 @@
 # Entity CRUDL
 
 One resource, `entity`, listed with filter, sort and pagination, shown, created, edited and deleted: the template every
-later resource copies. REST API on Node ships its resource and API part; the Angular app ships its web part against an API it does not own; the
-Angular full stack ships
-all of it, from the table to the pages, with an end-to-end suite over the whole stack. Each part below names the docs it
+later resource copies. REST API on Node and Hono API on Node ship its resource and API part; the Angular app ships its
+web part against an API it does not own; the Angular full stack ships all of it, from the table to the pages, with an
+end-to-end suite over the whole stack. Each part below names the docs it
 applies; build it by applying them, and use this file for what they leave open: names, values, behaviours and tests.
 
 ## Demonstrates
@@ -13,7 +13,7 @@ applies; build it by applying them, and use this file for what they leave open: 
 | the whole resource, API side    | [Database](../architecture/database.md), [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md) (serving) |
 | the whole resource, web side    | [REST API](../architecture/rest-api.md) (consuming)                                                                                       |
 | the table, schemas and DAO      | Drizzle (its reference code: `entity.schema.ts`, `schema.ts`, `entity.dao.ts`)                                                            |
-| the API's shell and controllers | Express, Express + Drizzle                                                                                                                |
+| the API's shell and controllers | Express, Express + Drizzle; on Hono API on Node, Hono, Hono + Drizzle (see its variant)                                                   |
 | the wire between web and API    | Angular + the API contract                                                                                                                |
 | the shell, slices and pages     | Angular, NgRx (its reference code: the router, the list and form slices)                                                                  |
 | the components                  | [UI components](../architecture/ui-components.md) (two tiers), Angular (signal components, Storybook)                                     |
@@ -36,14 +36,15 @@ reference code; the web mirrors them by hand in `models/entity.model.ts` (dates 
 
 ## API
 
-The Angular full stack and REST API on Node. The routes and their answers are the blueprint's HTTP contract.
+The Angular full stack, REST API on Node and Hono API on Node. The routes and their answers are the blueprint's HTTP
+contract.
 
 | Piece       | What it is                                                                                                                                                                  |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----- | --------------------- |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | context     | `AppContext { db: DbClient; entityDao: EntityDao }`; `db` stays for the health probe                                                                                        |
 | controllers | `home` (`getHome`: `{ service: 'api', status: 'running' }`), `health` (`getHealth`), `entity` (`listEntities`, `getEntity`, `createEntity`, `updateEntity`, `deleteEntity`) |
-| mounts      | `GET /`, `GET /health`, `GET                                                                                                                                                | POST /entities`, `GET | PATCH | DELETE /entities/:id` |
-| database    | `db/scripts/init.sql` creates `app`; no migration ships, the first `db:generate --name init` writes it                                                                      |
+| mounts      | `GET /`, `GET /health`, `GET` and `POST /entities`, `GET`, `PATCH` and `DELETE /entities/:id`                                                                               |
+| database    | `db/scripts/init.sql` creates `app`; the scaffold's `db:generate --name init` writes the first migration, committed, and `migrate.ts` applies it before the API serves      |
 
 **Test utilities** (`tests/utils/`): `http-mocks.ts` (`createStubContext()` with a `vi.fn()` per DAO method and the db's
 `execute`; `mockRequest`, `mockResponse` with chainable spies as plain properties, `mockNext`, `mockLog`, and an
@@ -72,12 +73,12 @@ has no handlers and no spec, and is the only importer of `environment`.
 
 **Model, service, helpers.**
 
-| Piece                          | Contract                                                                                                                                                                                                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EntityService`                | the only `HttpClient` user: `list`, `get`, `create` (POST), `update` (PATCH), `delete`, each an `Observable`                                                                                                                                                                              |
-| `entity-list-params.helper.ts` | `DEFAULT_PAGE` 1, `DEFAULT_PAGE_SIZE` 20; `parseListInput` never throws (bad filter, unknown sort field or page below 1 fall back; any direction but `DESC` is `ASC`); `toParams` maps absent and default values to `null`; `sameListInput`                                               |
-| `entity-filter-form.helper.ts` | `FilterForm` (`name`, `description`, `createdFrom`, `createdBefore`) ⇄ `EntityFilterInput` (trimmed `contains`, `createdAt.ge` / `.lt`, a day as local midnight in ISO-8601); reads back only what the strip can express; `formatRange` → `0 of 0` or `first–last of total · page X of Y` |
-| `http-error.helper.ts`         | `httpErrorMessage(err)`: the API's `message`, else the response's                                                                                                                                                                                                                         |
+| Piece                          | Contract                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EntityService`                | the only `HttpClient` user: `list`, `get`, `create` (POST), `update` (PATCH), `delete`, each an `Observable`                                                                                                                                                                                                          |
+| `entity-list-params.helper.ts` | `DEFAULT_PAGE` 1, `DEFAULT_PAGE_SIZE` 20; `parseListInput` never throws (bad filter, unknown sort field or page below 1 fall back; no `sortField` means the default sort, `createdAt DESC`, and with a field any direction but `DESC` is `ASC`); `toParams` maps absent and default values to `null`; `sameListInput` |
+| `entity-filter-form.helper.ts` | `FilterForm` (`name`, `description`, `createdFrom`, `createdBefore`) ⇄ `EntityFilterInput` (trimmed `contains`, `createdAt.ge` / `.lt`, a day as local midnight in ISO-8601); reads back only what the strip can express; `formatRange` → `0 of 0` or `first–last of total · page X of Y`                             |
+| `http-error.helper.ts`         | `httpErrorMessage(err)`: the API's `message`, else the response's                                                                                                                                                                                                                                                     |
 
 **Slices.** One per page, as the NgRx reference code has the list and form slices; the detail slice is the list's shape
 with an `id` (the NgRx doc says how).
@@ -153,6 +154,17 @@ Full stack only. Playwright drives Chromium against a stack of its own, so the d
 | `entity-form-page.spec.ts`   | create lands on the detail page; edit a seeded entity                                                                                              |
 
 Each spec opens its page by URL and creates uniquely named rows, so runs stay deterministic.
+
+## Variant: Hono
+
+On Hono API on Node the resource, routes, answers and tiers are the same; the shell follows Hono and Hono + Drizzle:
+
+- Handlers are `(c: Context<AppEnv>) => Promise<Response>` reading `c.var.context`, and errors are thrown
+  `HTTPException`s that `app.onError` shapes; there is no `express.d.ts` and no `http-errors`.
+- `http-mocks.ts` keeps only `createStubContext()`; handler unit tests call `createApp(stub.context).request(…)`, so
+  they cover the route table too, and the error handler's test asserts an `HTTPException` shown at `warn`, anything
+  else a 500 at `error`.
+- `test-server.ts` serves the app with `@hono/node-server`'s `serve({ fetch: app.fetch, port: 0 })`.
 
 ## Variant: Fundamental NGX
 
