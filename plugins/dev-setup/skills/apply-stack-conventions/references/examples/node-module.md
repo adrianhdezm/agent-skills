@@ -6,19 +6,19 @@ the same shape holds.
 
 ## Demonstrates
 
-| Part                               | Applies                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------ |
-| `src/<module>.ts`, exporting only  | Node (one file has side effects), Code style (named exports, doc comments)     |
-| `src/main.ts`, the one side effect | Node (reads the environment once, imports with `.ts`), the Node package layout |
-| `tests/<module>.test.ts`           | Vitest (one `describe` named for the module, a behaviour sentence per case)    |
+| Part                               | Applies                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------- |
+| `src/<module>.ts`, exporting only  | Node (one file has side effects), Code style (named exports, doc comments)  |
+| `src/main.ts`, the one side effect | Node (reads its input once, imports with `.ts`), the Node package layout    |
+| `tests/<module>.test.ts`           | Vitest (one `describe` named for the module, a behaviour sentence per case) |
 
 ## Data
 
-| What   | Value                                       |
-| ------ | ------------------------------------------- |
-| module | `src/greeting.ts`, exporting `greet(name)`  |
-| result | `hello, ${name}`                            |
-| entry  | prints `greet(process.env.NAME ?? 'world')` |
+| What   | Value                                                                                                         |
+| ------ | ------------------------------------------------------------------------------------------------------------- |
+| module | `src/greeting.ts`, exporting `greet(name)`                                                                    |
+| result | `hello, ${name}`                                                                                              |
+| entry  | prints `greet(process.argv[2] ?? 'world')`: a command-line argument, so a default is input, not configuration |
 
 ## Behaviour
 

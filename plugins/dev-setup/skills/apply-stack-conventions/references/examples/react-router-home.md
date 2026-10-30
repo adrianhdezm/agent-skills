@@ -24,10 +24,10 @@ with it; only where the value comes from differs by runtime.
 | starter primitives | `button`, `input`, `label`, `card`                                  |
 | `APP_NAME`         | the app name in Title Case                                          |
 
-| Runtime | `APP_NAME` comes from                                                       | `appContext` carries                                         |
-| ------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Workers | `vars.APP_NAME` in `wrangler.jsonc`                                         | `{ cloudflare: { env: Env; ctx: Context['executionCtx'] } }` |
-| Node    | `process.env.APP_NAME`, read once at module scope, falling back to the name | `{ env: { APP_NAME: string } }`                              |
+| Runtime | `APP_NAME` comes from                                                                          | `appContext` carries                                         |
+| ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Workers | `vars.APP_NAME` in `wrangler.jsonc`                                                            | `{ cloudflare: { env: Env; ctx: Context['executionCtx'] } }` |
+| Node    | `process.env.APP_NAME`, read once at module scope; the server throws at start when it is unset | `{ env: { APP_NAME: string } }`                              |
 
 ## Behaviour
 
