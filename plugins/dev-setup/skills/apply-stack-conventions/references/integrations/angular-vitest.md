@@ -35,6 +35,10 @@ Analog compiles only tsconfig.spec.json's program
   both setup files belong there. Never switch to `@Input()` to make a component testable.
 - **`vite/client` in `tsconfig.spec.json`** declares the `*.css` import of `browser-setup.ts`; an undeclared side-effect
   import is rejected.
+- **`noEmit` in any tsconfig breaks Analog**: it compiles nothing, so decorators reach Vite untransformed. Unit tests
+  fail with `Failed to resolve import "@oxc-project/runtime/helpers/decorate"`, browser tests with `NG0950` / `NG0951`,
+  and Analog's warning "… contains Angular decorators but is not in the TypeScript program" points at the include list,
+  which is not the cause. Leave `noEmit` out of every Angular tsconfig; the `typecheck` script passes `--noEmit`.
 - **A test config named `vite.config.*`** is read by Storybook too: name it `vitest.config.mts`.
 - **The first browser run can report "Vite unexpectedly reloaded a test"** while Vite pre-bundles; run it again.
 
