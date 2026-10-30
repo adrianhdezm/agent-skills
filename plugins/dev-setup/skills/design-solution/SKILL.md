@@ -25,9 +25,10 @@ It is grounded in the real code and the project's conventions, not in a framewor
 - `docs/<slug>/02-analysis.md`: the behaviours (B1…) and criteria (B1.1…). If it is missing, stop and point to
   `/analyze-problem`.
 - **The conventions file is the source of truth for the stack**: `coding-conventions.md` (written by
-  `create-fullstack-app`), `CLAUDE.md` or `AGENTS.md`, whichever the project has. Follow its architecture, its recipe
+  `bootstrap-project` for every stack), `CLAUDE.md` or `AGENTS.md`, whichever the project has. Follow its architecture, its recipe
   for adding a resource, its naming and its test tiers. Where there is no such file, follow the patterns in the code
-  and record each one you relied on under **Conventions used**.
+  and record each one you relied on under **Conventions used**. For how two technologies of the stack connect, or the
+  reason behind a rule, use the `apply-stack-conventions` skill's docs for that stack.
 - `CONSTRAINTS.md`, if the project has one: its checks, its Done means and its Boundaries. A design that needs an
   "Ask first" item (a new dependency, a schema change on existing data) names it as a decision.
 - The code itself: open the files the design will touch, and copy real paths and lines.
@@ -47,15 +48,22 @@ It is grounded in the real code and the project's conventions, not in a framewor
 1. **Read the inputs** above, plus `01-brainstorm.md` for the user's own words.
 
 2. **Settle the stack.** If the project already has code, the stack is what is there. If it has no code yet, the stack
-   is the first decision, and it comes before the rest of the design. Ask it alone, with a recommendation that fits the
-   analysis:
-   - `create-fullstack-app`: an Angular + Express + Postgres web app with accounts, data and several screens.
-   - `create-cloudflare-worker`: a small Hono service or site on the edge.
-   - `create-node-project`: a CLI, a library or a script.
+   is the first decision, and it comes before the rest of the design. Take it through the `bootstrap-project`
+   interview ([interview.md](../bootstrap-project/references/interview.md)): fill in what the analysis already
+   answers, recommend a combination from its table with the reason in one sentence, and ask the user that question
+   alone. The combinations:
+   - **Node package**: a CLI, a library or a script.
+   - **Hono Worker**: an API or small service on Cloudflare Workers.
+   - **React Router on Workers**: a web app on the edge, nothing to operate.
+   - **React Router on Node**: a web app next to Postgres, run by Docker Compose.
+   - **Angular app**: an Angular client alone, calling an API that already exists.
+   - **Angular full stack**: an Express + Postgres API and an Angular client, with a CRUDL example wired end to end.
    - something else, if the user names it.
 
-   Then run that scaffold skill in the project folder. Offer to commit the scaffold on its own, so later diffs show only
-   the feature. Design against the real scaffold: its example resource shows exactly where each building block goes.
+   Then run `bootstrap-project` with that combination in the project folder; it asks only what is still open. Offer
+   to commit the scaffold on its own, so later diffs show only the feature. Design against the real scaffold: where it
+   ships an example resource (the Angular stacks' `entity`), that shows exactly where each building block goes; where
+   it ships none, the project's `coding-conventions.md` does.
 
    If the project has no `CONSTRAINTS.md`, run the `define-constraints` skill now, before the first feature code. The
    user can keep it to the floor alone.
