@@ -139,7 +139,7 @@ non-goals, and a **Later** list so the first version stays small.
 ### 3. Design: `/design-solution <slug>`
 
 **You:** if the project has no code yet, pick the stack first: Claude recommends a combination from the
-`bootstrap-project` interview (a Node package, a Hono Worker, a REST API on Node, React Router on Workers or on Node, an
+`bootstrap-project` interview (a Node package, a Hono Worker, a REST API on Node with Express or Hono, React Router on Workers or on Node, an
 Angular app or the Angular full stack, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
 claim, press **Respond**, and paste the result back into the chat.
 

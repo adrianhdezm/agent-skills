@@ -18,7 +18,8 @@ questions that pick one; each answer below names the stack it leads to.
    - **Cloudflare Workers**: on the edge, nothing to operate, billed per request. Data comes later as bindings (D1,
      KV, R2). An API is a **Hono Worker**; a web app is **React Router on Workers**.
    - **Node, with Docker Compose and Postgres**: a long-running process next to a relational database, self-hosted
-     wherever Compose runs. An API is a **REST API on Node**; a web app takes question 3.
+     wherever Compose runs. An API is a **REST API on Node** (Express), or a **Hono API on Node** when Hono is asked
+     for; a web app takes question 3.
    - **Static files only** (web app): the app calls an API it does not own, and Nginx serves it. **Angular app**.
 3. **Which frontend?** For a web app on Node.
    - **React Router**: one package; server-rendered routes whose loaders and actions are the backend. **React Router
@@ -35,9 +36,9 @@ questions that pick one; each answer below names the stack it leads to.
    a request for another server framework gets the blueprint that fits offered instead, as `apply-stack-conventions`
    says.
 
-An answer the questions do not lead to a stack from (Angular on Workers, a React app over its own REST API, a Hono API
-on Node, a library no doc covers) is a combination without a blueprint: say so plainly and offer the nearest blueprint
-that `apply-stack-conventions` names for it. Another language: this skill does not apply.
+An answer the questions do not lead to a stack from (Angular on Workers, a React app over its own REST API, a library
+no doc covers) is a combination without a blueprint: say so plainly and offer the nearest blueprint that
+`apply-stack-conventions` names for it. Another language: this skill does not apply.
 
 ## Recommending a stack
 

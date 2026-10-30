@@ -181,14 +181,17 @@ process.on('SIGTERM', () => {
 
 ## Conventions
 
-- **`server.ts` runs `workers/app.ts`**: Vite middleware in development, the build in production. The app never calls
-  `serve()` itself.
-- **Static files are served by `serveStatic` with their cache headers set in `onFound`**: fingerprinted `/assets/*`
-  immutable for a year, the rest of `build/client` for an hour.
-- **`vite` is reached only from the dev branch**, so production runs with production dependencies alone.
+- **The app never calls `serve()` itself**: a Node entry serves it through `@hono/node-server`.
+- **Behind a React Router app, `server.ts` runs `workers/app.ts`**: Vite middleware in development, the build in
+  production, with `vite` reached only from the dev branch, and static files served by `serveStatic` with their cache
+  headers set in `onFound` (fingerprinted `/assets/*` immutable for a year, the rest of `build/client` for an hour).
+- **In an API, `src/server.ts` is the composition root**: it reads its settings, builds the context for
+  `createApp(context)`, serves it, and on `SIGINT` / `SIGTERM` closes the server and then the pool.
 
 ## Verify it is wired
 
-- `server.ts` imports `vite` only inside its dev branch, and imports the build through a variable path.
+- Behind a React Router app: `server.ts` imports `vite` only inside its dev branch, and imports the build through a
+  variable path.
 - `vite.config.ts` builds `./workers/app.ts` as the SSR input.
+- In an API: `SIGTERM` closes the server and the pool, and the process exits 0.
 - A production response for `/assets/<file>` carries `cache-control: public, max-age=31536000, immutable`.
