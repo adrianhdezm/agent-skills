@@ -22,7 +22,7 @@ Vite as the dev server and the build: one `vite.config.ts`, plugins in a deliber
 
 | What                 | Value                                                                |
 | -------------------- | -------------------------------------------------------------------- |
-| dependencies         | dev `vite`                                                           |
+| devDependencies      | `vite`                                                               |
 | `vite.config.ts`     | `defineConfig({ plugins: [...], resolve: { tsconfigPaths: true } })` |
 | client project types | `"vite/client"`                                                      |
 

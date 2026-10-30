@@ -16,7 +16,8 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 
 | What                | Value                                                                                                                                                                                                             |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies        | `pg`; dev `@types/pg`, `@testcontainers/postgresql`                                                                                                                                                               |
+| dependencies        | `pg`                                                                                                                                                                                                              |
+| devDependencies     | `@types/pg`, `@testcontainers/postgresql`                                                                                                                                                                         |
 | client              | `drizzle(pool, { schema })` from `drizzle-orm/node-postgres`, `DbClient` its type                                                                                                                                 |
 | `drizzle.config.ts` | `dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset)                                                                                                                              |
 | scripts             | `db:generate` and `db:migrate`, each `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                          |

@@ -22,12 +22,12 @@ app/env.d.ts ─► @react-router/dev/vite/env ─► the virtual module's types
 
 ## Required values
 
-| What         | Value                                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| dependencies | dev `vite`                                                                                                                    |
-| plugins      | the runtime's plugin first where there is one, then the styling plugin, then `reactRouter()`                                  |
-| aliases      | `resolve.tsconfigPaths: true`, so `~/` comes from the runtime project's `paths`                                               |
-| commands     | `react-router dev` and `react-router build` drive Vite; `vite preview` serves a build where the runtime's integration says so |
+| What            | Value                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| devDependencies | `vite`                                                                                                                        |
+| plugins         | the runtime's plugin first where there is one, then the styling plugin, then `reactRouter()`                                  |
+| aliases         | `resolve.tsconfigPaths: true`, so `~/` comes from the runtime project's `paths`                                               |
+| commands        | `react-router dev` and `react-router build` drive Vite; `vite preview` serves a build where the runtime's integration says so |
 
 ## Pitfalls
 

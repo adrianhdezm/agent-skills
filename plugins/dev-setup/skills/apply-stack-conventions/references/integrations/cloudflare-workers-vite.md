@@ -21,12 +21,12 @@ vite preview ─► the build, in workerd, locally
 
 ## Required values
 
-| What         | Value                                                                                                                        |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| dependencies | dev `vite`, `@cloudflare/vite-plugin`                                                                                        |
-| plugin       | `cloudflare({ viteEnvironment: { name: 'worker' } })` for a plain Worker, `'ssr'` under a framework; first in `plugins`      |
-| scripts      | `dev` `vite dev` (or the framework's); `build` `vite build` (or the framework's); `preview` `pnpm run build && vite preview` |
-| source maps  | `environments.<name>.build.sourcemap: true` for a plain Worker                                                               |
+| What            | Value                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| devDependencies | `vite`, `@cloudflare/vite-plugin`                                                                                            |
+| plugin          | `cloudflare({ viteEnvironment: { name: 'worker' } })` for a plain Worker, `'ssr'` under a framework; first in `plugins`      |
+| scripts         | `dev` `vite dev` (or the framework's); `build` `vite build` (or the framework's); `preview` `pnpm run build && vite preview` |
+| source maps     | `environments.<name>.build.sourcemap: true` for a plain Worker                                                               |
 
 ## Pitfalls
 

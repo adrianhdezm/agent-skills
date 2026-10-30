@@ -22,7 +22,7 @@ meaningful state, on the app's own build tool. Not a test runner.
 
 | What                   | Value                                                                   |
 | ---------------------- | ----------------------------------------------------------------------- |
-| dependencies           | dev `storybook@10`, the framework's builder package on the same major   |
+| devDependencies        | `storybook@10`, the framework's builder package on the same major       |
 | config                 | `.storybook/main.ts` (stories glob, framework), `.storybook/preview.ts` |
 | port                   | `6006`                                                                  |
 | `.gitignore` additions | `*storybook.log`, `storybook-static`                                    |

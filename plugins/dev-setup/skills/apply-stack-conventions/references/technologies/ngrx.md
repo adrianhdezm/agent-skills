@@ -51,12 +51,13 @@ Angular full stack's `web/` uses it.
 
 ## Required values
 
-| What        | Value                                                                                                                      |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
-| packages    | `@ngrx/store@22`, `@ngrx/effects@22`, `@ngrx/router-store@22`; dev `@ngrx/store-devtools@22` (NgRx tracks Angular's major) |
-| effects     | functional: `createEffect(() => …, { functional: true })`, registered with `provideEffects(<module namespace>)`            |
-| slice files | `store/<page>/<page>.{model,actions,reducer,selectors,effects}.ts`; feature key `<PAGE>_FEATURE_KEY`                       |
-| specs       | `<page>.reducer.spec.ts` and `<page>.effects.spec.ts` beside each slice; a selectors spec only for a selector with logic   |
+| What            | Value                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| dependencies    | `@ngrx/store@22`, `@ngrx/effects@22`, `@ngrx/router-store@22` (NgRx tracks Angular's major)                              |
+| devDependencies | `@ngrx/store-devtools@22`                                                                                                |
+| effects         | functional: `createEffect(() => …, { functional: true })`, registered with `provideEffects(<module namespace>)`          |
+| slice files     | `store/<page>/<page>.{model,actions,reducer,selectors,effects}.ts`; feature key `<PAGE>_FEATURE_KEY`                     |
+| specs           | `<page>.reducer.spec.ts` and `<page>.effects.spec.ts` beside each slice; a selectors spec only for a selector with logic |
 
 ## Pitfalls
 

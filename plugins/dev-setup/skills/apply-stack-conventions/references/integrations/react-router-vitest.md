@@ -14,7 +14,7 @@ tests/unit/routes/*.test.tsx ─► createRoutesStub([{ path, Component, loader 
 
 | What                 | Value                                                                                                                                               |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies         | dev `@vitejs/plugin-react`, `vitest-browser-react`, `@vitest/browser-playwright`, `playwright`                                                      |
+| devDependencies      | `@vitejs/plugin-react`, `vitest-browser-react`, `@vitest/browser-playwright`, `playwright`                                                          |
 | `vitest.config.ts`   | one inline project `unit`: `plugins: [react()]`, `resolve.tsconfigPaths: true`, `include: ['tests/unit/**/*.test.{ts,tsx}']`, Chromium browser mode |
 | `tsconfig.test.json` | extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`                                                                   |
 
