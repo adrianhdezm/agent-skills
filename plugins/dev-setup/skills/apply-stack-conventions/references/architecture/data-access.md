@@ -23,12 +23,41 @@ the Database concept.
 - **Data access is tested against the real database** the Database concept describes, seeded through the data layer or
   a seed helper; the SQL a translator builds is unit-tested without one.
 
-## Open decision
+## The DAO contract
 
-**Two DAO contracts are in use.** One takes a single input object per method and returns paged lists with a total
-(`list(input)` → `{ items, total, page, pageSize, totalPages }`); the other exposes `getAll({ filters, limit, offset })`
-and `deleteMany`, with cross-table reads in query classes. Both keep the principles above. Follow the one the project
-already uses; which one becomes the single house contract is an open decision.
+Every DAO implements the same contract, and a read-only query over several tables offers the same `get` and `list`.
+Each method takes one input object, so a new field never breaks a call site.
+
+| Method   | Takes                                 | Returns            | When the row is missing |
+| -------- | ------------------------------------- | ------------------ | ----------------------- |
+| `get`    | `{ id }`                              | the row, or `null` | `null`                  |
+| `list`   | `{ filter?, sort?, page, pageSize }`  | a paginated result | an empty page           |
+| `create` | the create input                      | the created row    | —                       |
+| `update` | the update input, with `id` inside it | the updated row    | throws `NotFoundError`  |
+| `delete` | `{ id }`                              | nothing            | throws `NotFoundError`  |
+
+**Filter.** Typed per field kind, with recursive `and` / `or` / `not`; strict, so an unknown field or an operator the
+kind lacks is rejected. Fields are named after the resource's columns.
+
+| Kind    | Operators                                                                                                                               |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| id      | `eq ne in`                                                                                                                              |
+| string  | `eq ne lt le gt ge between in contains notContains beginsWith`; the last three case-insensitive, matching wildcard characters literally |
+| number  | `eq ne lt le gt ge between in`                                                                                                          |
+| date    | `eq ne lt le gt ge between in`, as an ISO date or date-time                                                                             |
+| boolean | `eq ne`                                                                                                                                 |
+
+`between` is an inclusive pair; an empty `in` matches nothing; `{}` matches every row, so an `or` containing it matches
+every row and `not {}` matches none.
+
+**Sort.** One field from the resource's allowlist and a direction (`ASC` when only the field is given); every resource
+declares a default sort, and every sort ends with the `id` as a tie-breaker.
+
+**Pagination.** Page-based with a total, because tables need "page X of Y" and random access: `page` from 1,
+`pageSize` 1 to 100 (default 20). The result is `{ items, total, page, pageSize, totalPages }`, `totalPages` 0 when
+there are no rows.
+
+**Limits.** `in` at most 100 values; `and` / `or` at most 20 branches.
 
 ## Conventions
 
@@ -38,6 +67,9 @@ already uses; which one becomes the single house contract is an open decision.
   connection.
 - **Types are inferred from the schemas**, never written to mirror them.
 - **The data layer throws domain errors** (`NotFoundError`) and never an HTTP error; the HTTP layer maps them.
+- **Every DAO implements the one contract**: `get`, `list`, `create`, `update`, `delete`, each taking one input object;
+  every filtered read goes through `list` with the typed filter, never a custom finder such as `findBySlug`.
+- **A read across tables is a read-only query** offering the same `get` and `list`.
 - **Every list has a default sort, an `id` tie-breaker and a maximum page size.**
 - **A write across tables is a service method in one atomic unit** (a transaction, or the engine's batch where it has no transactions); a batch over many rows is
   one statement.
@@ -48,3 +80,4 @@ already uses; which one becomes the single house contract is an open decision.
 - No route, controller, effect or component imports the ORM, a table or the database client.
 - The database client and the DAOs are constructed in exactly one place, the server entry.
 - Every list query has an `ORDER BY` ending in the id, and a page size limit.
+- Every DAO exposes exactly the contract's methods, and no finder beside `list`.
