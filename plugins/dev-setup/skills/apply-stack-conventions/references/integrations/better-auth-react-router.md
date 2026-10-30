@@ -41,6 +41,34 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 - **The top-level `@conform-to/zod` import is the Zod 3 API**: import from `@conform-to/zod/v4`.
 - **Login and signup nested under the protected layout** redirect to themselves: keep them outside it.
 - **Middleware exported as a single function** cannot be composed and must call `next()`: export an array.
+- **`signInEmail` and `signUpEmail` with `asResponse: true` do not throw on bad credentials**: they return a 4xx
+  response. An action that only catches errors redirects a wrong password as if it had signed in: check
+  `response.ok`.
+- **`submission.reply()` sends the submitted values back**, so a failed sign-in renders the password into the page's
+  HTML: reply with `{ hideFields: ['password'] }`.
+- **The session cookie is on the sign-in response**: redirect with `{ headers: response.headers }`, or the browser
+  arrives signed out.
+
+## Reference code
+
+`app/routes/login.tsx`'s server half; signup is the same with `signUpEmail` and its own schema:
+
+```tsx
+export async function action({ request, context }: Route.ActionArgs) {
+  const submission = parseWithZod(await request.formData(), { schema: loginSchema });
+  if (submission.status !== 'success') {
+    return { result: submission.reply({ hideFields: ['password'] }), formError: undefined };
+  }
+  const response = await context
+    .get(appContext)
+    .auth.api.signInEmail({ body: submission.value, headers: request.headers, asResponse: true });
+  if (!response.ok) {
+    const body: { message?: string } = await response.json();
+    return { result: submission.reply({ hideFields: ['password'] }), formError: body.message ?? 'Could not sign in' };
+  }
+  return redirect(safeRedirectTo(new URL(request.url).searchParams.get('redirectTo')), { headers: response.headers });
+}
+```
 
 ## Conventions
 
@@ -56,3 +84,5 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 - `app/routes.ts` registers `api/auth/*` as a splat, and `login`, `signup`, `logout` outside the protected layout.
 - The protected layout exports its middleware as an array that redirects an anonymous request to `/login?redirectTo=…`.
+- A wrong password answers the login page again with an error and no password in its HTML; a right one redirects with
+  a `Set-Cookie` header.
