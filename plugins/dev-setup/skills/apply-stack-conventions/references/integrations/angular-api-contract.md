@@ -36,6 +36,13 @@ effect ─► <Resource>Service (HttpClient) ─► GET <apiBaseUrl>/<resources>
 The wire format itself (the list request and response, the error body, values) is the REST API concept's; on the
 API side, the controllers and `errorHandler` (the Express doc) produce it.
 
+## Pitfalls
+
+- **The derived production URL assumes the API is published on port 3000 of the page's host.** Publishing it on
+  another port, or serving the web from a host the API is not on (a static host, a CDN, the edge), leaves every call
+  failing while the page itself loads: set the production `apiBaseUrl` explicitly there, and check a smoke test calls the
+  API as the page does rather than fetching only the HTML.
+
 ## Conventions
 
 - **The API base URL is build-time configuration**, in `src/environments/`; only the `appContext` slice reads it. There

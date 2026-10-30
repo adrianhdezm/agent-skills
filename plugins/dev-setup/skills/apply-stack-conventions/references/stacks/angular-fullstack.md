@@ -87,10 +87,10 @@ my-app/
 The `db` service from [Postgres + Docker Compose](../integrations/postgres-docker-compose.md#required-values) with `<owner>` = `api`,
 then:
 
-- **`api`**: the Express + Docker Compose service, with `build: { context: ., dockerfile: api/Dockerfile }` and ports
-  `'3000:3000'`.
-- **`web`**: `build: { context: ., dockerfile: web/Dockerfile }`, ports `'4200:80'` (Nginx listens on 80), depending on
-  `api`.
+- **`api`**: the Docker Compose doc's service, with `build: { context: ., dockerfile: api/Dockerfile }`, ports
+  `'${PORT:-3000}:3000'` and its `/health` healthcheck.
+- **`web`**: `build: { context: ., dockerfile: web/Dockerfile }`, ports `'${WEB_PORT:-4200}:80'` (Nginx listens on 80),
+  depending on `api` being healthy.
 
 Both images build from the repo root, copying the root manifests and their own, and installing with
 `--filter <pkg> --frozen-lockfile`. The API image installs with `--ignore-scripts` in both stages (its build and runtime
@@ -117,7 +117,7 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 | root scripts          | `dev:api` `pnpm --filter api dev`; `dev:web` `pnpm --filter web start`; `build`, `typecheck`, `lint`, `test`, `format`, `format:check` `pnpm -r <script>`; `test:integration` `pnpm --filter api test:integration`; `test:browser` `pnpm --filter web test:browser`; `test:e2e` `pnpm --filter web test:e2e`; `storybook` `pnpm --filter web storybook`; `compose:up` `docker compose up --build -d --wait`; `compose:down` `docker compose down`                                                                                                                                                              |
 | `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.angular/`, `.vitest/`, `.DS_Store`, and `api/db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `.dockerignore`       | `**/node_modules`, `**/dist`, `**/.angular`, `.git`, `.env`, `api/db/data`, `web/storybook-static`, `web/test-results`, `web/playwright-report`, `web/.vitest`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `WEB_PORT=4200`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | shared tooling        | in the catalog, read as `catalog:` by both packages: `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the exact `typescript`                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `api/package.json`    | `name: "api"`, `version: "0.0.0"`, `private`, `type: "module"`, written by hand; dependencies from the Express and Drizzle docs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `"**/*.{ts,js,mjs,json,md,yml,yaml}"`; `start` `node --env-file=../.env dist/server.js`; `db:generate`, `db:migrate` as the Drizzle doc says |
@@ -439,7 +439,10 @@ export default defineConfig([
 | `6006`          | Storybook                   |
 
 The web has no runtime environment: its API base URL is build-time, in `web/src/environments/` (production derives it
-from the page's host on port 3000, development and e2e name `localhost:3000` and `localhost:3100`).
+from the page's host on port 3000, development and e2e name `localhost:3000` and `localhost:3100`). So `PORT` moves the
+API in development only: the production image calls port 3000, and moving the published API port means changing the
+production environment file too. The e2e ports live in two files, `web/src/environments/environment.e2e.ts` (the API)
+and `web/playwright.config.ts` (both servers), and change together.
 
 ### HTTP contract
 
@@ -506,6 +509,7 @@ pnpm compose:up                               # db healthy, migrate exits 0, the
 pnpm test:integration
 curl -s http://localhost:3000/health          # {"status":"ok","db":"up",…}
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4200/entities   # 200
+curl -s -H 'Origin: http://localhost:4200' http://localhost:3000/entities  # the call the page makes, with CORS
 pnpm test:browser && pnpm test:e2e
 pnpm --filter web build-storybook             # storybook-static/index.json lists the six stories
 ```
