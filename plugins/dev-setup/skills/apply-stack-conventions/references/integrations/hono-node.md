@@ -124,6 +124,8 @@ async function startProduction() {
 await (DEV ? startDev() : startProduction());
 ```
 
+- **Vite in middleware mode opens its HMR WebSocket on port 24678**, beside the app's `PORT`: a second dev server on the
+  same machine fails on it. Count it among the ports to check, and give each dev server its own `server.hmr.port`.
 - **`vite` is imported only in the dev branch**, so the production image runs without dev dependencies.
 - **The build path is a variable**: `build/` does not exist before the first build, and `tsc` must not resolve it.
 - **Cache headers are set in `onFound`**, because nothing after `serveStatic` runs for a file it served.
