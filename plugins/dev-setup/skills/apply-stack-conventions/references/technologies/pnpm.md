@@ -44,7 +44,8 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 
 - **`private` set on the same line as other fields becomes a string.** Only `pnpm pkg set private=true --json` stores
   a boolean, and `--json` would parse every other value on the line as JSON, so it goes on its own line.
-- **`scripts.format:check=…` is rejected** as an invalid property path. A script name with a `:` takes the quoted
+- **A script name with a `:` is rejected as a property path** (`scripts.format:check=…`, `scripts.compose:up=…`), and
+  one rejected key fails the whole `pnpm pkg set` call, so none of its keys are set. Every such name takes the quoted
   bracket form: `"scripts['format:check']=<command>"`.
 - **pnpm 12 fails `pnpm add` half done** (`ERR_PNPM_IGNORED_BUILDS`) when a new dependency has an unapproved install
   script; pnpm 11 fails every later `pnpm <script>` instead. Write `allowBuilds` first. A package that shows up in the
