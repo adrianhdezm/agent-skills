@@ -44,7 +44,7 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 <repo>/
 ├── .postcssrc.json / .prettierrc / .prettierignore / eslint.config.mjs
 ├── .storybook/                # main.ts, preview.ts, tsconfig.json, typings.d.ts
-├── angular.json / package.json / tsconfig{,.app,.spec}.json / vitest.config.mts
+├── angular.json / package.json / tsconfig{,.app,.spec,.node}.json / vitest.config.mts
 ├── pnpm-lock.yaml / pnpm-workspace.yaml
 ├── Dockerfile / nginx.conf    # Node build → Nginx, SPA fallback
 ├── coding-conventions.md      # assembled from the stack blueprint
@@ -71,11 +71,230 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 | devDependencies     | the Angular, NgRx and integrations' dev packages and `@playwright/test@1`; the shared tooling (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `@types/node@24`); the CLI's `typescript` replaced by the exact 6.0.x and its `vitest` by `vitest@5`; the CLI's `prettier` kept                   |
 | environments        | development: `production: false`, `appName: '<App name>'`, `apiBaseUrl` the development URL (default `http://localhost:3000`); production: `production: true`, the same `appName`, `apiBaseUrl` the production URL (default `` `${window.location.protocol}//${window.location.hostname}:3000` ``, so one build works on any host) |
 | `src/index.html`    | `<title>` is `<App name>`                                                                                                                                                                                                                                                                                                          |
-| `eslint.config.mjs` | the Angular + ESLint presets, selectors, overrides and ignores                                                                                                                                                                                                                                                                     |
+| `eslint.config.mjs` | under Reference code: the Angular + ESLint presets, selectors, overrides and ignores                                                                                                                                                                                                                                               |
 | `.prettierrc`       | shared, with the HTML override; `.prettierignore`: `node_modules`, `dist`, `.angular`                                                                                                                                                                                                                                              |
 | `Dockerfile`        | Nginx + Docker Compose's two stages, as Angular + Nginx says                                                                                                                                                                                                                                                                       |
 
 `<App name>` is the repo name in Title Case.
+
+## Reference code
+
+The TypeScript, ESLint and Vitest configs as a fresh scaffold writes them, after the CLI's cleanup; the tables above and the Angular docs say why each value is there. The shared compiler options live in `tsconfig.json`, because the CLI and the spec project extend it.
+
+`tsconfig.json`:
+
+```jsonc
+/* Solution file: the projects below are the checks. The shared options live here because the Angular CLI and the spec project extend this file. */
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    // Environment, modules, output
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM"],
+    "module": "preserve",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "importHelpers": true,
+    "experimentalDecorators": true,
+    "incremental": true,
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  },
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.spec.json" }, { "path": "./tsconfig.node.json" }]
+}
+```
+
+`tsconfig.app.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/test-setup.ts", "src/testing/**/*.ts"]
+}
+```
+
+`tsconfig.spec.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "vite/client"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.spec.tsbuildinfo"
+  },
+  "include": ["src/**/*.spec.ts", "src/test-setup.ts", "src/testing/**/*.ts", "src/**/*.d.ts"]
+}
+```
+
+`tsconfig.node.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["vitest.config.mts"]
+}
+```
+
+`eslint.config.mjs`:
+
+```js
+import js from '@eslint/js';
+import angular from 'angular-eslint';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import prettier from 'eslint-config-prettier/flat';
+import storybook from 'eslint-plugin-storybook';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig(
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'dist/**',
+    '.angular/**',
+    'storybook-static/**',
+    'eslint.config.mjs'
+  ]),
+  js.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    extends: [tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      // src/app and src/testing run in the browser (tsconfig.app.json, tsconfig.spec.json); vitest.config.mts runs on Node (tsconfig.node.json).
+      globals: { ...globals.browser },
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname }
+    },
+    processor: angular.processInlineTemplates
+  },
+  {
+    files: ['**/*.ts'],
+    extends: [angular.configs.tsRecommended],
+    rules: {
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
+      '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }]
+    }
+  },
+  {
+    // The primitives are the design system: their selectors carry the `ui` prefix.
+    files: ['src/app/components/ui/**/*.ts'],
+    rules: {
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'ui', style: 'camelCase' }],
+      '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'ui', style: 'kebab-case' }]
+    }
+  },
+  {
+    files: ['**/*.html'],
+    extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility]
+  },
+  storybook.configs['flat/recommended'],
+  prettier,
+  {
+    files: ['**/*.ts'],
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // A reducer is one `on(...)` per action: its complexity is its handler count.
+    files: ['**/*.reducer.ts'],
+    rules: { complexity: 'off' }
+  },
+  {
+    // A describe holds every case for one module; the old browser-context import is replaced by vitest/browser.
+    files: ['**/*.spec.ts'],
+    rules: {
+      'max-lines-per-function': 'off',
+      'max-nested-callbacks': 'off',
+      'max-statements': 'off',
+      'no-restricted-imports': ['error', { paths: [{ name: '@vitest/browser/context', message: 'Use vitest/browser.' }] }]
+    }
+  }
+);
+```
+
+`vitest.config.mts`:
+
+```ts
+import angular from '@analogjs/vite-plugin-angular';
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [angular()],
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          include: ['src/**/*.spec.ts'],
+          exclude: ['src/**/*.browser.spec.ts'],
+          setupFiles: ['src/test-setup.ts']
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'browser',
+          include: ['src/**/*.browser.spec.ts'],
+          setupFiles: ['src/testing/browser-setup.ts'],
+          browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] }
+        }
+      }
+    ]
+  }
+});
+```
 
 ## Scaffold
 
@@ -108,7 +327,7 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 | ------------------------------------------------- | ----------------------------------- |
 | `pnpm start`                                      | `ng serve` on `:4200`               |
 | `pnpm build`                                      | `ng build` → `dist/<name>/browser/` |
-| `pnpm typecheck`                                  | the app and spec tsconfigs          |
+| `pnpm typecheck`                                  | the app, spec and node tsconfigs    |
 | `pnpm test`                                       | the `unit` project (jsdom)          |
 | `pnpm test:browser`                               | the `browser` project (Chromium)    |
 | `pnpm storybook`                                  | Storybook on `:6006`                |
