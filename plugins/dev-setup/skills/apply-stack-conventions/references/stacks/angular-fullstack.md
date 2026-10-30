@@ -36,6 +36,7 @@ included only when the project has it, with `--with <name>`, or `--with <group>`
 - [Angular + the API contract](../integrations/angular-api-contract.md)
 - [Docker Compose](../technologies/docker-compose.md)
 - [Postgres + Docker Compose](../integrations/postgres-docker-compose.md)
+- [Express + Docker Compose](../integrations/express-docker-compose.md)
 - [Nginx + Docker Compose](../integrations/nginx-docker-compose.md)
 - [ESLint](../technologies/eslint.md)
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
@@ -87,8 +88,8 @@ my-app/
 The `db` service from [Postgres + Docker Compose](../integrations/postgres-docker-compose.md#required-values) with `<owner>` = `api`,
 then:
 
-- **`api`**: `build: { context: ., dockerfile: api/Dockerfile }`, `DATABASE_URL` pointing at host `db`, `PORT: '3000'`,
-  ports `'3000:3000'`, depending on `db` being healthy.
+- **`api`**: the Express + Docker Compose service, with `build: { context: ., dockerfile: api/Dockerfile }` and ports
+  `'3000:3000'`.
 - **`web`**: `build: { context: ., dockerfile: web/Dockerfile }`, ports `'4200:80'` (Nginx listens on 80), depending on
   `api`.
 

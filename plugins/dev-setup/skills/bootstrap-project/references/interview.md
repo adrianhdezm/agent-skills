@@ -34,6 +34,7 @@ one line and run to the end.
 | ---------------------- | ------------------------------ | ------------ | ----------------------- | -------------------------------------------------------------------------------------------------------- |
 | a library, CLI, script | Node 24, no build              | none         | Node package            | [node-package.md](../../apply-stack-conventions/references/stacks/node-package.md)                       |
 | an API or service      | Cloudflare Workers             | none         | Hono Worker             | [hono-worker.md](../../apply-stack-conventions/references/stacks/hono-worker.md)                         |
+| an API or service      | Node, Docker Compose, Postgres | none         | REST API on Node        | [node-api.md](../../apply-stack-conventions/references/stacks/node-api.md)                               |
 | a web app              | Cloudflare Workers             | React Router | React Router on Workers | [react-router-cloudflare.md](../../apply-stack-conventions/references/stacks/react-router-cloudflare.md) |
 | a web app              | Node, Docker Compose, Postgres | React Router | React Router on Node    | [react-router-docker.md](../../apply-stack-conventions/references/stacks/react-router-docker.md)         |
 | a web app              | static files, an existing API  | Angular      | Angular app             | [angular-app.md](../../apply-stack-conventions/references/stacks/angular-app.md)                         |
@@ -42,8 +43,8 @@ one line and run to the end.
 **Any other combination** in TypeScript is composed from the docs that cover its parts, with the gaps filled and
 reported. Say plainly when it has no blueprint, and offer the nearest blueprint if one would do:
 
-- **An API alone on Node with Postgres**: composed from Node, Express, Drizzle and Express + Drizzle, with the API part
-  of the Entity CRUDL example; or React Router on Node, whose resource routes serve JSON.
+- **A React app over its own REST API**: React Router on Node for the app and REST API on Node for the API, side by
+  side; or React Router on Node alone, whose resource routes serve JSON.
 - **Angular on Workers**: the Angular app's static build on any static host; or React Router on Workers.
 - **A framework or library no doc covers**: the shared tooling's docs plus that framework's official docs, listed as a
   gap.
@@ -58,8 +59,9 @@ recommend one, with the reason in a sentence:
 | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | nothing runs as a server: other code imports it, or a person runs it in a terminal or a schedule                       | Node package                                                                                     |
 | endpoints only, a handful of them, little or no relational data                                                        | Hono Worker                                                                                      |
+| an API several clients use (web, mobile, partners) over relational data, or it must be self-hosted                     | REST API on Node: it arrives with Postgres, the DAO layer and a CRUDL resource                   |
 | screens and forms, modest data per user, nothing to operate, users anywhere                                            | React Router on Workers                                                                          |
-| screens and forms over relational data, long-running work, or it must be self-hosted                                   | React Router on Node                                                                             |
+| screens and forms over relational data, long-running work, or it must be self-hosted (the React full stack)            | React Router on Node                                                                             |
 | many list, detail and form screens over an API that already exists, or the SAP Fiori look without a backend of its own | Angular app                                                                                      |
 | many list, detail and form screens over a relational model, an API other clients will use too, or the SAP Fiori look   | Angular full stack: it arrives with Postgres, the DAO layer and a CRUDL example wired end to end |
 

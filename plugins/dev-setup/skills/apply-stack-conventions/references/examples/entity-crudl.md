@@ -1,7 +1,8 @@
 # Entity CRUDL
 
 One resource, `entity`, listed with filter, sort and pagination, shown, created, edited and deleted: the template every
-later resource copies. The Angular app ships its web part against an API it does not own; the Angular full stack ships
+later resource copies. REST API on Node ships its resource and API part; the Angular app ships its web part against an API it does not own; the
+Angular full stack ships
 all of it, from the table to the pages, with an end-to-end suite over the whole stack. Each part below names the docs it
 applies; build it by applying them, and use this file for what they leave open: names, values, behaviours and tests.
 
@@ -35,7 +36,7 @@ reference code; the web mirrors them by hand in `models/entity.model.ts` (dates 
 
 ## API
 
-Full stack only. The routes and their answers are the blueprint's HTTP contract.
+The Angular full stack and REST API on Node. The routes and their answers are the blueprint's HTTP contract.
 
 | Piece       | What it is                                                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----- | --------------------- |
