@@ -144,7 +144,7 @@ The API's configs as a fresh scaffold writes them (strict presets), and the web'
 {
   "compilerOptions": {
     // Environment, modules, output
-    "target": "ES2022",
+    "target": "ES2024",
     "lib": ["ES2024"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
