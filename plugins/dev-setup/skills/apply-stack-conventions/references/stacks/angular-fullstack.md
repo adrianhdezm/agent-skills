@@ -99,9 +99,6 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 
 - **Two packages with their own configs**, the shared tool versions in the root catalog, and the Angular CLI's tsconfig
   layout in `web/`. The API compiles with `composite` and `outDir`, as Node + TypeScript says.
-- **`eslint-config-prettier` comes last** in both ESLint configs, so the `curly: 'error'` above it never runs. Moving it
-  before the project's rules, as the other stacks do, may surface missing braces: do it as its own change, with the
-  checks.
 - **`lint` passes warnings**: no `--max-warnings 0`.
 - **Web specs sit beside the file they test**, and `null` marks absence in the DAO contract and the store slices.
 
