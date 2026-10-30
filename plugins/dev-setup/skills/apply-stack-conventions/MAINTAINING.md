@@ -17,6 +17,15 @@ fixes), **Scaffold** (only where building it departs from the usual order), **Co
 the stack) and **Smoke test** (the live proof a fresh scaffold runs). The sections of the other layers are listed under
 each table in [references/catalog.md](references/catalog.md).
 
+**Composition** and **Examples** are read by `scripts/assemble-conventions.mjs`, so they hold only a bulleted list of
+links, one doc per line, with no text around it. An entry the project may leave out ends in ` — optional`, picked with
+`--with <file base name>`, or in ` — optional (<group>)`, picked with `--with <group>` for every entry of that group;
+a group is a row's `Optional (--with)` entry in the Stacks table of `SKILL.md`.
+
+The stacks are listed once, in the two tables under **Stacks** in `SKILL.md`: what each suits, how to choose, and the
+combinations without a blueprint. `bootstrap-project`'s interview and `design-solution` link there, so adding or
+changing a stack touches nothing outside this skill.
+
 ## Changing the conventions
 
 - **A rule that holds whatever the technology goes in its architecture doc.** A fact about one technology goes in its
@@ -36,4 +45,9 @@ each table in [references/catalog.md](references/catalog.md).
   row in [references/catalog.md](references/catalog.md) (a stack, a row in the Stacks table of `SKILL.md`), and, for a
   doc, a line in the Composition of every blueprint that uses it (an example, a line in its Examples). Then run the
   assembly for every stack, which fails on a missing section or a link that would not resolve in a project, and the
-  knowledge-flow check.
+  knowledge-flow check, from this skill's directory:
+
+  ```sh
+  for stack in references/stacks/*.md; do node scripts/assemble-conventions.mjs "$stack" > /dev/null || echo "broken: $stack"; done
+  node ../../../../scripts/check-knowledge-flow.mjs
+  ```

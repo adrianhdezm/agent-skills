@@ -6,10 +6,6 @@ its own, for an API that several clients use.
 
 ## Composition
 
-The architecture concepts, technologies and integrations this stack is built from. Their conventions, after this
-file's own, are assembled into the project's `coding-conventions.md` in this order. An entry marked optional is
-included only when the project has it, with `--with <name>`, or `--with <group>` for every entry of a group.
-
 - [Code style](../architecture/code-style.md)
 - [pnpm](../technologies/pnpm.md)
 - [TypeScript](../technologies/typescript.md)
