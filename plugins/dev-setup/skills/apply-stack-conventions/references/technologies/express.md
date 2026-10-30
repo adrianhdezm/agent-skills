@@ -21,7 +21,8 @@ layer, and one error shape.
   skeleton even when nothing is awaited. Each validates every input inline with zod `safeParse` and throws
   `createError(400, …, { expose: true, cause: z.flattenError(error) })` on failure, calls a DAO through
   `req.app.locals.context`, and shapes the response. No `parseOr400` helpers: a handler shows every error it can
-  produce.
+  produce. A file-private function for a repeated conversion (a query string to a number) keeps a list handler under
+  the complexity limit and is fine; one that throws HTTP errors is not.
 - **Errors leave a controller only through `next(err)`**, and `errorHandler` shapes every response as
   `{ status: 'error', message }`: the error's own message for an `http-errors` error created with `expose: true`,
   `Internal Server Error` for anything else. It logs 5xx at `error` and 4xx at `warn`, so routine client mistakes do
