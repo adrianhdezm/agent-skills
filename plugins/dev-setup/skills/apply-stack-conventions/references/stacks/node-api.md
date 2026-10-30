@@ -69,12 +69,163 @@ my-api/
 | scripts               | `dev` `node --env-file=.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `start` `node --env-file=.env dist/server.js`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check`; `db:generate`, `db:migrate` as Drizzle + Postgres says, with `--env-file=.env`; `compose:up`, `compose:down` |
 | dependencies          | the Express, Drizzle and Postgres docs' runtime packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | devDependencies       | the Express, Drizzle and Drizzle + Postgres dev packages; `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the pinned `typescript`                                                                                                                                                                                                                                                                                                                                                                                             |
-| configs               | the tsconfigs from the Express doc; `drizzle.config.ts` and the three Vitest projects from Drizzle + Postgres, with `env: { LOG_LEVEL: 'silent' }` at the root; `eslint.config.js` with the shared rules, `globals.node`, the controller override (`*.controller.ts`: `@typescript-eslint/require-await` off, because every handler is `async` for one shape), ignoring `dist/**`, `db/**`, `eslint.config.js`                                                                                                                                                                                                |
+| configs               | the tsconfigs, `eslint.config.js` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres. ESLint turns `@typescript-eslint/require-await` off for `*.controller.ts`, because every handler is `async` for one shape; Vitest sets `env: { LOG_LEVEL: 'silent' }` at the root                                                                                                                                                                                                                                                                                                 |
 | `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `docker-compose.yml`  | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the Express + Docker Compose `api` service                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `.prettierignore`     | `node_modules`, `dist`, `db/migrations`, `db/data`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `.dockerignore`       | `**/node_modules`, `dist`, `.git`, `.env`, `db`, `coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+## Reference code
+
+The config files as a fresh scaffold writes them; the tables above and the Express doc say why each value is there.
+
+`tsconfig.json`:
+
+```jsonc
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}
+```
+
+`tsconfig.app.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    // Environment, modules, output
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "types": ["node"],
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    // Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts"]
+}
+```
+
+`tsconfig.node.json`:
+
+```jsonc
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    // Environment, modules, output
+    "composite": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["drizzle.config.ts", "vitest.config.ts", "tests/**/*.ts", "src/**/*.ts"]
+}
+```
+
+`eslint.config.js`:
+
+```js
+import js from '@eslint/js';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import prettier from 'eslint-config-prettier/flat';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig([
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'dist/**',
+    'db/**',
+    // No TypeScript project includes the ESLint config itself
+    'eslint.config.js'
+  ]),
+  js.configs.recommended,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  {
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        // src/ belongs to tsconfig.app.json; tests and config files to tsconfig.node.json
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname
+      }
+    }
+  },
+  prettier,
+  {
+    rules: {
+      // Correctness
+      curly: 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'inline-type-imports' }],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
+      // Complexity and size guardrails
+      complexity: ['warn', 10],
+      'max-depth': ['warn', 4],
+      'max-lines-per-function': ['warn', 75],
+      'max-statements': ['warn', 20],
+      'max-params': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+
+      // Clarity and simplicity
+      'no-else-return': 'warn',
+      'no-nested-ternary': 'warn',
+      'no-unneeded-ternary': 'warn'
+    }
+  },
+  {
+    // Every handler is async for one shape, even when nothing is awaited
+    files: ['**/*.controller.ts'],
+    rules: { '@typescript-eslint/require-await': 'off' }
+  },
+  {
+    // A describe holds every case for one module
+    files: ['tests/**/*.ts'],
+    rules: { 'max-lines-per-function': 'off', 'max-nested-callbacks': 'off', 'max-statements': 'off' }
+  }
+]);
+```
+
+`vitest.config.ts`:
+
+```ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    env: { LOG_LEVEL: 'silent' },
+    projects: [
+      { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'] } },
+      { extends: true, test: { name: 'db', include: ['tests/db/**/*.test.ts'], hookTimeout: 120_000, testTimeout: 30_000 } },
+      { extends: true, test: { name: 'api', include: ['tests/api/**/*.test.ts'], hookTimeout: 120_000, testTimeout: 30_000 } }
+    ]
+  }
+});
+```
 
 ## Scaffold
 
