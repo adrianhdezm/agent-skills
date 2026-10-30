@@ -54,6 +54,8 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 `app/routes/login.tsx`'s server half; signup is the same with `signUpEmail` and its own schema:
 
 ```tsx
+const errorBodySchema = z.object({ message: z.string().optional() });
+
 export async function action({ request, context }: Route.ActionArgs) {
   const submission = parseWithZod(await request.formData(), { schema: loginSchema });
   if (submission.status !== 'success') {
@@ -63,7 +65,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     .get(appContext)
     .auth.api.signInEmail({ body: submission.value, headers: request.headers, asResponse: true });
   if (!response.ok) {
-    const body: { message?: string } = await response.json();
+    const body = errorBodySchema.parse(await response.json());
     return { result: submission.reply({ hideFields: ['password'] }), formError: body.message ?? 'Could not sign in' };
   }
   return redirect(safeRedirectTo(new URL(request.url).searchParams.get('redirectTo')), { headers: response.headers });
