@@ -21,14 +21,10 @@ its client is built and tested there, belong to that engine's integration.
 - **DAOs are the only code that touches Drizzle.** One class per table, `<Resource>Dao implements Dao<…>`, created once
   in the composition root and put on the app's context. "Dao", not "Repository": a class per table returning rows is
   DAO-shaped, and a repository promises a domain layer that does not exist.
-- **One contract, single-input methods**, AppSync-style: `get({ id })` → `T | null`, `list(input)` →
-  `PaginatedResult<T>`, `create(input)`, `update(input)` with the `id` inside the input, `delete({ id })` → `void`.
-  New fields never break call sites. DAOs throw `NotFoundError` for a missing row on update and delete, and stay
-  callable from non-HTTP code; the HTTP layer turns it into a 404.
-- **Typed filter inputs per column kind**, modelled on AppSync's `Model<Type>FilterInput`, with recursive `and` / `or`
-  / `not`, built by `createFilterInputSchema`; sorts by an allowlist (`createSortInputSchema`); page-based pagination
-  with a total (`createListInputSchema`), because admin tables need "page X of Y" and random access. A Hasura-style
-  `where` tree lost its types in the translator; flat per-resource filters could not express OR and NOT.
+- **The DAOs implement the data access concept's contract**, AppSync-style: the `Dao` interface in `dao.model.ts`, its
+  filter, sort and pagination inputs built by `createFilterInputSchema`, `createSortInputSchema` and
+  `createListInputSchema` (modelled on AppSync's `Model<Type>FilterInput`). A Hasura-style `where` tree lost its types in
+  the translator; flat per-resource filters could not express OR and NOT.
 - **Fields are named after columns.** The DAO passes its Drizzle table to `filterToSql` / `sortToSql`, and
   `FilterTable` / `SortTable` make a field without a matching column a compile error: no column maps.
 - **One translator for every scalar kind**: the schemas already reject operators a kind does not support.
@@ -54,12 +50,10 @@ its client is built and tested there, belong to that engine's integration.
 | dependencies        | `drizzle-orm`, `drizzle-zod`, `zod`; dev `drizzle-kit`, and the engine's driver                                                                                                                                                                        |
 | `drizzle.config.ts` | `out: './db/migrations'`, `schema: './src/db/schemas/*.schema.ts'`, `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__', schema: 'public' }` |
 | scripts             | `db:generate` and `db:migrate`, each `node --env-file=../.env node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                                                                   |
-| limits              | `in` at most 100 values; `and` / `or` at most 20 branches; `pageSize` 1 to 100, default 20; `page` from 1                                                                                                                                              |
+| limits              | the contract's, in `list-input.helper.ts` and the scalar schemas                                                                                                                                                                                       |
 
-Filter operators per kind: ids `eq ne in`; strings `eq ne lt le gt ge between in contains notContains beginsWith`
-(the last three case-insensitive, escaping LIKE metacharacters); numbers and dates `eq ne lt le gt ge between in`
-(dates as ISO date or date-time); booleans `eq ne`. `between` is an inclusive pair; an empty `in` matches nothing; `{}`
-matches every row, so an `or` containing it matches every row and `not {}` matches none.
+The filter operators and their semantics are the contract's; `contains`, `notContains` and `beginsWith` escape LIKE
+metacharacters, so user input is matched literally.
 
 ## Pitfalls
 
@@ -560,8 +554,7 @@ export async function startTestDb(): Promise<TestDb> {
 
 - **DAOs are the only code that touches the ORM**; they read no request, throw no HTTP errors, and hold no
   configuration of their own. A missing row on update or delete is a `NotFoundError`.
-- **The contract is single-input**: `get({ id })` → `T | null`, `list(input)` → `PaginatedResult<T>`, `create(input)`,
-  `update(input)` with the `id` inside, `delete({ id })` → `void`.
+- **Every DAO `implements Dao<…>`** from `dao.model.ts`, the data access contract.
 - **Resource schema files carry no comments and follow one order**: the table; the schemas (`select<Resource>Schema`,
   `<resource>IdInputSchema`, `create…`, `update…`, `<resource>FilterInputSchema`, `<resource>SortInputSchema`,
   `list<Resource>InputSchema`); `<resource>DefaultSort`; then the inferred types in the same order.
@@ -570,14 +563,10 @@ export async function startTestDb(): Promise<TestDb> {
 
 ### List queries
 
-- **Filters** are typed per column kind, with recursive `and` / `or` / `not`; schemas are strict, so an unknown field or
-  operator is a 400. Ids take `eq ne in`; strings add `lt le gt ge between contains notContains beginsWith`
-  (case-insensitive); numbers and dates `eq ne lt le gt ge between in`; booleans `eq ne`. `in` takes at most 100 values
-  and an empty one matches nothing.
+- **Filter, sort and pagination follow the data access contract**, built per resource from the list-input builders;
+  schemas are strict, so an unknown field or operator is rejected.
 - **Fields are named after the table's columns**; the compiler rejects a field with no column.
-- **Sorting** is an allowlist with a default sort per resource and an `id` tie-breaker on every sort.
-- **Pagination is page-based**: `page` (default 1) and `pageSize` (default 20, max 100) in;
-  `{ items, total, page, pageSize, totalPages }` out.
+- **`sortToSql` appends the `id` tie-breaker**; each resource's schema file declares its default sort.
 - **Extending**: a filterable column is one line in the resource's filter schema, a sortable one one entry in its sort
   allowlist; a new operator is one line in its scalar schema plus one branch in `dao.helper.ts`.
 

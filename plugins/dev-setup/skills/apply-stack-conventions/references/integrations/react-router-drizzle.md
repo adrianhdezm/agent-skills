@@ -21,32 +21,35 @@ context.get(appContext).db   (built per request on Workers, once on Node, by the
 
 ## Where it lives
 
-| File                                       | Holds                                                                |
-| ------------------------------------------ | -------------------------------------------------------------------- |
-| `app/db/schema.ts`                         | the tables, both sides of every `relations()`, the exported `schema` |
-| `app/db/data-access.ts`                    | `Dao`, `RelationQuery`, `GetAllOptions`, `GetAllResult`              |
-| `app/db/daos/<entity>.dao.ts`              | one DAO per table, with its types and `drizzle-zod` schemas          |
-| `app/db/queries/<parent>-<child>.query.ts` | one read-only query per cross-table read                             |
-| `app/services/`                            | one service per business workflow                                    |
-| `app/context.ts`                           | the database client's type on `appContext`                           |
-| `tests/integration/`                       | DAOs, queries and services against a real database                   |
+| File                                       | Holds                                                                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `app/db/schema.ts`                         | the tables, both sides of every `relations()`, the exported `schema`                                           |
+| `app/db/data-access.ts`                    | the contract: `Dao`, `RelationQuery`, `PaginatedResult`, `IdInput`, and the list-input builders and translator |
+| `app/db/schemas/<entity>.schema.ts`        | the entity's table, input schemas, filter, sort and list input, default sort, inferred types                   |
+| `app/db/daos/<entity>.dao.ts`              | one DAO per table, implementing the contract                                                                   |
+| `app/db/queries/<parent>-<child>.query.ts` | one read-only query per cross-table read                                                                       |
+| `app/services/`                            | one service per business workflow                                                                              |
+| `app/context.ts`                           | the database client's type on `appContext`                                                                     |
+| `tests/integration/`                       | DAOs, queries and services against a real database                                                             |
 
 ## Conventions
 
 D1 on Workers or Postgres on Node, both through Drizzle with `drizzle-zod`: `Routes → Services → Queries → DAOs →
 Database`.
 
-- **A DAO per table** in `app/db/daos/<entity>.dao.ts`, constructed with the Drizzle client. It exposes only `create`,
-  `get`, `getAll`, `update`, `delete` and `deleteMany`; every filtered read goes through
-  `getAll({ filters, limit, offset })` with a typed `<Entity>Filters`, never a custom `findBySlug`. It owns its
-  entity's types (`<Entity>Record`, `Create<Entity>`, `Update<Entity>`, `<Entity>Filters`) and its `drizzle-zod`
-  schemas, imports no other DAO, query or service, and holds no business logic.
+- **A DAO per table** in `app/db/daos/<entity>.dao.ts`, constructed with the Drizzle client, implementing the data
+  access contract (`get`, `list`, `create`, `update`, `delete`) as the Drizzle doc's reference code does; every filtered
+  read goes through `list` with the typed filter, never a custom `findBySlug`. Its entity's table, schemas and inferred
+  types live in `app/db/schemas/<entity>.schema.ts`, in the Drizzle doc's order. It imports no other DAO, query or
+  service, and holds no business logic.
 - **A query per cross-table read** in `app/db/queries/<parent>-<child>.query.ts`: read-only, Drizzle's relational API
-  (`db.query.*` with `with`), only `get` and `getAll`, returning a `<Parent>With<Child>` type; no query-builder joins.
+  (`db.query.*` with `with`), offering the contract's `get` and `list` and returning a `<Parent>With<Child>` type; no
+  query-builder joins.
 - **A service per business workflow** in `app/services/`: anything that writes more than one table, needs atomic
   writes, or composes DAOs and queries. Services import no tables and build no queries.
-- **The shared interfaces** (`Dao`, `RelationQuery`, `GetAllOptions`, `GetAllResult`) live in `app/db/data-access.ts`;
-  tables, both sides of every `relations()`, and the exported `schema` in `app/db/schema.ts`.
+- **The contract and its builders live in `app/db/data-access.ts`**: `Dao`, `RelationQuery`, `PaginatedResult`,
+  `IdInput`, the list-input builders and the translator; `app/db/schema.ts` registers every table, both sides of every
+  `relations()`, and exports `schema`.
 - **Concurrency and atomic writes follow the engine's doc**: Cloudflare D1 runs queries in
   sequence and batches atomic work; Postgres runs independent queries together and uses transactions.
 - **Integration tests seed through DAOs**, not raw SQL, in workerd with D1 or in Node with the Compose Postgres; their
