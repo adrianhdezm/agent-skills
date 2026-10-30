@@ -74,7 +74,7 @@ current branch, and `CLAUDE.md` or `AGENTS.md` points at the file.
 ## The guard
 
 The cheapest road to green is to lower the bar: skip a test, add `@ts-ignore`, drop an assertion, edit a threshold.
-The guard finds these moves in the diff since the base branch, including uncommitted and untracked files:
+The guard finds these moves in the diff since a base commit, including uncommitted and untracked files:
 
 ```bash
 node <skill-dir>/scripts/guard.mjs [--base <ref>]
@@ -83,7 +83,11 @@ node <skill-dir>/scripts/guard.mjs [--base <ref>]
 `<skill-dir>` is this skill's base directory. Exit 0 is clean, 1 lists findings as `file:line kind text`, and 2 means
 it could not run. It reports new suppressions, skipped or focused tests, stubs and swallowed errors, removed
 assertions, deleted test files, and any change to `CONSTRAINTS.md`. Each finding needs a reason the user accepts, or a
-fix. `/implement-design` runs it before closing a slice, and `/verify-build` runs it for the whole initiative.
+fix. `/implement-design` runs it before closing a slice, and `/verify-build` runs it for the whole initiative, both
+with `--base` set to the `Base:` commit in `03-design.md`. Without `--base` it uses the merge base with `origin/main`,
+`main` or `master`; on a repo that works on `main` that is `HEAD` itself, so it scans only uncommitted changes and
+says so. When `design-solution` calls this skill, it commits `CONSTRAINTS.md` with the scaffold and records that
+commit as the base, so the new file is not reported as a change.
 
 ## Template
 

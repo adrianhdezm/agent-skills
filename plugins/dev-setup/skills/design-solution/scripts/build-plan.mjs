@@ -1,34 +1,48 @@
 #!/usr/bin/env node
-// Checks a design plan JSON and builds the interactive review page from it.
+// Checks a design plan JSON against the analysis and the design, and builds the interactive review page from it.
 //
-//   node build-plan.mjs <plan.json> [--analysis <02-analysis.md>] [--out <file.html>] [--standalone]
+//   node build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--out <file.html>] [--standalone]
 //
-// Errors stop the build; warnings do not. --standalone adds the doctype and head that a
-// published Artifact gets from its host, so the file also opens straight from disk.
+// Errors stop the build; warnings do not. The build refuses an analysis that is not approved, a behaviour that no
+// level-1 claim covers or that two cover, a behaviour in no slice or in two, a criterion with no test tier or with
+// two, and a slice that depends on a later one. --standalone adds the doctype and head that a published Artifact
+// gets from its host, so the file also opens straight from disk.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseAnalysis, live } from "../../analyze-problem/scripts/analysis.mjs";
+import { parseDesign } from "./design.mjs";
 
 const args = process.argv.slice(2);
+const VALUED = ["--analysis", "--design", "--out"];
 const flag = (name) => {
   const i = args.indexOf(name);
   return i === -1 ? undefined : args[i + 1];
 };
-const planPath = args.find((a, i) => !a.startsWith("--") && !["--analysis", "--out"].includes(args[i - 1]));
-if (!planPath) {
-  console.error("usage: build-plan.mjs <plan.json> [--analysis <02-analysis.md>] [--out <file.html>] [--standalone]");
+const planPath = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]));
+const analysisPath = flag("--analysis");
+const designPath = flag("--design");
+if (!planPath || !analysisPath || !designPath) {
+  console.error("usage: build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--out <file.html>] [--standalone]");
   process.exit(2);
 }
-const analysisPath = flag("--analysis");
 const outPath = flag("--out") ?? join(dirname(planPath), basename(planPath).replace(/\.plan\.json$|\.json$/, "") + ".html");
 const standalone = args.includes("--standalone");
+const read = (p) => {
+  try {
+    return readFileSync(p, "utf8");
+  } catch (e) {
+    console.error(`error: cannot read ${p}: ${e.message}`);
+    process.exit(2);
+  }
+};
 
 const errors = [];
 const warnings = [];
 let plan;
 try {
-  plan = JSON.parse(readFileSync(planPath, "utf8"));
+  plan = JSON.parse(read(planPath));
 } catch (e) {
   console.error(`error: ${planPath} is not valid JSON: ${e.message}`);
   process.exit(1);
@@ -44,7 +58,8 @@ if (!Array.isArray(plan.scope) || plan.scope.length === 0) errors.push("scope: l
 const KINDS = ["code", "mock", "list"];
 const decisionIds = new Set();
 let decisionCount = 0;
-const covered = new Set();
+const coveredBy = new Map(); // B -> level-1 claim numbers
+const levelOne = []; // { num, slice, covers }
 
 function checkExhibit(x, where, required) {
   if (!x) {
@@ -82,7 +97,9 @@ function walk(list, prefix, level) {
     if (c.decision) checkDecision(c.decision, where);
     if (level === 1) {
       if (!c.covers || c.covers.length === 0) errors.push(`${where}: a level-1 claim lists the behaviours it covers ("covers": ["B1"])`);
-      for (const b of c.covers ?? []) covered.add(b);
+      if (!c.slice) errors.push(`${where}: a level-1 claim names the slice that delivers it ("slice": "S1")`);
+      for (const b of c.covers ?? []) coveredBy.set(b, [...(coveredBy.get(b) ?? []), num]);
+      levelOne.push({ num, slice: c.slice, covers: c.covers ?? [] });
     }
     if (c.children) walk(c.children, num, level + 1);
   });
@@ -96,15 +113,81 @@ walk(plan.claims ?? [], "", 1);
 if (decisionCount > 5) errors.push(`decisions: ${decisionCount}; ask only the 2 to 5 forks that change what gets built`);
 else if (decisionCount < 2) warnings.push(`decisions: ${decisionCount}; most plans have 2 to 5 forks`);
 
-if (analysisPath) {
-  const text = readFileSync(analysisPath, "utf8");
-  const ids = [];
-  for (const m of text.matchAll(/^###\s+(B\d+)\b(.*)$/gm)) if (!/_\(dropped\)_/.test(m[2])) ids.push(m[1]);
-  for (const b of ids) if (!covered.has(b)) errors.push(`coverage: ${b} from the analysis is not covered by any level-1 claim`);
-  for (const b of covered) if (!ids.includes(b)) errors.push(`coverage: ${b} is not a behaviour in the analysis`);
-  if (ids.length === 0) warnings.push(`coverage: found no "### B<n>" headings in ${analysisPath}`);
-} else {
-  warnings.push("coverage: not checked; pass --analysis docs/<slug>/02-analysis.md");
+// The analysis: approved, and every live behaviour covered by exactly one level-1 claim.
+const analysis = parseAnalysis(read(analysisPath));
+if (!/^Approved\b/.test(analysis.status ?? "")) {
+  errors.push(`analysis: ${analysisPath} does not say "Status: Approved <YYYY-MM-DD>"; finish /analyze-problem first`);
+}
+const behaviours = live(analysis);
+const ids = behaviours.map((b) => b.id);
+const dropped = new Set(analysis.behaviours.filter((b) => b.dropped).map((b) => b.id));
+if (ids.length === 0) errors.push(`coverage: found no "### B<n>" headings in ${analysisPath}`);
+for (const b of ids) {
+  const by = coveredBy.get(b) ?? [];
+  if (by.length === 0) errors.push(`coverage: ${b} from the analysis is not covered by any level-1 claim`);
+  if (by.length > 1) errors.push(`coverage: ${b} is covered by claims ${by.join(" and ")}; a behaviour belongs to one level-1 claim`);
+}
+for (const b of coveredBy.keys()) {
+  if (dropped.has(b)) errors.push(`coverage: ${b} is dropped in the analysis`);
+  else if (!ids.includes(b)) errors.push(`coverage: ${b} is not a behaviour in the analysis`);
+}
+
+// The design: every behaviour in one slice, every criterion with one test tier, no forward dependencies.
+const KNOWN_TIERS = ["unit", "integration", "component", "contract", "end to end", "end-to-end", "e2e", "api", "browser"];
+const design = parseDesign(read(designPath));
+if (design.slices.length === 0) errors.push(`design: no "### S<n>: … (B1, B2)" headings under "## Slices" in ${designPath}`);
+if (!design.base) warnings.push('design: no "Base: <commit>" on the header line; implementation and verification diff against it');
+const order = new Map();
+const sliceOf = new Map(); // B -> [S]
+const tierOf = new Map(); // B1.1 -> [{ slice, tier }]
+for (const [i, s] of design.slices.entries()) {
+  if (order.has(s.id)) errors.push(`design: ${s.id} is used twice`);
+  order.set(s.id, i);
+}
+for (const s of design.slices) {
+  if (s.covers.length === 0) errors.push(`design ${s.id}: list the behaviours it delivers in its heading, "### ${s.id}: … (B1, B2)"`);
+  for (const b of s.covers) {
+    sliceOf.set(b, [...(sliceOf.get(b) ?? []), s.id]);
+    if (dropped.has(b)) errors.push(`design ${s.id}: ${b} is dropped in the analysis`);
+    else if (!ids.includes(b)) errors.push(`design ${s.id}: ${b} is not a behaviour in the analysis`);
+  }
+  if (s.dependsOn === null) warnings.push(`design ${s.id}: no "Depends on:" line`);
+  for (const d of s.dependsOn ?? []) {
+    if (!order.has(d)) errors.push(`design ${s.id}: depends on ${d}, which is not a slice`);
+    else if (order.get(d) >= order.get(s.id)) errors.push(`design ${s.id}: depends on ${d}, which comes after it; reorder the slices`);
+  }
+  if (s.tests.length === 0) errors.push(`design ${s.id}: no "- Tests: B1.1 unit · B1.2 integration" line`);
+  for (const part of s.stray) errors.push(`design ${s.id}: "${part}" on the Tests line is not "<criterion ID> <tier>"`);
+  for (const t of s.tests) {
+    tierOf.set(t.id, [...(tierOf.get(t.id) ?? []), { slice: s.id, tier: t.tier }]);
+    if (!t.tier) errors.push(`design ${s.id}: ${t.id} has no test tier`);
+    else if (!KNOWN_TIERS.includes(t.tier)) warnings.push(`design ${s.id}: ${t.id} tier "${t.tier}" is not one of ${KNOWN_TIERS.join(", ")}; fine if the conventions name it`);
+    const b = t.id.split(".")[0];
+    if (!s.covers.includes(b)) errors.push(`design ${s.id}: tests ${t.id}, but ${b} is not in ${s.id}`);
+  }
+}
+for (const b of ids) {
+  const in_ = sliceOf.get(b) ?? [];
+  if (in_.length === 0) errors.push(`design: ${b} is in no slice`);
+  if (in_.length > 1) errors.push(`design: ${b} is in ${in_.join(" and ")}; every behaviour is in exactly one slice`);
+}
+const criteria = behaviours.flatMap((b) => b.criteria.map((c) => c.id));
+for (const c of criteria) {
+  const t = tierOf.get(c) ?? [];
+  if (t.length === 0) errors.push(`design: ${c} has no test tier on any slice's Tests line`);
+  if (t.length > 1) errors.push(`design: ${c} has a tier in ${t.map((x) => x.slice).join(" and ")}; give it one`);
+}
+for (const id of tierOf.keys()) if (!criteria.includes(id)) errors.push(`design: ${id} on a Tests line is not a live criterion in the analysis`);
+
+// The plan and the design agree on which slice delivers which behaviour.
+for (const c of levelOne) {
+  if (!c.slice) continue;
+  const s = design.slices.find((x) => x.id === c.slice);
+  if (!s) {
+    errors.push(`claim ${c.num}: slice ${c.slice} is not in the design`);
+    continue;
+  }
+  for (const b of c.covers) if (!s.covers.includes(b)) errors.push(`claim ${c.num}: covers ${b} in ${c.slice}, but the design puts ${b} in ${(sliceOf.get(b) ?? ["no slice"]).join(", ")}`);
 }
 
 for (const w of warnings) console.log(`warning: ${w}`);
