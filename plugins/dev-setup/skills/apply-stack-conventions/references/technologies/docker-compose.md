@@ -54,6 +54,9 @@ at the root, healthchecked services, and one root `.env` feeding them at run tim
 
 ## Pitfalls
 
+- **`up --wait` reports a service with no healthcheck as healthy once its process starts**, and a one-shot service as
+  exited without its code: neither proves the app answers. The smoke test's request does, and
+  `docker compose ps -a --format '{{.Service}} {{.ExitCode}}'` shows each exit code.
 - **Without a healthcheck, `up --wait` returns while a service still refuses connections**, and a step run straight
   after fails on a cold machine.
 - **A per-package build context cannot see the catalog**, and the install fails inside the image.
