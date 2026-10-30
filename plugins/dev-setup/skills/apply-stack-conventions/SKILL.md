@@ -48,43 +48,43 @@ Another language is out of scope: every doc here is TypeScript.
    [catalog](references/catalog.md).
 
 2. **List the docs.**
-   - **With a blueprint**, the script lists them: its **Composition**, keeping only the optional entries picked, and its
-     **Examples**, as the hand-off's `Docs:` and `Examples:` lines.
-
-     ```sh
-     node <skill-dir>/scripts/assemble-conventions.mjs <skill-dir>/references/stacks/<stack>.md [--with <entry>]... --list
-     ```
-
+   - **With a blueprint**, the script reads them from its **Composition**, keeping only the optional entries picked,
+     and its **Examples**.
    - **Composed**, take the code style concept, the shared tooling (pnpm, TypeScript, ESLint, Prettier, Vitest), the
      architecture doc of each concept the project needs (a database, endpoints, sign-in, uploads) and the docs whose
      Realises line names it and fit the runtime, the technology doc of each technology, the integration doc of each
      pair that connects, and the examples whose Demonstrates table names those docs. Order them code style, pnpm,
-     TypeScript, concepts, runtime and frameworks, integrations, tooling.
+     TypeScript, concepts, runtime and frameworks, integrations, tooling. An integration whose other half was swapped
+     for a technology the project uses instead (Express + Drizzle in a Hono API) is left out of the list, and its seam
+     applied with the project's technology in its place; name each one so under **Found**.
    - Name each technology the combination has that no doc covers as a gap.
 
-3. **Assemble the conventions** into the scratchpad. The script fails on a missing section or a link that would not
-   resolve in a project; a failure is a broken doc, reported under **Found**, not something to work around.
+3. **Assemble the conventions** with one command, which writes `coding-conventions.md` and prints the hand-off block.
+   `<scratchpad>` is the caller's scratch directory, or a new temporary one. The script fails on a missing section or a
+   link that would not resolve in a project; a failure is a broken doc, reported under **Found**, not something to work
+   around.
 
    ```sh
    # with a blueprint, a --with for each optional entry picked
-   node <skill-dir>/scripts/assemble-conventions.mjs <skill-dir>/references/stacks/<stack>.md [--with <entry>]... > <scratchpad>/coding-conventions.md
-   # composed, the docs from step 2 in their order
-   node <skill-dir>/scripts/assemble-conventions.mjs --compose "<what it is>" <doc>... > <scratchpad>/coding-conventions.md
+   node <skill-dir>/scripts/assemble-conventions.mjs <skill-dir>/references/stacks/<stack>.md [--with <entry>]... --out <scratchpad>/coding-conventions.md
+   # composed: a noun phrase for what it is, an --example for each example, then the docs from step 2 in their order
+   node <skill-dir>/scripts/assemble-conventions.mjs --compose "<what it is>" [--example <example>]... --out <scratchpad>/coding-conventions.md <doc>...
    ```
 
    For an existing project that has a `coding-conventions.md`, diff the two: a difference means one of them moved, and
    goes under **Found** for the user to decide.
 
-4. **Hand off.** Return this block to the caller, with paths absolute so it can read each one:
+4. **Hand off.** Return the block the script printed, with the two lines only you can write added, to the caller:
 
    ```
    Stack: React Router on Node · with: database, authentication     (or: Composed: <what it is>)
    Blueprint: <skill-dir>/references/stacks/react-router-docker.md  (or: none)
-   Docs: <path>, <path>, …                                           (in composition order)
+   Docs: <path>, <path>, …                                           (absolute, in composition order)
    Examples: <path>, …
-   Gaps: no doc for Fastify                                          (or: none)
+   Ports: Postgres 5432 (moved with `DB_PORT`), the app's `PORT` …   (the blueprint's ports row)
    Conventions: <scratchpad>/coding-conventions.md
-   Found: <a broken doc, a drift from the project's coding-conventions.md>   (or: none)
+   Gaps: no doc for <technology>                                     (or: none; added by you)
+   Found: <a broken doc, a swapped integration, a drift from the project's coding-conventions.md>   (or: none; added by you)
    ```
 
    Run without a calling skill, end with the same block.
@@ -94,5 +94,5 @@ Another language is out of scope: every doc here is TypeScript.
 - [ ] The stack matches a blueprint row, or the composition was built from the catalog and says so
 - [ ] Only the optional entries the project has or asks for were picked
 - [ ] Docs are in composition order; every technology without a doc is a gap
-- [ ] `coding-conventions.md` was assembled by the script, and the script passed
-- [ ] The hand-off block was returned with absolute paths
+- [ ] `coding-conventions.md` was assembled by the script with `--out`, and the script passed
+- [ ] The hand-off block the script printed was returned, with Gaps and Found added

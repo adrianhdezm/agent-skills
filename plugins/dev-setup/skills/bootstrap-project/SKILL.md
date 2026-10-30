@@ -44,8 +44,10 @@ Copy this checklist and tick it off:
    Stop and ask only when a gap is a technology the user named and the choice changes the project's shape (which
    database, which framework); otherwise carry on.
 
-3. **Check the toolchain**: Node 24+, pnpm 11+, git, and Docker where a doc uses it, plus every port the blueprint or
-   the docs name. If the target already holds a `package.json`, follow
+3. **Check the toolchain**: Node 24+, pnpm 11+, git, and Docker where a doc uses it, plus every port on the hand-off's
+   `Ports` line (for a composed combination, the ports its docs name): a port is free when
+   `node -e "require('net').createServer().once('error', () => process.exit(1)).listen(<port>, () => process.exit(0))"`
+   exits 0. If the target already holds a `package.json`, follow
    [Adding to an existing project](#adding-to-an-existing-project) instead.
 
 4. **Build the project**, without asking, in this order unless the blueprint's Scaffold notes say otherwise:
