@@ -39,7 +39,6 @@ request ─► controller ─► req.app.locals.context.<resource>Dao ─► Dri
 
 ## Reference code
 
-From the REST API scaffold, which passes typecheck, lint, the unit and integration tests and its Compose smoke test;
 `src/db/client.ts` is Drizzle + Postgres's and the error handler Express + Pino's.
 
 `src/server.ts`: the composition root: settings read and checked, the client and DAOs built once, the listener, and shutdown closing the server and then the pool.
