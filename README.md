@@ -35,11 +35,10 @@ a verified build (see [From idea to verified build](#from-idea-to-verified-build
 | Skill                       | What it does                                                                                                                                                                                                               |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `analyze-problem`           | Phase 2: interviews fork by fork and writes a framework-free analysis with numbered behaviours (B1…) and testable acceptance criteria (B1.1…)                                                                              |
+| `apply-stack-conventions`   | The house conventions per architecture concept (data access, REST API, auth, file storage), technology, integration, example and stack                                                                                     |
+| `bootstrap-project`         | Scaffolds a project from a short interview by looking up the stack conventions for each technology, pairing and starter example, filling gaps with reported defaults; every check passing                                  |
 | `brainstorm-idea`           | Phase 1: collects the idea and its references, proposes directions that differ in kind, optionally tests the riskiest assumption with a throwaway PoC, and records the chosen direction                                    |
 | `confirm-my-goal`           | Plays back the goal, problem and scope in its own words, flags assumptions, and waits for confirmation before acting; runs only via `/confirm-my-goal`                                                                     |
-| `create-cloudflare-worker`  | Scaffolds a Hono Cloudflare Worker built by Vite: pnpm, ESLint, Prettier, Vitest inside workerd, and four passing checks                                                                                                   |
-| `create-fullstack-app`      | Scaffolds a pnpm monorepo with an Express 5 + Drizzle + Postgres API, an Angular 22 + NgRx + Tailwind web app, Docker Compose, an entity CRUDL example end to end, and five passing checks                                 |
-| `create-node-project`       | Scaffolds a single-package TypeScript project that Node 24 runs directly: pnpm, ESLint, Prettier, Vitest, and three passing checks                                                                                         |
 | `debug-failure`             | Finds the root cause of a failure: reproduces it, narrows it down (bisecting a regression), writes a failing test, fixes the cause and proves it with every check                                                          |
 | `define-constraints`        | Writes the project's quality bar into `CONSTRAINTS.md` (floor, checks with commands, measured values, done means, boundaries), wires `check:fast` / `check:task` / `check:full`, and guards the diff against a lowered bar |
 | `design-solution`           | Phase 3: maps each behaviour onto the project's real building blocks, puts the open forks on an interactive HTML plan, and writes the decisions and ordered vertical slices; scaffolds first when no code exists           |
@@ -139,15 +138,16 @@ non-goals, and a **Later** list so the first version stays small.
 
 ### 3. Design: `/design-solution <slug>`
 
-**You:** if the project has no code yet, pick the stack first (`create-fullstack-app`, `create-cloudflare-worker`,
-`create-node-project`, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
+**You:** if the project has no code yet, pick the stack first: Claude recommends a combination from the
+`bootstrap-project` interview (a Node package, a Hono Worker, React Router on Workers or on Node, an Angular app or
+the Angular full stack, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
 claim, press **Respond**, and paste the result back into the chat.
 
 **Claude:** scaffolds the project if needed, and runs `/define-constraints` to write the quality bar into
 `CONSTRAINTS.md` (four questions, each with a default; "the floor only" is a fine answer). Then it maps every behaviour
 onto the project's real building blocks: tables and migrations, data access, contracts, routes, state, components, and
 the test tier for each criterion. It follows the project's conventions file (such as `coding-conventions.md` from
-`create-fullstack-app`), decides the contract, UI and security rules for each behaviour, and checks the official docs
+`bootstrap-project`), decides the contract, UI and security rules for each behaviour, and checks the official docs
 for any API it is unsure of. It cuts the work into small **vertical slices**, each one visible end to end when it is
 done, with the riskiest one early, and builds the plan page. A script checks that every behaviour is covered.
 

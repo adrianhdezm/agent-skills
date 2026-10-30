@@ -30,7 +30,7 @@ current branch, and `CLAUDE.md` or `AGENTS.md` points at the file.
 ```
 
 1. **Read before you ask.** Find the stack, the test runner, the lint config, the `package.json` scripts, the
-   conventions file (such as `coding-conventions.md` from `create-fullstack-app`), CI workflows and today's coverage
+   conventions file (such as `coding-conventions.md` from `bootstrap-project`), CI workflows and today's coverage
    if the suite writes it. Report what you found in two lines. Never ask for what you can read.
 
 2. **Ask four questions, one at a time.** Each one comes with your guess and a default, so "I don't know" still gives a

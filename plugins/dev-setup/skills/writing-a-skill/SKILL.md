@@ -64,7 +64,7 @@ Omit any section that doesn't apply — don't leave empty placeholders.
 
 Use verb-object form, the command the user would type: `verify-build`, `debug-failure`, `confirm-my-goal`. Lowercase letters, numbers, and hyphens only, max 64 chars. The H1 title matches the name (`# Verify Build`).
 
-A skill that scaffolds a new project is named `create-<thing>`, after the `pnpm create` / `npm init` convention users already search for: `create-node-project`, `create-cloudflare-worker`, `create-fullstack-app`.
+Scaffolding a new project is one skill, `bootstrap-project`, and how each technology is used and connected is one skill, `apply-stack-conventions`. A new stack becomes a blueprint in `apply-stack-conventions`, not a new `create-<thing>` skill; a new technology, integration or example becomes a doc there, and `bootstrap-project` finds it by looking it up.
 
 Older skills keep their gerund names (`setting-up-npm-block`, `writing-a-skill`). Do not use that form for new ones.
 
@@ -134,7 +134,7 @@ For reference files longer than 100 lines, add a table of contents at the top so
 
 ## Review Checklist
 
-- [ ] Name uses verb-object form, or `create-<thing>` for a project scaffolder
+- [ ] Name uses verb-object form
 - [ ] Description includes "Use when..." with specific triggers
 - [ ] A **Done means** line, and an End of the run with Blocked on me / Changed / Found
 - [ ] A skill that runs long says when to keep going and when to stop
