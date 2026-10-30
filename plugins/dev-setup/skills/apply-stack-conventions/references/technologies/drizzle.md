@@ -60,6 +60,8 @@ metacharacters, so user input is matched literally.
 
 - **Integration tests need an existing `db/migrations/`**: they run after the first `db:generate`.
 - **drizzle-kit does not load `.env`**: run its bin under `node --env-file`.
+- **drizzle-zod's object schemas strip unknown keys** rather than rejecting them, so a body with an extra field would
+  pass: end every row input schema in `.strict()` (before any `.refine`), as the reference code does.
 - **A shipped migration** carries the scaffold's clock and diverges from the schema on the first edit: ship none.
 
 ## Reference code
@@ -381,7 +383,9 @@ export const entityIdInputSchema = z.object({
 export const createEntityInputSchema = createInsertSchema(entity, {
   name: (schema) => schema.min(1, 'name is required').max(200),
   description: (schema) => schema.max(2000).nullish()
-}).pick({ name: true, description: true });
+})
+  .pick({ name: true, description: true })
+  .strict();
 
 export const updateEntityInputSchema = createUpdateSchema(entity, {
   name: (schema) => schema.min(1).max(200),
@@ -389,6 +393,7 @@ export const updateEntityInputSchema = createUpdateSchema(entity, {
 })
   .pick({ name: true, description: true })
   .extend({ id: z.uuid('id must be a valid UUID') })
+  .strict()
   .refine((input) => Object.keys(input).some((key) => key !== 'id'), { message: 'at least one field is required' });
 
 export const entityFilterInputSchema = createFilterInputSchema({
