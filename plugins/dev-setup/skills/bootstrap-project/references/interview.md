@@ -30,7 +30,10 @@ questions that pick one; each answer below names the stack it leads to.
    the full stack, the database name (default `app`); alone, the API's base URL (default `http://localhost:3000` in
    development, the page's own host on port 3000 in production). The React Router stacks' optional entries (database,
    authentication, file storage, Storybook) are taken from the request, not asked.
-5. **Always**: the project name (default: the target directory's name) and a one-sentence description.
+5. **Always**: the project name (default: the target directory's name) and a one-sentence description. For a stack
+   that starts from Entity CRUDL (both REST APIs on Node, both Angular stacks), also the first resource's name, singular
+   (default `entity`): a renamed resource keeps the example's fields, routes and tests, under the new name. Suggest one
+   only when the description names a thing (stock items, invoices), and still default to `entity`.
 6. **Anything the request names that the questions above do not cover** (a database, a library): take it as part of
    the combination; whether a doc covers it is looked up in the next step, not asked. Server code is Express or Hono:
    a request for another server framework gets the blueprint that fits offered instead, as `apply-stack-conventions`
@@ -54,7 +57,8 @@ One line the rest of the run, and a calling skill, can quote:
 Stack: React Router on Node · with: database · my-app · Lets a team book the shared meeting rooms.
 ```
 
-For an Angular stack, add the Fundamental NGX choice, and the database name or the API base URL. A combination with no
+For an Angular stack, add the Fundamental NGX choice, and the database name or the API base URL; for a stack that
+starts from Entity CRUDL, the resource's name when it is not `entity`. A combination with no
 blueprint names its parts instead:
 
 ```
