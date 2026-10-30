@@ -10,7 +10,8 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
   and scripts, and `pnpm add` for the dependencies, so versions are current at scaffold time and nothing is
   hand-typed. A monorepo's package manifests are the exception: a framework's CLI writes one, and a package's
   `package.json` with only scripts is quicker to write than to set.
-- **ESM only**: `"type": "module"` in every package.
+- **ESM only**: `"type": "module"` in every package written here. A manifest a framework's CLI writes keeps the CLI's
+  module system; that framework's doc says what follows from it.
 - **`private: true`** on every app and package nobody installs, so it is never published.
 - **`packageManager: "pnpm@<the local version>"`** at the root: Corepack reads it inside container builds, and it tells
   a teammate which pnpm wrote the lockfile.
@@ -35,8 +36,8 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 | `version`        | `0.1.0` (`0.0.0` for the packages inside a monorepo) |
 | `description`    | one sentence on what it does                         |
 | `private`        | `true`, a boolean                                    |
-| `type`           | `module`                                             |
-| `engines.node`   | `>=24`                                               |
+| `type`           | `module`, except in a manifest a framework CLI wrote |
+| `engines.node`   | `>=24`, at the root                                  |
 | `packageManager` | `pnpm@$(pnpm --version)`, at the root only           |
 
 ## Pitfalls
