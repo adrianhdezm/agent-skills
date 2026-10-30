@@ -14,12 +14,12 @@ host apps ─► localhost:5432          app services ─► db:5432 (their own 
 
 ## Where it lives
 
-| File                          | Holds                                          |
-| ----------------------------- | ---------------------------------------------- |
-| `docker-compose.yml`          | the `db` service                               |
-| `<owner>/db/scripts/init.sql` | `CREATE DATABASE app;` and its grant           |
-| `<owner>/db/data/`            | the bind-mounted data, git- and docker-ignored |
-| `.env`, `.env.example`        | `DB_PASSWORD`, `DB_PORT`, `DATABASE_URL`       |
+| File                          | Holds                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `docker-compose.yml`          | the `db` service                                                                               |
+| `<owner>/db/scripts/init.sql` | `CREATE DATABASE app;`, its only line: the `postgres` superuser owns it, so no grant is needed |
+| `<owner>/db/data/`            | the bind-mounted data, git- and docker-ignored                                                 |
+| `.env`, `.env.example`        | `DB_PASSWORD`, `DB_PORT`, `DATABASE_URL`                                                       |
 
 ## Required values
 
