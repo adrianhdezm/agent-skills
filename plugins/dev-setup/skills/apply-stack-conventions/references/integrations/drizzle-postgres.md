@@ -7,7 +7,7 @@ full stack use it.
 ## The seam
 
 ```
-DATABASE_URL ─► pg Pool (module scope, error listener) ─► drizzle(pool, { schema }) from drizzle-orm/node-postgres
+createDbClient(DATABASE_URL), once per process ─► pg Pool (error listener) ─► drizzle(pool, { schema }) from drizzle-orm/node-postgres
 drizzle.config.ts (dialect: 'postgresql', dbCredentials.url) ─► drizzle-kit generate / migrate
 tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suites
 ```
@@ -18,7 +18,7 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | dependencies        | `pg`                                                                                                                                                                                                              |
 | devDependencies     | `@types/pg`, `@testcontainers/postgresql`                                                                                                                                                                         |
-| client              | `drizzle(pool, { schema })` from `drizzle-orm/node-postgres`, `DbClient` its type                                                                                                                                 |
+| client              | `createDbClient(url)` returning `{ pool, db }`, `DbClient` the `NodePgDatabase` type                                                                                                                              |
 | `drizzle.config.ts` | `dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset)                                                                                                                              |
 | scripts             | `db:generate` and `db:migrate`, each `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                          |
 | schema              | `pgTable`; `uuid('id').primaryKey().defaultRandom()`; `timestamp(…, { withTimezone: true }).defaultNow()`; `text`                                                                                                 |
@@ -26,6 +26,27 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 | `allowBuilds`       | `cpu-features`, `protobufjs`, `ssh2` set to `false`: optional native dependencies of Testcontainers that the local Docker socket never needs                                                                      |
 
 ## Reference code
+
+`src/db/client.ts` (`app/db/client.ts` in React Router, with `~/` imports): the one pool, its idle-error listener, and
+the Drizzle client on it; the caller keeps `pool` to close it on shutdown.
+
+```ts
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import { logger } from '../logger.js';
+import { schema } from './schema.js';
+
+export type DbClient = NodePgDatabase<typeof schema>;
+
+/** The one pool of the process and the Drizzle client on it. An idle client's error is logged, not fatal. */
+export function createDbClient(connectionString: string): { pool: Pool; db: DbClient } {
+  const pool = new Pool({ connectionString });
+  pool.on('error', (error) => {
+    logger.error({ err: error }, 'Idle database client error');
+  });
+  return { pool, db: drizzle(pool, { schema }) };
+}
+```
 
 `src/migrate.ts`, which applies the committed migrations with drizzle-orm's own migrator, a production dependency, so
 the image needs no drizzle-kit; the engine's Compose integration runs it before the app:
