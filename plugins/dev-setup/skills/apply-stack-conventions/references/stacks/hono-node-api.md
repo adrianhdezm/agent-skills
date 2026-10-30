@@ -305,9 +305,9 @@ add the schema, controller (with a stub in `createStubContext`), DAO (with a see
 pnpm db:generate --name init                  # exactly one migration
 pnpm compose:up                               # db healthy, migrate exits 0, then api
 pnpm test:integration
-curl -s http://localhost:3000/health          # {"status":"ok","db":"up",…}
+curl -s "http://localhost:${PORT:-3000}/health"   # {"status":"ok","db":"up",…}, on the PORT in .env
 ```
 
-`docker compose ps -a` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
+`docker compose ps -a --format '{{.Service}} {{.ExitCode}}'` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
 `GET /entities` answers `{ items, total, page, pageSize, totalPages }`, an unknown filter field is a 400, `PATCH`
 updates, `DELETE` answers 204 and then 404.

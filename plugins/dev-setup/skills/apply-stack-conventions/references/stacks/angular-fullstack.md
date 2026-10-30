@@ -507,14 +507,14 @@ slice and browser specs, and an e2e spec per page.
 pnpm --filter api db:generate --name init     # exactly one migration
 pnpm compose:up                               # db healthy, migrate exits 0, then api and web
 pnpm test:integration
-curl -s http://localhost:3000/health          # {"status":"ok","db":"up",…}
+curl -s "http://localhost:${PORT:-3000}/health"   # {"status":"ok","db":"up",…}, on the PORT in .env
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4200/entities   # 200
 curl -s -H 'Origin: http://localhost:4200' http://localhost:3000/entities  # the call the page makes, with CORS
 pnpm test:browser && pnpm test:e2e
 pnpm --filter web build-storybook             # storybook-static/index.json lists the six stories
 ```
 
-`docker compose ps -a` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
+`docker compose ps -a --format '{{.Service}} {{.ExitCode}}'` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
 `GET /entities` answers `{ items, total, page, pageSize, totalPages }`, an unknown filter field is a 400, `PATCH`
 updates, `DELETE` answers 204 and then 404. After `test:e2e` the dev database and any running services are as they
 were.

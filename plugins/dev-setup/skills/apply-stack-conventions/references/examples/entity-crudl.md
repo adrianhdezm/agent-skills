@@ -46,6 +46,10 @@ contract.
 | mounts      | `GET /`, `GET /health`, `GET` and `POST /entities`, `GET`, `PATCH` and `DELETE /entities/:id`                                                                               |
 | database    | `db/scripts/init.sql` creates `app`; the scaffold's `db:generate --name init` writes the first migration, committed, and `migrate.ts` applies it before the API serves      |
 
+The tests are written from these tables; the utilities and the code under test are reference code. Three renders the
+translator's tests meet: `PgDialect.sqlToQuery` returns `{ sql, params, typings }`, each nested `and` / `or` is
+parenthesised on its own, and an empty `not` renders as `false`.
+
 **Test utilities** (`tests/utils/`): `http-mocks.ts` (`createStubContext()` with a `vi.fn()` per DAO method and the db's
 `execute`; `mockRequest`, `mockResponse` with chainable spies as plain properties, `mockNext`, `mockLog`, and an
 `httpError(status)` matcher); `test-server.ts` (`serve(app)` on an ephemeral port → `{ baseUrl, close }`);
