@@ -39,6 +39,7 @@ it is layered when it arrives.
 - [Drizzle + Postgres](../integrations/drizzle-postgres.md) — optional (database)
 - [S3 storage](../technologies/s3-storage.md) — optional (file-storage)
 - [S3 storage + Docker Compose](../integrations/s3-storage-docker-compose.md) — optional (file-storage)
+- [Drizzle + S3 storage](../integrations/drizzle-s3-storage.md) — optional (file-storage)
 - [ESLint](../technologies/eslint.md)
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
 - [Prettier](../technologies/prettier.md)

@@ -101,6 +101,7 @@ Each has **Use it like this** (the principles, each with its reason), **Required
 | [Better Auth + Drizzle](integrations/better-auth-drizzle.md)                 | the auth tables in the schema, the adapter and its provider                                    | `better-auth` and `drizzle-orm`                    |
 | [Better Auth + React Router](integrations/better-auth-react-router.md)       | auth on `appContext`, the splat route, the protected layout, Conform forms                     | `better-auth` and `react-router`                   |
 | [S3 storage + Docker Compose](integrations/s3-storage-docker-compose.md)     | RustFS as a Compose service                                                                    | a `rustfs` service                                 |
+| [Drizzle + S3 storage](integrations/drizzle-s3-storage.md)                   | `FilesService`: object first and undone on failure, owner-scoped reads, delete row then object | `drizzle-orm` and `@aws-sdk/client-s3`             |
 
 Each has **The seam** (what calls what, as a diagram), **Where it lives** (the files to open), **Required values**,
 **Pitfalls**, **Reference code**, **Conventions** and **Verify it is wired** (what a check confirms), each only where it

@@ -6,14 +6,14 @@ picked; it builds on Sign in, so file storage comes with authentication and the 
 
 ## Demonstrates
 
-| Part                                                          | Applies                                                                                                                        |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| the `files` table and its migration                           | [File storage](../architecture/file-storage.md) (metadata, `ownerId`), the engine's Drizzle integration                        |
-| `app/services/files.service.ts`                               | [File storage](../architecture/file-storage.md) (one service owns both sides, object first, undone if the row fails)           |
-| the store client                                              | Cloudflare R2 (the bucket binding) on Workers; S3 storage and S3 storage + Docker Compose (RustFS) on Node                     |
-| `workers/app.ts`, `app/context.ts`                            | Hono + React Router (the service built by the server entry onto `appContext`)                                                  |
-| `routes/files.tsx`, `files.$id.tsx`, `files.$id.download.tsx` | React Router (loaders and actions under the protected layout), [Authentication](../architecture/authentication.md) (ownership) |
-| `tests/integration/files.service.test.ts`                     | the engine's Drizzle integration (real database), [File storage](../architecture/file-storage.md) (the rollback branch)        |
+| Part                                                          | Applies                                                                                                                                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the `files` table and its migration                           | [File storage](../architecture/file-storage.md) (metadata, `ownerId`), the engine's Drizzle integration                                                                 |
+| `app/services/files.service.ts`                               | [File storage](../architecture/file-storage.md) (one service owns both sides, object first, undone if the row fails); Drizzle + S3 storage on Node (its reference code) |
+| the store client                                              | Cloudflare R2 (the bucket binding) on Workers; S3 storage and S3 storage + Docker Compose (RustFS) on Node                                                              |
+| `workers/app.ts`, `app/context.ts`                            | Hono + React Router (the service built by the server entry onto `appContext`)                                                                                           |
+| `routes/files.tsx`, `files.$id.tsx`, `files.$id.download.tsx` | React Router (loaders and actions under the protected layout), [Authentication](../architecture/authentication.md) (ownership)                                          |
+| `tests/integration/files.service.test.ts`                     | the engine's Drizzle integration (real database), [File storage](../architecture/file-storage.md) (the rollback branch)                                                 |
 
 ## Data
 
