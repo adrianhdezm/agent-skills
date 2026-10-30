@@ -111,7 +111,8 @@ Three supporting skills plug into the phases. You can also run each of them on i
 **You:** describe the idea in your own words, who has the problem, and anything that inspires it: links, screenshots,
 products you like. Then react to the directions Claude proposes, and pick one.
 
-**Claude:** reads your references and proposes 3 to 5 directions that differ in kind, at least one of them unusual,
+**Claude:** reads your references, and what earlier initiatives handed on (their **Next initiative**, **Later** and
+**Not doing** lists), and proposes 3 to 5 directions that differ in kind, at least one of them unusual,
 each with its riskiest assumption. If one assumption can be tested in about half an hour of code, it offers a
 throwaway proof of concept in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-poc`, outside your project.
 
@@ -133,6 +134,10 @@ behaviour gets an ID and acceptance criteria:
 - B3.2 Given a teammate voted for A, when they vote for B, then A goes down by one and B goes up by one.
 ```
 
+Every open question from the brainstorm gets an answer here, and each assumption still untested is listed as a
+constraint. A script then checks the file: the shape the later scripts read, unique IDs with no gaps, Given/When/Then
+in every criterion, and that no ID disappeared since the last commit.
+
 **You get:** `02-analysis.md`, with actors, behaviours, the domain in plain words, flows, screens, constraints,
 non-goals, and a **Later** list so the first version stays small.
 
@@ -141,7 +146,7 @@ non-goals, and a **Later** list so the first version stays small.
 **You:** if the project has no code yet, pick the stack first: Claude recommends a combination from the
 `bootstrap-project` interview (a Node package, a Hono Worker, a REST API on Node with Express or Hono, React Router on Workers or on Node, an
 Angular app or the Angular full stack, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
-claim, press **Respond**, and paste the result back into the chat.
+claim and press **Respond**. Then press **Send to Claude**, or copy the response and paste it into the chat.
 
 **Claude:** scaffolds the project if needed, and runs `/define-constraints` to write the quality bar into
 `CONSTRAINTS.md` (four questions, each with a default; "the floor only" is a fine answer). Then it maps every behaviour
@@ -149,27 +154,33 @@ onto the project's real building blocks: tables and migrations, data access, con
 the test tier for each criterion. It follows the project's conventions file (such as `coding-conventions.md` from
 `bootstrap-project`), decides the contract, UI and security rules for each behaviour, and checks the official docs
 for any API it is unsure of. It cuts the work into small **vertical slices**, each one visible end to end when it is
-done, with the riskiest one early, and builds the plan page. A script checks that every behaviour is covered.
+done, with the riskiest one early, and builds the plan page. It does not start until the analysis says `Approved`.
+It commits the scaffold and `CONSTRAINTS.md` on their own and records that commit as the design's `Base:`, the point
+every later diff and guard run starts from. A script checks that every behaviour sits in one claim and one slice, that
+every criterion has one test tier, and that no slice depends on a later one.
 
 **You get:** `CONSTRAINTS.md` if the project had none, `03-design.md` (decisions, schema, contracts, modules, ordered
-slices, risks, sources) and `03-design.html`, the review
+slices, risks, sources, and the base commit) and `03-design.html`, the review
 page, published as a private artifact. The design is marked `Approved` once nothing is open.
 
-### 4. Implement: `/implement-design <slug> [S2 | all]`
+### 4. Implement: `/implement-design <slug> [S2 | fixes | all]`
 
-**You:** start it, and read `04-progress.md` instead of the scrollback when you want to know where it stands. Say
-"commit each slice" if you want commits. Without that, nothing is committed.
+**You:** start it, and read `04-progress.md` instead of the scrollback when you want to know where it stands. It
+commits each slice on its own; say "no commits" if you do not want that.
 
 **Claude:** builds one slice at a time. It writes the slice's checklist first, then writes each test before or with
 its code, titled with the criterion ID (`it("B3.2 moves my vote from A to B", …)`). It runs `check:fast` after each
-item, uses `/debug-failure` when a failure is not plain, and closes the slice only when `check:task` passes and the
-guard finds no lowered bar (no new suppressions, skipped tests or removed assertions). If the code is heavier than it
+item, and uses `/debug-failure` when a failure is not plain. It closes the slice only when `check:task` passes, the
+tests of every tier the slice's criteria use have run (end to end included), every criterion has a titled test, the
+guard finds no lowered bar since the base (no new suppressions, skipped tests or removed assertions), and no checklist
+item is open. If the code is heavier than it
 needs to be, it runs `/simplify-code` on the slice. It touches only what the slice needs and lists anything else it
 noticed. A small departure from the design is recorded as a deviation. A change to behaviour, contract or data stops
 the run and asks you first.
 
-**You get:** working code and tests, plus `04-progress.md` with ticked checklists, decisions, deviations and anything
-it found.
+**You get:** working code and tests, one commit per slice, plus `04-progress.md` with ticked checklists, decisions,
+deviations and anything it found. With no slice named, it starts with any open fixes from verification, then the next
+slice.
 
 ### 5. Verify: `/verify-build <slug>`
 
@@ -177,19 +188,25 @@ it found.
 
 **Claude:** checks what green tests alone do not prove:
 
-- traces every criterion ID to the tests that name it, and reads those tests;
-- runs every project check (`check:full`), the guard, and the **Done means** list from `CONSTRAINTS.md`;
+- traces every criterion ID to the tests whose titles name it, and reads those tests;
+- runs every project check (`check:full`), the guard since the design's base, and each item of the **Done means**
+  list from `CONSTRAINTS.md`;
 - starts the app and walks each behaviour as a user would, in the browser through the `chrome-devtools` MCP server,
   saving a screenshot as evidence;
 - checks that each design decision is honoured, with `file:line`;
-- reviews the diff across correctness, readability, architecture, security and performance, labelling each finding
-  **Critical** or **Required** (blocks) or **Optional** or **Nit** (does not).
+- reviews the diff in a fresh subagent that never saw the progress notes, across correctness, readability,
+  architecture, security and performance, labelling each finding **Critical** or **Required** (blocks) or
+  **Optional** or **Nit** (does not).
 
-It changes no code. Each failure becomes a task under **Fixes from verification** in `04-progress.md`.
+It changes no code. Each failure becomes a checklist item under **Fixes from verification** in `04-progress.md`. On a
+**Ready** verdict it closes the initiative: accepted deviations go into the design, accepted gaps are listed, and a
+**Next initiative** section hands the Later list and untested assumptions to the next brainstorm.
 
 **You get:** `05-verification.md` with a verdict (**Ready**, **Ready with fixes** or **Not ready**), a table of every
 criterion with its test, its live result and its evidence, and screenshots in `evidence/`. If there are fixes, run
-`/implement-design <slug>` again: it starts with them. Then verify again.
+`/implement-design <slug>` again: it starts with them. Then run `/verify-build <slug> --since <commit>`: it walks
+again only the behaviours the fixes touched, and adds a row to the file's **Runs** table, so earlier verdicts stay on
+record.
 
 ### How the IDs tie it together
 
@@ -220,14 +237,16 @@ docs/v1/
 
 ### Tips
 
+- **Where does it stand?** `node <plugin>/skills/implement-design/scripts/progress.mjs docs/<slug>` prints the
+  Status line of each phase file, each slice's state and open items, and what comes next.
 - **Every run ends the same way**, with three headings: **Blocked on me**, **Changed** and **Found**, then the command
   to run next. Read **Blocked on me** first.
 - **Keep the first version small.** Push ideas to **Later** in the analysis. The next initiative can pick them up.
 - **"Not opened; default kept"** in a plan response means you did not look at that decision. Claude will ask about it
   in chat if it matters.
 - **Changing your mind** about a behaviour means updating the analysis. IDs never get renumbered: a removed behaviour
-  is marked _(dropped)_, and a new one gets the next number.
+  is marked _(dropped)_, and a new one gets the next number. A behaviour whose meaning changes gets a new number too.
 - **Never lower the bar to get to green.** If a check in `CONSTRAINTS.md` is wrong, change it in its own commit, with
   a reason, or add an exception with an owner and an expiry date.
 - **The next initiative** starts again at `/brainstorm-idea` with a new slug, in the same repo. Earlier initiatives'
-  docs stay as they are.
+  docs stay as they are, and the brainstorm reads what they handed on.

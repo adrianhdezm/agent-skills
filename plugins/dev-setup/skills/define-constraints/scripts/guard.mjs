@@ -4,11 +4,14 @@
 //
 //   node guard.mjs [--base <ref>]
 //
-// Run it from the repository root. The base defaults to the merge base with origin/main, main or master.
+// Run it from the repository root. In an initiative, pass the Base commit from docs/<slug>/03-design.md. Without
+// --base, the base is the merge base with origin/main, main or master, which on a repo that works on main is HEAD
+// itself, so committed work would not be scanned: the guard says so when that happens.
 // Uncommitted and untracked files count as changes. Exit 0: clean · 1: findings · 2: could not run.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { TEST_FILE as TEST } from "./test-files.mjs";
 
 const args = process.argv.slice(2);
 const bi = args.indexOf("--base");
@@ -30,6 +33,7 @@ if (!base) {
   }
 }
 if (!base) bail("no base found; pass --base <ref>");
+const guessed = bi === -1;
 try {
   git("rev-parse", "--verify", `${base}^{commit}`);
 } catch {
@@ -37,7 +41,6 @@ try {
 }
 
 const SKIP = /(^|\/)(node_modules|dist|build|coverage|\.wrangler|\.angular)\/|(^|\/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/;
-const TEST = /(\.|-|_)(test|spec|e2e)\.[cm]?[jt]sx?$|(^|\/)tests?\/.*\.[cm]?[jt]sx?$|(^|\/)test_[^/]*\.py$|_test\.(py|go)$/;
 const CODE = /\.([cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs|swift|vue|svelte)$/;
 
 const SUPPRESSION =
@@ -106,6 +109,9 @@ for (const [f, removed] of removedAssertions) {
   if (removed > added) add(f, 0, "assertions removed", `${removed} assertion lines removed, ${added} added`);
 }
 
+if (guessed && git("rev-parse", "HEAD").trim() === git("rev-parse", `${base}^{commit}`).trim()) {
+  console.log("guard: the base is HEAD itself, so only uncommitted changes are scanned; pass --base <commit work started from>");
+}
 if (findings.length === 0) {
   console.log(`guard: clean since ${base.slice(0, 7)}`);
   process.exit(0);

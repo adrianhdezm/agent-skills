@@ -21,7 +21,8 @@ and the project's checks pass.
 
 ## Scope
 
-By default, simplify only what changed: the current slice, or the diff against the base branch. Code outside that
+By default, simplify only what changed: the current slice, or the diff against the base (in an initiative, the
+`Base:` commit in `03-design.md`). Code outside that
 scope is out of bounds unless the user widens it. Note what you see there under **Noticed** instead of fixing it.
 
 Never touch a block between `simplify-ignore-start` and `simplify-ignore-end` comments. Someone marked it on purpose.
