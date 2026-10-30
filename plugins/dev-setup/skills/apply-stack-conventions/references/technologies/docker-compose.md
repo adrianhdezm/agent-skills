@@ -54,8 +54,9 @@ at the root, healthchecked services, and one root `.env` feeding them at run tim
 
 ## Pitfalls
 
-- **`up --wait` reports a service with no healthcheck as healthy once its process starts**, and a one-shot service as
-  exited without its code: neither proves the app answers. The smoke test's request does, and
+- **`up --wait` reports a service with no healthcheck as healthy once its process starts**, and a one-shot service
+  as exited without its code: neither proves the app answers. A service others depend on gets a healthcheck, as `api`
+  in the reference code does; the smoke test's request is the proof; and
   `docker compose ps -a --format '{{.Service}} {{.ExitCode}}'` shows each exit code.
 - **Without a healthcheck, `up --wait` returns while a service still refuses connections**, and a step run straight
   after fails on a cold machine.
@@ -66,6 +67,66 @@ at the root, healthchecked services, and one root `.env` feeding them at run tim
   period instead of shutting down.
 - **A harness may refuse to write `.env` or `.env.example`.** Give the user the contents, list it under **Blocked on
   me**, and carry on with every step that does not read it.
+
+## Reference code
+
+A compiled API's `Dockerfile`, the same whatever framework it serves with: the build stage compiles `src/` to
+`dist/`, the runtime stage keeps production dependencies, `dist/` and `db/migrations/`, and runs as `node`:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY tsconfig.json tsconfig.app.json ./
+COPY src ./src
+RUN pnpm build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+COPY --from=build /app/dist ./dist
+COPY db/migrations ./db/migrations
+ENV NODE_ENV=production
+USER node
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+Its two services beside the database's: `migrate` runs the image's migration entry once and exits, and `api` starts
+after it and reports healthy only when its health route answers:
+
+```yaml
+  migrate:
+    build: .
+    command: ['node', 'dist/migrate.js']
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+      PORT: '3000'
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health >/dev/null || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+```
 
 ## Conventions
 
