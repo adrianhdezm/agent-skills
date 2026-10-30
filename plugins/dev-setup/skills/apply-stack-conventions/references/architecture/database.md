@@ -19,8 +19,9 @@ tooling belong to the engine's technology doc. The code that reads and writes th
 - **A column is nullable only where absence means something**; otherwise `not null`, with a default where one is
   natural.
 - **The schema changes through migrations only.** They are generated from the schema files, reviewed, and committed with
-  the change; nothing pushes a schema to a live database. A scaffold ships none, so the first migration is the project's
-  own. Migrations are applied before the app serves: a missing table is a deploy error, not a request error.
+  the change; nothing pushes a schema to a live database. No doc carries a migration file: the scaffold generates the
+  first one, `init`, from its own schema and commits it. Migrations are applied by a step that runs to completion
+  before the app serves, in every environment: a missing table is a deploy error, not a request error.
 - **One connection setting, which fails loudly.** The client and the migration tool read one setting (a URL or a
   binding) and throw when it is missing; no fallback, no credential in source.
 - **One database per environment.** Development, end-to-end tests and production never share one; an end-to-end suite

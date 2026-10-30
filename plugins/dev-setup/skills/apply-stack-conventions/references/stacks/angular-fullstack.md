@@ -60,9 +60,9 @@ my-app/
 ├── api/
 │   ├── Dockerfile / drizzle.config.ts / eslint.config.mjs / .prettierrc / .prettierignore
 │   ├── package.json / tsconfig{,.app,.node}.json / vitest.config.ts
-│   ├── db/scripts/init.sql   # no db/migrations/ is shipped
+│   ├── db/scripts/init.sql, db/migrations/   # the init migration the scaffold generated
 │   ├── src/
-│   │   ├── server.ts / app.ts / logger.ts / express.d.ts
+│   │   ├── server.ts / app.ts / migrate.ts / logger.ts / express.d.ts
 │   │   ├── db/client.ts / db/schema.ts / db/schemas/entity.schema.ts
 │   │   ├── models/           # dao.model, list-input.model, error.model, app-context.model
 │   │   ├── helpers/          # dao.helper, list-input.helper, query-parser.helper
@@ -114,7 +114,7 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 | root `package.json`   | `name`, `version: "0.0.0"`, `private: true`, `engines.node: ">=24"`, `packageManager`; no Prettier or ESLint of its own                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | root scripts          | `dev:api` `pnpm --filter api dev`; `dev:web` `pnpm --filter web start`; `build`, `typecheck`, `lint`, `test`, `format`, `format:check` `pnpm -r <script>`; `test:integration` `pnpm --filter api test:integration`; `test:browser` `pnpm --filter web test:browser`; `test:e2e` `pnpm --filter web test:e2e`; `storybook` `pnpm --filter web storybook`; `compose:up` `docker compose up --build -d --wait`; `compose:down` `docker compose down`                                                                                                                                                              |
 | `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.angular/`, `.vitest/`, `.DS_Store`, and `api/db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `.dockerignore`       | `**/node_modules`, `**/dist`, `**/.angular`, `.git`, `.env`, `api/db`, `web/storybook-static`, `web/test-results`, `web/playwright-report`, `web/.vitest`                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `.dockerignore`       | `**/node_modules`, `**/dist`, `**/.angular`, `.git`, `.env`, `api/db/data`, `web/storybook-static`, `web/test-results`, `web/playwright-report`, `web/.vitest`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | shared tooling        | in the catalog, read as `catalog:` by both packages: `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the exact `typescript`                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `api/package.json`    | `name: "api"`, `version: "0.0.0"`, `private`, `type: "module"`, written by hand; dependencies from the Express and Drizzle docs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -398,7 +398,8 @@ export default defineConfig([
 - **Then confirm** every file of the Shape exists, the catalog's `typescript` is exact, every shared tool reads
   `catalog:` in both manifests, `web/package.json` has no `packageManager`, and `pnpm install` reports no
   `ERR_PNPM_IGNORED_BUILDS`.
-- **Bring the stack up for the smoke test**; `db:generate --name init` produces exactly one migration.
+- **Generate the `init` migration before the first `compose:up`**: the image carries `db/migrations/`, and the
+  `migrate` service applies it before the API starts. It produces exactly one migration, committed with the scaffold.
 
 ## Conventions
 
@@ -498,8 +499,8 @@ slice and browser specs, and an e2e spec per page.
 ## Smoke test
 
 ```sh
-pnpm compose:up
-pnpm --filter api db:generate --name init && pnpm --filter api db:migrate
+pnpm --filter api db:generate --name init     # exactly one migration
+pnpm compose:up                               # db healthy, migrate exits 0, then api and web
 pnpm test:integration
 curl -s http://localhost:3000/health          # {"status":"ok","db":"up",…}
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4200/entities   # 200
@@ -507,7 +508,7 @@ pnpm test:browser && pnpm test:e2e
 pnpm --filter web build-storybook             # storybook-static/index.json lists the six stories
 ```
 
-`db:generate` produces exactly one migration. Through the API, `POST /entities` creates, a filtered, sorted, paged
+`docker compose ps -a` shows `migrate` exited 0. Through the API, `POST /entities` creates, a filtered, sorted, paged
 `GET /entities` answers `{ items, total, page, pageSize, totalPages }`, an unknown filter field is a 400, `PATCH`
 updates, `DELETE` answers 204 and then 404. After `test:e2e` the dev database and any running services are as they
 were.
