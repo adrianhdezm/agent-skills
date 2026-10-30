@@ -78,7 +78,7 @@ Angular full stack's `web/` uses it.
 Write these as given; they are the pattern every later resource copies. The detail page's slice is the list's shape
 with an `id: string | null` instead of the input, statuses `'idle' | 'loading' | 'loaded' | 'error'`, a `Load` /
 `Load Success` / `Load Failure` / `Leave` group, and one `load$` read ending on `Leave`; its reducer starts the slice
-over when the id changes.
+over when the id changes. Its files close this section.
 
 **`app.config.ts`**
 
@@ -428,9 +428,6 @@ export const delete$ = createEffect(
 );
 ```
 
-`target.id !== state.target?.id` below is `true` for the first `{ id: null }` too, since the initial `target` is
-`null`; `action.payload.event` is the router's `NavigationEnd`, whose `id` is unique per navigation.
-
 **`store/entity-form-page/entity-form-page.model.ts`**
 
 ```ts
@@ -481,6 +478,9 @@ export const EntityFormPageActions = createActionGroup({
   }
 });
 ```
+
+In the reducer, `target.id !== state.target?.id` is `true` for the first `{ id: null }` too, since the initial
+`target` is `null`; `action.payload.event` is the router's `NavigationEnd`, whose `id` is unique per navigation.
 
 **`store/entity-form-page/entity-form-page.reducer.ts`**
 
@@ -700,6 +700,120 @@ export function renderPage<T>(component: Type<T>, selectors: MockSelector[]) {
 }
 ```
 
+**`store/entity-detail-page/entity-detail-page.model.ts`**
+
+```ts
+import { type Entity } from '../../models/entity.model';
+
+export type EntityDetailPageStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
+export interface EntityDetailPageState {
+  /** Copied from the URL; `null` until the router has navigated to the detail page. */
+  id: string | null;
+  status: EntityDetailPageStatus;
+  entity: Entity | null;
+  /** Set when `status` is `'error'`. */
+  error: string | null;
+}
+```
+
+**`store/entity-detail-page/entity-detail-page.actions.ts`**
+
+```ts
+import { createActionGroup, emptyProps, props } from '@ngrx/store';
+import { type Entity } from '../../models/entity.model';
+
+export const EntityDetailPageActions = createActionGroup({
+  source: 'Entity Detail Page',
+  events: {
+    Load: props<{ id: string }>(),
+    'Load Success': props<{ entity: Entity }>(),
+    'Load Failure': props<{ error: string }>(),
+
+    Leave: emptyProps()
+  }
+});
+```
+
+**`store/entity-detail-page/entity-detail-page.reducer.ts`**
+
+```ts
+import { createReducer, on } from '@ngrx/store';
+import { routerNavigatedAction } from '@ngrx/router-store';
+import { navigatedRoute } from '../app-router/app-router.serializer';
+import { EntityDetailPageActions } from './entity-detail-page.actions';
+import { type EntityDetailPageState } from './entity-detail-page.model';
+
+export const initialEntityDetailPageState: EntityDetailPageState = {
+  id: null,
+  status: 'idle',
+  entity: null,
+  error: null
+};
+
+export const entityDetailPageReducer = createReducer(
+  initialEntityDetailPageState,
+  // A new id starts the slice over, or the page would show entity 42 under the URL for 43.
+  on(routerNavigatedAction, (state, action) => {
+    const route = navigatedRoute(action);
+    if (route.state !== 'entity-detail') {
+      return state;
+    }
+    const id = route.params['id'] as string;
+    return id === state.id ? state : { ...initialEntityDetailPageState, id };
+  }),
+  on(EntityDetailPageActions.leave, () => initialEntityDetailPageState),
+
+  on(EntityDetailPageActions.load, (state) => ({ ...state, status: 'loading' as const, error: null })),
+  on(EntityDetailPageActions.loadSuccess, (state, { entity }) => ({ ...state, status: 'loaded' as const, entity })),
+  on(EntityDetailPageActions.loadFailure, (state, { error }) => ({ ...state, status: 'error' as const, error }))
+);
+```
+
+**`store/entity-detail-page/entity-detail-page.selectors.ts`**
+
+```ts
+import { createFeatureSelector, createSelector } from '@ngrx/store';
+import { type EntityDetailPageState } from './entity-detail-page.model';
+
+export const ENTITY_DETAIL_PAGE_FEATURE_KEY = 'entityDetailPage';
+
+export const selectEntityDetailPageState = createFeatureSelector<EntityDetailPageState>(ENTITY_DETAIL_PAGE_FEATURE_KEY);
+
+/** The id the reducer copied from the URL; `null` until the router has navigated to the detail page. */
+export const selectId = createSelector(selectEntityDetailPageState, (s) => s.id);
+export const selectStatus = createSelector(selectEntityDetailPageState, (s) => s.status);
+export const selectEntity = createSelector(selectEntityDetailPageState, (s) => s.entity);
+export const selectError = createSelector(selectEntityDetailPageState, (s) => s.error);
+```
+
+**`store/entity-detail-page/entity-detail-page.effects.ts`**
+
+```ts
+import { inject } from '@angular/core';
+import { type HttpErrorResponse } from '@angular/common/http';
+import { Actions, createEffect, ofType } from '@ngrx/effects';
+import { catchError, map, of, switchMap, takeUntil } from 'rxjs';
+import { httpErrorMessage } from '../../helpers/http-error.helper';
+import { EntityService } from '../../services/entity.service';
+import { EntityDetailPageActions } from './entity-detail-page.actions';
+
+export const load$ = createEffect(
+  (actions$ = inject(Actions), entityService = inject(EntityService)) =>
+    actions$.pipe(
+      ofType(EntityDetailPageActions.load),
+      switchMap(({ id }) =>
+        entityService.get(id).pipe(
+          map((entity) => EntityDetailPageActions.loadSuccess({ entity })),
+          catchError((err: HttpErrorResponse) => of(EntityDetailPageActions.loadFailure({ error: httpErrorMessage(err) }))),
+          takeUntil(actions$.pipe(ofType(EntityDetailPageActions.leave)))
+        )
+      )
+    ),
+  { functional: true }
+);
+```
+
 ## Conventions
 
 ### Route-driven state
@@ -769,6 +883,8 @@ Derive UI state that must follow the store with `linkedSignal`, not an `effect()
   visit does nothing" case.
 - **Page specs** mount through `renderPage()` and move the route state with `overrideSelector` + `refreshState()`,
   each value a new object: the first state loads, an equal one does not, a new one on the same component does, and
-  destroy dispatches `Leave`.
+  destroy dispatches `Leave`. A page that derives something from a sequence of statuses (a `linkedSignal` or
+  `computed` watching `status`) sees only the last of several `refreshState()` calls in one tick, since signals are
+  read lazily: `await fixture.whenStable()` after each one.
 - **No spec for selectors that only pick a field**, nor for the route table: each page's end-to-end test opens its page
   by URL, which proves the path, the state and the slice registered on the route.
