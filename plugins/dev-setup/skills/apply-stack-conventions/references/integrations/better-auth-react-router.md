@@ -51,7 +51,89 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 ## Reference code
 
-`app/routes/login.tsx`'s server half; signup is the same with `signUpEmail` and its own schema:
+`app/lib/auth.ts` on Postgres (`provider: 'sqlite'`, and the request's origin as `baseURL`, on D1):
+
+```ts
+import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+
+import type { DbClient } from '~/db/client';
+import { schema } from '~/db/schema';
+
+/** Builds Better Auth over the app's Drizzle client; only the server entry calls it. */
+export function createAuth(db: DbClient, options: { secret: string; baseURL: string }) {
+  return betterAuth({
+    secret: options.secret,
+    baseURL: options.baseURL,
+    database: drizzleAdapter(db, {
+      provider: 'pg',
+      schema: {
+        ...schema,
+        user: schema.users,
+        session: schema.sessions,
+        account: schema.accounts,
+        verification: schema.verifications
+      }
+    }),
+    emailAndPassword: { enabled: true, autoSignIn: false },
+    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
+    advanced: { cookiePrefix: 'App', database: { generateId: 'uuid' } }
+  });
+}
+
+export type AppAuth = ReturnType<typeof createAuth>;
+```
+
+`app/lib/credentials.ts`, the schemas both the forms and the actions parse with:
+
+```ts
+import { z } from 'zod/v4';
+
+export const loginSchema = z.object({
+  email: z.email('Enter a valid email'),
+  password: z.string('Password is required').min(1, 'Password is required')
+});
+
+export const signupSchema = z.object({
+  name: z.string('Name is required').min(1, 'Name is required'),
+  email: z.email('Enter a valid email'),
+  password: z.string('Password is required').min(8, 'Use at least 8 characters')
+});
+
+/** The error body Better Auth answers a failed credentials call with. */
+export const errorBodySchema = z.object({ message: z.string().optional() });
+```
+
+`app/routes/protected.tsx`, the layout every signed-in route sits under:
+
+```tsx
+import { Outlet, redirect } from 'react-router';
+
+import { appContext, userContext } from '~/context';
+
+import type { Route } from './+types/protected';
+
+/** Authenticates once for every route under this layout; an anonymous request goes to the login page. */
+const requireUser: Route.MiddlewareFunction = async ({ request, context }, next) => {
+  const session = await context.get(appContext).auth.api.getSession({ headers: request.headers });
+  if (!session) {
+    const url = new URL(request.url);
+    throw redirect(`/login?redirectTo=${encodeURIComponent(url.pathname + url.search)}`);
+  }
+  context.set(userContext, { id: session.user.id, name: session.user.name, email: session.user.email });
+  return next();
+};
+
+export const middleware: Route.MiddlewareFunction[] = [requireUser];
+
+export default function Protected() {
+  return <Outlet />;
+}
+```
+
+The forms are two small components, a login form and a signup form, each with its own `useForm` over its own schema
+(`getFormProps`, `getInputProps`, `getZodConstraint` from `@conform-to/zod/v4`); one component shared by both needs
+casts, since the schemas' fields differ. `app/routes/login.tsx`'s server half; signup is the same with `signUpEmail` and its own schema:
 
 ```tsx
 const errorBodySchema = z.object({ message: z.string().optional() });
