@@ -32,6 +32,21 @@ context.get(appContext).db   (built per request on Workers, once on Node, by the
 | `app/context.ts`                           | the database client's type on `appContext`                                                                     |
 | `tests/integration/`                       | DAOs, queries and services against a real database                                                             |
 
+## Reference code
+
+Drizzle's reference code applies here, laid out for React Router; the second-round React Router on Node run built
+it this way with every check passing:
+
+| In Drizzle's reference code                                                 | In a React Router app                                                           |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/models/dao.model.ts`, `list-input.model.ts`, `error.model.ts`          | one `app/db/data-access.ts`, the contract in one file                           |
+| `src/helpers/list-input.helper.ts`, `dao.helper.ts`                         | the same `app/db/data-access.ts`, below the contract                            |
+| `src/helpers/query-parser.helper.ts`                                        | `app/db/data-access.ts` as well, once a loader decodes list params from the URL |
+| `src/db/schemas/<entity>.schema.ts`, `src/db/schema.ts`, `src/db/client.ts` | `app/db/schemas/…`, `app/db/schema.ts`, `app/db/client.ts`                      |
+| `src/daos/<entity>.dao.ts`                                                  | `app/db/daos/<entity>.dao.ts`                                                   |
+| relative imports with `.js`                                                 | `~/db/…` imports with no extension                                              |
+| `drizzle.config.ts` `schema: './src/db/schemas/*.schema.ts'`                | `schema: './app/db/schemas/*.schema.ts'`                                        |
+
 ## Conventions
 
 D1 on Workers or Postgres on Node, both through Drizzle with `drizzle-zod`: `Routes → Services → Queries → DAOs →
