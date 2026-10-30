@@ -67,6 +67,7 @@ my-app/
 ├── package.json / pnpm-lock.yaml / pnpm-workspace.yaml
 ├── react-router.config.ts
 ├── server.ts                  # dev and production entry, run by Node as TypeScript
+├── migrate.ts                 # with the database entry: applies db/migrations/ before the app, in Compose
 ├── tsconfig.json              # solution file, plus `paths` for the shadcn CLI
 ├── tsconfig.app.json          # app/ and workers/: Node and the browser
 ├── tsconfig.node.json         # server.ts and the config files
