@@ -41,6 +41,11 @@ with it; only where the value comes from differs by runtime.
 | unit, browser | `tests/unit/lib/utils.test.ts`    | `cn` merges classes, imported through `~/`             |
 | unit, browser | `tests/unit/routes/home.test.tsx` | the heading shows the message a stubbed loader returns |
 
+## Variants
+
+- **With Storybook**: a story file beside each starter primitive (`app/components/ui/button.stories.tsx` and the
+  rest), one story per state the primitive has; `pnpm build-storybook` lists them in `storybook-static/index.json`.
+
 ## Done when
 
 The stack's checks pass, and the built app serves `/` with the welcome heading (proving the loader read `APP_NAME` from

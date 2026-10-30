@@ -21,7 +21,8 @@ other layers are listed under each table in [references/catalog.md](references/c
 **Composition** and **Examples** are read by `scripts/assemble-conventions.mjs`, so they hold only a bulleted list of
 links, one doc per line, with no text around it. An entry the project may leave out ends in ` — optional`, picked with
 `--with <file base name>`, or in ` — optional (<group>)`, picked with `--with <group>` for every entry of that group;
-a group is a row's `Optional (--with)` entry in the Stacks table of `SKILL.md`.
+a group is a row's `Optional (--with)` entry in the Stacks table of `SKILL.md`. An example marked
+` — optional (<group>)`, right after its link, is listed only when that group is picked.
 
 The stacks are listed once, in the two tables under **Stacks** in `SKILL.md`: what each suits, how to choose, and the
 combinations without a blueprint. `bootstrap-project`'s interview and `design-solution` link there, so adding or

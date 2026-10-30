@@ -46,6 +46,8 @@ shadcn/ui. No database is wired: D1, R2 and KV arrive later as bindings.
 ## Examples
 
 - [React Router home](../examples/react-router-home.md): the home route reading `APP_NAME` from the bindings
+- [Sign in](../examples/sign-in.md) — optional (authentication): sign up, log in, a protected account page, log out
+- [File upload](../examples/file-upload.md) — optional (file-storage): upload, list, download and delete, per user; needs authentication too
 
 ## Shape
 
