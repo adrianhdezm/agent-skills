@@ -46,6 +46,290 @@ Drizzle's reference code applies here, laid out for React Router:
 | relative imports with `.js`                                                 | `~/db/…` imports with no extension                                              |
 | `drizzle.config.ts` `schema: './src/db/schemas/*.schema.ts'`                | `schema: './app/db/schemas/*.schema.ts'`                                        |
 
+A React Router app on Node has no logger doc, so its `app/db/client.ts` is Drizzle + Postgres's with `console.error` in
+place of the logger. Its integration tests are one Vitest project, `integration`, over `tests/integration/`
+(`test:integration` `vitest run --project integration`), beside the `unit` project.
+
+`app/db/client.ts` on Postgres:
+
+```ts
+import { type NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+import { schema } from './schema';
+
+export type DbClient = NodePgDatabase<typeof schema>;
+
+/** The one pool of the process and the Drizzle client on it. An idle client's error is logged, not fatal. */
+export function createDbClient(connectionString: string): { pool: Pool; db: DbClient } {
+  const pool = new Pool({ connectionString });
+  pool.on('error', (error) => {
+    console.error('Idle database client error', error);
+  });
+  return { pool, db: drizzle(pool, { schema }) };
+}
+```
+
+`app/db/data-access.ts` on Postgres, the contract, the list-input builders and the translator merged into one file:
+
+```ts
+import { type SQL, and, asc, between, desc, eq, gt, gte, ilike, inArray, lt, lte, ne, not, notIlike, or, sql } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
+import { z } from 'zod';
+
+export interface PaginatedResult<T> {
+  readonly items: readonly T[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalPages: number;
+}
+
+export interface IdInput {
+  readonly id: string;
+}
+
+export interface Dao<T, ListInput, CreateInput, UpdateInput extends IdInput> {
+  get(input: IdInput): Promise<T | null>;
+  list(input: ListInput): Promise<PaginatedResult<T>>;
+  create(input: CreateInput): Promise<T>;
+  update(input: UpdateInput): Promise<T>;
+  delete(input: IdInput): Promise<void>;
+}
+
+const MAX_IN_VALUES = 100;
+
+function equatable<T extends z.ZodType>(value: T) {
+  return {
+    eq: value.optional(),
+    ne: value.optional()
+  };
+}
+
+function oneOf<T extends z.ZodType>(value: T) {
+  return z.array(value).max(MAX_IN_VALUES).optional();
+}
+
+function comparable<T extends z.ZodType>(value: T) {
+  return {
+    ...equatable(value),
+    lt: value.optional(),
+    le: value.optional(),
+    gt: value.optional(),
+    ge: value.optional(),
+    between: z.tuple([value, value]).optional(),
+    in: oneOf(value)
+  };
+}
+
+export const idFilterInputSchema = z.strictObject({
+  ...equatable(z.uuid()),
+  in: oneOf(z.uuid())
+});
+
+export const stringFilterInputSchema = z.strictObject({
+  ...comparable(z.string()),
+  contains: z.string().optional(),
+  notContains: z.string().optional(),
+  beginsWith: z.string().optional()
+});
+
+export const numberFilterInputSchema = z.strictObject(comparable(z.number()));
+
+export const dateFilterInputSchema = z.strictObject(comparable(z.coerce.date()));
+
+export const booleanFilterInputSchema = z.strictObject(equatable(z.boolean()));
+
+export type ScalarFilterInputSchema =
+  | typeof idFilterInputSchema
+  | typeof stringFilterInputSchema
+  | typeof numberFilterInputSchema
+  | typeof dateFilterInputSchema
+  | typeof booleanFilterInputSchema;
+
+export const sortDirectionSchema = z.enum(['ASC', 'DESC']);
+
+export type IdFilterInput = z.infer<typeof idFilterInputSchema>;
+export type StringFilterInput = z.infer<typeof stringFilterInputSchema>;
+export type NumberFilterInput = z.infer<typeof numberFilterInputSchema>;
+export type DateFilterInput = z.infer<typeof dateFilterInputSchema>;
+export type BooleanFilterInput = z.infer<typeof booleanFilterInputSchema>;
+export type ScalarFilterInput = IdFilterInput | StringFilterInput | NumberFilterInput | DateFilterInput | BooleanFilterInput;
+export type SortDirection = z.infer<typeof sortDirectionSchema>;
+
+export interface SortInput<SortField extends string> {
+  readonly field: SortField;
+  readonly direction: SortDirection;
+}
+
+export interface LogicalFilterInput<Filter> {
+  and?: Filter[];
+  or?: Filter[];
+  not?: Filter;
+}
+
+export type FilterField<Filter> = {
+  [K in keyof Filter]-?: NonNullable<Filter[K]> extends ScalarFilterInput ? K : never;
+}[keyof Filter];
+
+type KeysOfUnion<U> = U extends unknown ? keyof U : never;
+type ValueOfUnion<U, K extends PropertyKey> = U extends unknown ? (K extends keyof U ? U[K] : never) : never;
+
+export type FieldFilterInput = { [K in KeysOfUnion<ScalarFilterInput>]?: ValueOfUnion<ScalarFilterInput, K> };
+
+/**
+ * Thrown by DAOs when a required row is missing. HTTP controllers map this
+ * to a 404 — DAOs stay transport-agnostic.
+ */
+export class NotFoundError extends Error {
+  readonly resource: string;
+  readonly id: string;
+
+  constructor(resource: string, id: string) {
+    super(`${resource} not found: ${id}`);
+    this.name = 'NotFoundError';
+    this.resource = resource;
+    this.id = id;
+  }
+}
+
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 100;
+const MAX_LOGICAL_BRANCHES = 20;
+
+export function createFilterInputSchema<Fields extends Record<string, ScalarFilterInputSchema>>(fields: Fields) {
+  const schema = z.strictObject({
+    ...z.object(fields).partial().shape,
+    get and() {
+      return z.array(schema).max(MAX_LOGICAL_BRANCHES).optional();
+    },
+    get or() {
+      return z.array(schema).max(MAX_LOGICAL_BRANCHES).optional();
+    },
+    get not() {
+      return schema.optional();
+    }
+  });
+  return schema;
+}
+
+export function createSortInputSchema<const SortFields extends readonly [string, ...string[]]>(sortFields: SortFields) {
+  return z.strictObject({
+    field: z.enum(sortFields),
+    direction: sortDirectionSchema
+  });
+}
+
+export function createListInputSchema<Filter extends z.ZodType, Sort extends z.ZodType>(opts: { filter: Filter; sort: Sort }) {
+  return z.strictObject({
+    filter: opts.filter.optional(),
+    sort: opts.sort.optional(),
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE)
+  });
+}
+
+export type FilterTable<FilterInput> = Readonly<Record<FilterField<FilterInput>, AnyPgColumn>>;
+export type SortTable<SortField extends string> = Readonly<Record<SortField | 'id', AnyPgColumn>>;
+
+const LOGICAL_KEYS: ReadonlySet<string> = new Set(['and', 'or', 'not'] satisfies (keyof LogicalFilterInput<unknown>)[]);
+const MATCHES_NOTHING = sql`false`;
+
+export function filterToSql<Filter extends LogicalFilterInput<Filter>>(filter: Filter, table: FilterTable<Filter>): SQL | undefined {
+  return and(
+    ...filterFields(filter).map((field) => fieldToSql(table[field], filter[field] as FieldFilterInput | undefined)),
+    filter.and && and(...filter.and.map((branch) => filterToSql(branch, table))),
+    filter.or && orToSql(filter.or.map((branch) => filterToSql(branch, table))),
+    filter.not && notToSql(filterToSql(filter.not, table))
+  );
+}
+
+export function sortToSql<SortField extends string>(sort: SortInput<SortField>, table: SortTable<SortField>): SQL[] {
+  const column = table[sort.field];
+  return [sort.direction === 'DESC' ? desc(column) : asc(column), asc(table.id)];
+}
+
+export function toPaginatedResult<T>(
+  items: readonly T[],
+  total: number,
+  { page, pageSize }: { page: number; pageSize: number }
+): PaginatedResult<T> {
+  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+}
+
+export function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+function filterFields<Filter>(filter: Filter & object): FilterField<Filter>[] {
+  return Object.keys(filter).filter((key) => !LOGICAL_KEYS.has(key)) as FilterField<Filter>[];
+}
+
+function fieldToSql(column: AnyPgColumn, input: FieldFilterInput | undefined): SQL | undefined {
+  return input && and(...comparisonsToSql(column, input), ...textMatchesToSql(column, input));
+}
+
+function comparisonsToSql(column: AnyPgColumn, input: FieldFilterInput): (SQL | undefined)[] {
+  return [
+    input.eq !== undefined ? eq(column, input.eq) : undefined,
+    input.ne !== undefined ? ne(column, input.ne) : undefined,
+    input.lt !== undefined ? lt(column, input.lt) : undefined,
+    input.le !== undefined ? lte(column, input.le) : undefined,
+    input.gt !== undefined ? gt(column, input.gt) : undefined,
+    input.ge !== undefined ? gte(column, input.ge) : undefined,
+    input.between !== undefined ? between(column, input.between[0], input.between[1]) : undefined,
+    input.in !== undefined ? inToSql(column, input.in) : undefined
+  ];
+}
+
+function textMatchesToSql(column: AnyPgColumn, input: FieldFilterInput): (SQL | undefined)[] {
+  return [
+    input.contains !== undefined ? ilike(column, containsPattern(input.contains)) : undefined,
+    input.notContains !== undefined ? notIlike(column, containsPattern(input.notContains)) : undefined,
+    input.beginsWith !== undefined ? ilike(column, prefixPattern(input.beginsWith)) : undefined
+  ];
+}
+
+function inToSql(column: AnyPgColumn, values: readonly unknown[]): SQL {
+  return values.length > 0 ? inArray(column, [...values]) : MATCHES_NOTHING;
+}
+
+function orToSql(branches: readonly (SQL | undefined)[]): SQL | undefined {
+  return branches.includes(undefined) ? undefined : or(...branches);
+}
+
+function notToSql(condition: SQL | undefined): SQL {
+  return condition ? not(condition) : MATCHES_NOTHING;
+}
+
+function containsPattern(value: string): string {
+  return `%${escapeLike(value)}%`;
+}
+
+function prefixPattern(value: string): string {
+  return `${escapeLike(value)}%`;
+}
+
+/**
+ * URL query values arrive as `string | string[] | undefined`. Keep the first
+ * value of a repeated param and drop empty ones, so schemas only see plain
+ * strings.
+ */
+export function normalizeQuery(params: unknown): Record<string, unknown> {
+  if (typeof params !== 'object' || params === null) {
+    return {};
+  }
+  const normalized: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(params)) {
+    const value: unknown = Array.isArray(raw) ? raw[0] : raw;
+    if (value !== undefined && value !== '') {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+```
+
 ## Conventions
 
 D1 on Workers or Postgres on Node, both through Drizzle with `drizzle-zod`: `Routes → Services → Queries → DAOs →
