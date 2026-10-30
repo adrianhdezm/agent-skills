@@ -42,7 +42,7 @@ Copy this checklist and tick it off:
    **Found**.
 
    Stop and ask only when a gap is a technology the user named and the choice changes the project's shape (which
-   database, which framework); otherwise carry on.
+   database, which library); otherwise carry on.
 
 3. **Check the toolchain**: Node 24+, pnpm 11+, git, and Docker where a doc uses it, plus every port on the hand-off's
    `Ports` line (for a composed combination, the ports its docs name): a port is free when
