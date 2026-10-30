@@ -5,12 +5,12 @@ Router stacks use it.
 
 ## Required values
 
-| What      | Value                                                                                                                                                                                                      |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| presets   | `react.configs.flat.recommended`, `react.configs.flat['jsx-runtime']`, `reactHooks.configs.flat.recommended`, `jsxA11y.flatConfigs.recommended`, `globals.browser`, `settings.react.version: 'detect'`     |
-| packages  | `eslint@9`, `@eslint/js@9`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-jsx-a11y`, `globals`                                                                                        |
-| overrides | `app/routes/**`: `@typescript-eslint/only-throw-error` off (loaders and actions throw `Response`s); tests: `@typescript-eslint/no-unsafe-assignment` off (`createRoutesStub` returns loosely typed values) |
-| ignores   | `build`, `.react-router`, `eslint.config.js` (no project includes it)                                                                                                                                      |
+| What            | Value                                                                                                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| presets         | `react.configs.flat.recommended`, `react.configs.flat['jsx-runtime']`, `reactHooks.configs.flat.recommended`, `jsxA11y.flatConfigs.recommended`, `globals.browser`, `settings.react.version: 'detect'`     |
+| devDependencies | `eslint@9`, `@eslint/js@9`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-jsx-a11y`, `globals`                                                                                        |
+| overrides       | `app/routes/**`: `@typescript-eslint/only-throw-error` off (loaders and actions throw `Response`s); tests: `@typescript-eslint/no-unsafe-assignment` off (`createRoutesStub` returns loosely typed values) |
+| ignores         | `build`, `.react-router`, `eslint.config.js` (no project includes it)                                                                                                                                      |
 
 ## Pitfalls
 

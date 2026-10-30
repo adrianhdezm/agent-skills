@@ -15,7 +15,7 @@ browser tests ─► src/testing/browser-setup.ts imports ../styles.css
 
 | What              | Value                                                                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies      | dev `tailwindcss`, `@tailwindcss/postcss`, `postcss`                                                                                              |
+| devDependencies   | `tailwindcss`, `@tailwindcss/postcss`, `postcss`                                                                                                  |
 | `.postcssrc.json` | `{ "plugins": { "@tailwindcss/postcss": {} } }`                                                                                                   |
 | `src/styles.css`  | `@layer theme, base, components, utilities;` then `tailwindcss/theme.css`, `preflight.css` and `utilities.css`, each into its layer; Preflight on |
 

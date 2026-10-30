@@ -14,7 +14,7 @@ stories: app/components/**/*.stories.tsx ─► preview.ts imports ../app/app.cs
 
 | What                    | Value                                                                                                                                                                                   |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies            | dev `storybook@10`, `@storybook/react-vite@10`, `eslint-plugin-storybook@10`                                                                                                            |
+| devDependencies         | `storybook@10`, `@storybook/react-vite@10`, `eslint-plugin-storybook@10`                                                                                                                |
 | scripts                 | `storybook` `storybook dev -p 6006`; `build-storybook` `storybook build`                                                                                                                |
 | `.storybook/main.ts`    | stories `../app/components/**/*.stories.tsx`, `framework: '@storybook/react-vite'`, a `viteFinal` that removes `reactRouter()` and any runtime plugin and keeps `resolve.tsconfigPaths` |
 | `.storybook/preview.ts` | imports `../app/app.css`                                                                                                                                                                |

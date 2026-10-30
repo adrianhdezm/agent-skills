@@ -15,10 +15,10 @@ the theme.
 
 ## Required values
 
-| What         | Value                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------ |
-| dependencies | dev `tailwindcss`, and the build plugin the framework's integration names                  |
-| stylesheet   | one global file that `@import`s Tailwind and defines the theme's tokens for light and dark |
+| What            | Value                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| devDependencies | `tailwindcss`, and the build plugin the framework's integration names                      |
+| stylesheet      | one global file that `@import`s Tailwind and defines the theme's tokens for light and dark |
 
 ## Pitfalls
 

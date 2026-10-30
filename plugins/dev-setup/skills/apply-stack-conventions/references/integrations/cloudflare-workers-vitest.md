@@ -16,7 +16,7 @@ tsconfig.test.json ─► types: ["./worker-configuration.d.ts", "@cloudflare/vi
 
 | What                 | Value                                                                                                                 |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| dependencies         | dev `@cloudflare/vitest-plugin`, on the same Vitest major                                                             |
+| devDependencies      | `@cloudflare/vitest-plugin`, on the same Vitest major                                                                 |
 | `vitest.config.ts`   | `cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`                                                    |
 | `tsconfig.test.json` | extends the Worker project, adds `tests`, `types: ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]` |
 

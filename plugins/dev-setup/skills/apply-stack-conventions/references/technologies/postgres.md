@@ -20,13 +20,14 @@ transactions for atomic work.
 
 ## Required values
 
-| What           | Value                                                                              |
-| -------------- | ---------------------------------------------------------------------------------- |
-| image          | `postgres:17-alpine`                                                               |
-| dependencies   | `pg`; dev `@types/pg`                                                              |
-| `.env.example` | `DB_PASSWORD=s3cr3t`, `DATABASE_URL=postgres://postgres:s3cr3t@localhost:5432/app` |
-| database name  | `app`, everywhere it appears, changed all together                                 |
-| port           | `5432`                                                                             |
+| What            | Value                                                                              |
+| --------------- | ---------------------------------------------------------------------------------- |
+| image           | `postgres:17-alpine`                                                               |
+| dependencies    | `pg`                                                                               |
+| devDependencies | `@types/pg`                                                                        |
+| `.env.example`  | `DB_PASSWORD=s3cr3t`, `DATABASE_URL=postgres://postgres:s3cr3t@localhost:5432/app` |
+| database name   | `app`, everywhere it appears, changed all together                                 |
+| port            | `5432`                                                                             |
 
 ## Pitfalls
 
