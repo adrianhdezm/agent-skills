@@ -13,19 +13,20 @@ its endpoints behind one handler, and a secret that never changes.
 - **One factory builds it**: `createAuth(…)` holds the `betterAuth` options and the database adapter, and exports
   `type AppAuth = ReturnType<typeof createAuth>`, which the app's context uses (`auth: AppAuth`). The server entry calls
   it where the runtime allows: inside the request handler where configuration exists only per request, with `baseURL`
-  taken from the request's URL; once at module scope where the process lives on.
+  taken from the request's URL; once at module scope where the process lives on, with `baseURL` from `BETTER_AUTH_URL`.
 - **Its endpoints are one handler**: every request under `api/auth/` goes to `auth.handler(request)`.
 - **Sessions are read with `auth.api.getSession({ headers })`**; sign-out is `auth.api.signOut({ headers,
 asResponse: true })`.
 
 ## Required values
 
-| What         | Value                                                                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dependencies | `better-auth`                                                                                                                                       |
-| options      | `emailAndPassword: { enabled: true, autoSignIn: false }`; `session.cookieCache: { enabled: true, maxAge: 5 * 60 }`; `advanced.cookiePrefix: 'App'`  |
-| secret       | `AUTH_SECRET` from `openssl rand -base64 32`, in the platform's secret store or the git-ignored env file; an empty `AUTH_SECRET=` in `.env.example` |
-| context      | `auth: AppAuth`, with `export type AppAuth = ReturnType<typeof createAuth>` beside the factory                                                      |
+| What         | Value                                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dependencies | `better-auth`                                                                                                                                                                         |
+| options      | `emailAndPassword: { enabled: true, autoSignIn: false }`; `session.cookieCache: { enabled: true, maxAge: 5 * 60 }`; `advanced.cookiePrefix: 'App'`                                    |
+| secret       | `AUTH_SECRET` from `openssl rand -base64 32`, in the platform's secret store or the git-ignored env file; an empty `AUTH_SECRET=` in `.env.example`                                   |
+| base URL     | per request, the request's origin; where the process lives on, `BETTER_AUTH_URL` (the app's public URL), the variable the library itself reads, in `.env.example` and the app service |
+| context      | `auth: AppAuth`, with `export type AppAuth = ReturnType<typeof createAuth>` beside the factory                                                                                        |
 
 ## Pitfalls
 
