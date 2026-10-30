@@ -15,7 +15,8 @@ its client is built and tested there, belong to that engine's integration.
 - **Migrations only.** `db:generate` writes a migration from the schema files and `db:migrate` applies it; there is no
   `db:push`. No doc ships a migration file: the scaffold's own `db:generate --name init` creates the first clean
   snapshot from its schema, and it is committed with the scaffold. drizzle-kit does not load `.env`, so its scripts run its bin under
-  `node --env-file=../.env node_modules/drizzle-kit/bin.cjs …`.
+  `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs …`, where `<root .env>` is `.env` in a single package
+  and `../.env` in a workspace package.
 - **drizzle-kit reads the resource schema files** (`src/db/schemas/*.schema.ts`), because it finds tables from module
   exports; `db/schema.ts` only groups them in the object handed to `drizzle(pool, { schema })`.
 - **DAOs are the only code that touches Drizzle.** One class per table, `<Resource>Dao implements Dao<…>`, created once
@@ -50,7 +51,7 @@ its client is built and tested there, belong to that engine's integration.
 | dependencies        | `drizzle-orm`, `drizzle-zod`, `zod`, and the engine's driver                                                                                                                                                                                           |
 | devDependencies     | `drizzle-kit`                                                                                                                                                                                                                                          |
 | `drizzle.config.ts` | `out: './db/migrations'`, `schema: './src/db/schemas/*.schema.ts'`, `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__', schema: 'public' }` |
-| scripts             | `db:generate` and `db:migrate`, each `node --env-file=../.env node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                                                                   |
+| scripts             | `db:generate` and `db:migrate`, each `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                                                               |
 | limits              | the contract's, in `list-input.helper.ts` and the scalar schemas                                                                                                                                                                                       |
 
 The filter operators and their semantics are the contract's; `contains`, `notContains` and `beginsWith` escape LIKE

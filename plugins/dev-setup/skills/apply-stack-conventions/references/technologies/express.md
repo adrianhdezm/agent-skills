@@ -29,9 +29,10 @@ layer, one error shape, and Pino logs.
   `createError(404, 'Not Found: <METHOD> <path>')`.
 - **Pino logs plain JSON**, at `LOG_LEVEL` (default `debug`, `info` when `NODE_ENV=production`). `pino-pretty` is a
   pipe in the `dev` script only, never an import or a `transport`, so the logger never depends on a dev dependency.
-- **Built with `tsc` to `dist/`**: `build` is `tsc -p tsconfig.app.json`, `start` is `node --env-file=../.env
-dist/server.js`, and `dev` is `node --env-file=../.env --import=tsx --watch src/server.ts | pino-pretty …`. Sources
-  import with the `.js` extension.
+- **Built with `tsc` to `dist/`**: `build` is `tsc -p tsconfig.app.json`, `start` is
+  `node --env-file=<root .env> dist/server.js`, and `dev` is
+  `node --env-file=<root .env> --import=tsx --watch src/server.ts | pino-pretty …`, where `<root .env>` is `.env` in a
+  single package and `../.env` in a workspace package. Sources import with the `.js` extension.
 - **Tests at two tiers.** Unit tests call each controller and middleware as a plain function with a mock `req` (a stub
   DAO on `req.app.locals.context`), a spy `res` and a spy `next`: every validation, error-mapping and logging branch is
   cheap to reach. API tests serve the real app on the real DAO and a real database and drive it over `fetch`: they
