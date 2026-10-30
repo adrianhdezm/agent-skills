@@ -30,12 +30,14 @@ questions that pick one; each answer below names the stack it leads to.
    development, the page's own host on port 3000 in production). The React Router stacks' optional entries (database,
    authentication, file storage, Storybook) are taken from the request, not asked.
 5. **Always**: the project name (default: the target directory's name) and a one-sentence description.
-6. **Anything the request names that the questions above do not cover** (another framework, a database, a
-   library): take it as part of the combination; whether a doc covers it is looked up in the next step, not asked.
+6. **Anything the request names that the questions above do not cover** (a database, a library): take it as part of
+   the combination; whether a doc covers it is looked up in the next step, not asked. Server code is Express or Hono:
+   a request for another server framework gets the blueprint that fits offered instead, as `apply-stack-conventions`
+   says.
 
-An answer the questions do not lead to a stack from (Angular on Workers, a React app over its own REST API, a framework
-no doc covers) is a combination without a blueprint: say so plainly and offer the nearest blueprint that
-`apply-stack-conventions` names for it. Another language: this skill does not apply.
+An answer the questions do not lead to a stack from (Angular on Workers, a React app over its own REST API, a Hono API
+on Node, a library no doc covers) is a combination without a blueprint: say so plainly and offer the nearest blueprint
+that `apply-stack-conventions` names for it. Another language: this skill does not apply.
 
 ## Recommending a stack
 

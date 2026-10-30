@@ -31,13 +31,16 @@ two fit, recommend the one with fewer moving parts and say what would tip it the
 Combinations without a blueprint are composed from the docs that cover their parts. Say plainly that one has no
 blueprint, and offer the nearest blueprint if it would do:
 
-| Combination                               | Built from                                                                                                 | Nearest blueprint                                      |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| A React app over its own REST API         | React Router on Node for the app, REST API on Node for the API, the React Router + Drizzle rules left out  | React Router on Node alone: resource routes serve JSON |
-| Angular on Workers or another static host | the Angular app blueprint, without Nginx and Docker Compose                                                | React Router on Workers                                |
-| A framework or library no doc covers      | the shared tooling's docs, the docs of the parts that have one, and that framework's official docs (a gap) | the blueprint closest in shape                         |
+| Combination                               | Built from                                                                                                                                    | Nearest blueprint                                      |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| A React app over its own REST API         | React Router on Node for the app, REST API on Node for the API, the React Router + Drizzle rules left out                                     | React Router on Node alone: resource routes serve JSON |
+| Angular on Workers or another static host | the Angular app blueprint, without Nginx and Docker Compose                                                                                   | React Router on Workers                                |
+| A Hono API on Node, with Postgres         | Hono, Node, Drizzle, Postgres and Docker Compose with their pairs; the Express + Drizzle and Express + Docker Compose seams applied with Hono | REST API on Node                                       |
+| A library no doc covers                   | the docs of the parts that have one, and that library's official docs (a gap)                                                                 | the blueprint the rest of the project matches          |
 
-Another language is out of scope: every doc here is TypeScript.
+**Server code is Express or Hono.** A request for another server framework (Fastify, NestJS, Koa) is not composed:
+say so, and offer the blueprint that fits with Express or Hono. Another language is out of scope: every doc here is
+TypeScript.
 
 ## Workflow
 
