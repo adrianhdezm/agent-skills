@@ -13,8 +13,7 @@ How TypeScript is configured and pinned: one project per runtime, checked withou
 - **Check, never emit, unless something builds.** Each project sets `noEmit` and its own `tsBuildInfoFile` under
   `node_modules/.tmp/`. A package that compiles to `dist/` emits from its app project only.
 - **`typecheck` is `tsc -b`**, preceded by whatever generates types the code imports. A package that emits checks with
-  `tsc -p <project> --noEmit` per project instead, since `tsc -b` would build it; such projects leave `tsBuildInfoFile`
-  out, which TypeScript accepts only beside `incremental` or `composite`.
+  `tsc -p <project> --noEmit` per project instead, since `tsc -b` would build it.
 - **Module resolution follows who turns the code into JavaScript**:
 
 | The code is                                 | `module` / `moduleResolution`                 | Imports      |
