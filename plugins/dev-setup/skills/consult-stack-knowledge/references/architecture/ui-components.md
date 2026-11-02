@@ -9,28 +9,40 @@ and where the primitives come from belong to the technology docs.
 
 ## Principles
 
-- **Two tiers of components.** Primitives (`components/ui/`) are the design system: commonly recognised base components
-  (dialog, select, pagination, button, tabs) with the generic API of that component and no resource, flow or app
-  wording. App components (`components/`) compose primitives for one purpose, in the app's words (`DeleteDialog` over a
-  dialog). A piece named for a resource or a flow (`delete-dialog`, `entity-table`) is never a primitive, however
-  reusable it looks.
-- **A primitive stays generic.** A new need is a new app component over the same primitive, never a new input that
-  teaches the primitive about the app.
+- **Two tiers of components**, so the design system can be replaced or regenerated without touching app code. Primitives
+  (`components/ui/`) are the design system: commonly recognised base components (dialog, select, pagination, button,
+  tabs) with the generic API of that component and no resource, flow or app wording. App components (`components/`)
+  compose primitives for one purpose, in the app's words (`DeleteDialog` over a dialog). A piece named for a resource or
+  a flow (`delete-dialog`, `entity-table`) is never a primitive, however reusable it looks.
+- **A primitive stays generic**, because one that knows the app can no longer be regenerated or shared. A new need is a
+  new app component over the same primitive, never a new input that teaches the primitive about the app.
 - **Pages use both and repeat neither**: a primitive directly for a generic control, an app component for an
   app-specific piece, and no primitive's markup rebuilt inside a page.
-- **Imports go one way**: pages → app components → primitives. A primitive imports only other primitives, the framework
-  and its component library.
-- **Add a primitive when the app first needs it**, never a catalogue in advance. A native element that needs nothing but
-  styling stays native, even when its classes repeat.
+- **Imports go one way**, so a primitive can be swapped without reading the pages: pages → app components → primitives.
+  A primitive imports only other primitives, the framework and its component library.
+- **Add a primitive when the app first needs it**, never a catalogue in advance, because an unused primitive drifts from
+  the library it came from. A native element that needs nothing but styling stays native, even when its classes repeat.
 - **Styles come from the theme.** Colours, spacing and type are the theme's tokens, never raw values, so themes and dark
   mode follow. No component carries its own stylesheet.
-- **Every screen has its empty, loading and error states.**
-- **Every control has a name and a label, and works from the keyboard.** A custom control that is not a native input
-  (a combobox) is labelled through `aria-labelledby`. Free-text inputs that hold no personal data turn autocomplete off.
+- **Every screen has its empty, loading and error states**, because the first user sees the empty one and a slow network
+  the other two.
+- **Every control has a name and a label, and works from the keyboard**, so assistive technology, the form post and the
+  tests all reach it by name. A custom control that is not a native input (a combobox) is labelled through
+  `aria-labelledby`. Free-text inputs that hold no personal data turn autocomplete off, so browser autofill cannot
+  pre-fill what a test or a user then overlooks.
 - **Accessible names are a contract**: tests find elements by role and name, so renaming a heading, label or button
   changes its tests.
-- **Each behaviour is tested where it lives**: a primitive's test covers its own behaviour, an app component's only what
-  it adds, a page's only what the page does.
+- **Each behaviour is tested where it lives**, so a change in one tier fails one test: a primitive's test covers its own
+  behaviour, an app component's only what it adds, a page's only what the page does.
+
+## Required values
+
+| What                                     | Value                |
+| ---------------------------------------- | -------------------- |
+| primitives                               | `components/ui/`     |
+| app components                           | `components/`        |
+| custom control label                     | `aria-labelledby`    |
+| free-text input holding no personal data | `autocomplete="off"` |
 
 ## Conventions
 

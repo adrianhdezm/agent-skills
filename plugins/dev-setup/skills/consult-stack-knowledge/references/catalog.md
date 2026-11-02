@@ -18,7 +18,7 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 | [Database](architecture/database.md)             | the engine per runtime, table design, migrations, connection, one database per environment        | a database                          |
 | [Data access](architecture/data-access.md)       | one layer touches the database, DAOs on the context, ordered lists, domain errors                 | a database                          |
 | [REST API](architecture/rest-api.md)             | resources and methods, status codes, one error body, edge validation, the list format             | JSON endpoints, or a client of them |
-| [Authentication](architecture/authentication.md) | the library that owns sessions, protected layouts, ownership checks, safe redirects               | sign-in, or per-user data           |
+| [Authentication](architecture/authentication.md) | the library that owns sessions, protected routes, ownership checks, safe redirects                | sign-in, or per-user data           |
 | [File storage](architecture/file-storage.md)     | bytes in an object store, metadata in a table, one service keeping them in step                   | uploads or stored files             |
 | [UI components](architecture/ui-components.md)   | two tiers of components, one-way imports, theme tokens, states, labels and accessible names       | screens                             |
 

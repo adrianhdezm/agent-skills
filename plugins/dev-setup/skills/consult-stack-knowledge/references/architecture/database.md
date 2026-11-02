@@ -9,29 +9,36 @@ tooling belong to the engine's technology doc. The code that reads and writes th
 
 ## Principles
 
-- **The engine follows the runtime.** A long-running process gets a server database it connects to; a runtime that
+- **The engine follows the runtime**, because a request-scoped runtime cannot hold a connection open and a long-running
+  one should not pay a hop it need not: a long-running process gets a server database it connects to; a runtime that
   offers its own managed database uses it rather than reaching out. The same engine runs in development, in tests and in
   production, so no query behaves differently between them.
 - **Primary keys are UUIDs**, so ids are safe to expose in URLs and can be known before the insert. Who generates them,
   the database or the schema, is the engine's to say.
-- **Every table records when a row was created and last updated**, in UTC, defaulted on insert; every update sets the
-  second.
-- **Columns are snake_case in the database and camelCase in code**, mapped once in the schema files.
+- **Every table records when a row was created and last updated**, in UTC, defaulted on insert, so any row can be
+  audited and ordered by age without a later migration; every update sets the second.
+- **Columns are snake_case in the database and camelCase in code**, mapped once in the schema files, so each side
+  follows its own naming rule and no query quotes identifiers.
 - **Every foreign key states its `on delete`** (`cascade` for rows that cannot outlive their owner), and **every foreign
   key is indexed**, because every join and every cascading delete reads by it.
-- **A column is nullable only where absence means something**; otherwise `not null`, with a default where one is
-  natural.
-- **The schema changes through migrations only.** They are generated from the schema files, reviewed, and committed with
-  the change; nothing pushes a schema to a live database. No doc carries a migration file: the scaffold generates the
-  first one, `init`, from its own schema and commits it. Migrations are applied by a step that runs to completion
-  before the app serves, in every environment: a missing table is a deploy error, not a request error.
-- **One connection setting, which fails loudly.** The client and the migration tool read one setting (a URL or a
-  binding) and throw when it is missing; no fallback, no credential in source.
-- **One database per environment.** Development, end-to-end tests and production never share one; an end-to-end suite
-  gets its own database and leaves the development one as it found it.
-- **Local data is disposable**: it lives in a git-ignored folder that a reset deletes.
-- **Seed data goes through the data layer or a seed helper**, never inside a migration.
-- **Tests run against the real engine**, isolated per suite and migrated with the project's own migrations.
+- **A column is nullable only where absence means something**, because a nullable column makes every reader handle a
+  case that never happens; otherwise `not null`, with a default where one is natural.
+- **The schema changes through migrations only**, because a pushed schema has no history to replay in another
+  environment. They are generated from the schema files, reviewed, and committed with the change; nothing pushes a
+  schema to a live database. Migrations are applied by a step that runs to completion before the app serves, in every
+  environment: a missing table is a deploy error, not a request error.
+- **One connection setting, which fails loudly**, because a fallback hides a misconfigured environment and connects to
+  the wrong database. The client and the migration tool read one setting (a URL or a binding) and throw when it is
+  missing; no fallback, no credential in source.
+- **One database per environment**, so a test run never wipes what a developer was looking at. Development, end-to-end
+  tests and production never share one; an end-to-end suite gets its own database and leaves the development one as it
+  found it.
+- **Local data is disposable**, so a reset is a delete and nothing of value lives there: it sits in a git-ignored folder
+  that a reset deletes.
+- **Seed data goes through the data layer or a seed helper**, never inside a migration, because a migration replays
+  everywhere, including production.
+- **Tests run against the real engine**, isolated per suite and migrated with the project's own migrations, so what
+  passes in tests is what the engine does.
 
 ## Conventions
 

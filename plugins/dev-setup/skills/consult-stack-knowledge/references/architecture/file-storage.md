@@ -8,23 +8,34 @@ step. These rules apply from the moment a project stores files.
 
 ## Principles
 
-- **Bytes go to an object store; metadata goes to the database.** Never file contents in a table. The `files` table
-  holds what is queried: `id`, a unique `key`, `filename`, `contentType`, `size`, `createdAt`. With sign-in it also
-  holds `ownerId`, indexed and referencing the user, so a download or delete can check ownership from the row.
+- **Bytes go to an object store; metadata goes to the database**, because a row is read whole while an object streams.
+  Never file contents in a table; the `files` table holds only what is queried, and with sign-in the owner, so a
+  download or delete can check ownership from the row.
 - **One service owns both sides.** `FilesService` writes the object and the row together, so it uses no DAO: every
-  database call is paired with an object-store call. It is the one deliberate exception to one DAO per table.
+  database call is paired with an object-store call. It is a deliberate exception to one DAO per table.
 - **The object goes first, and is undone if the row fails.** Upload stores the object, then inserts the row; if the
   insert throws, the service deletes the object before rethrowing, so no object is left without metadata. Delete removes
-  the row, then the object. A download reads the row first and fetches the object by its stored key.
-- **Keys are made by the server and unique**; the client's filename is metadata, never the key alone. A missing content
-  type is `application/octet-stream`.
+  the row, then the object, so a failure leaves at worst an orphan object, never a row whose download fails. A download
+  reads the row first and fetches the object by its stored key.
+- **Keys are made by the server and unique**, because a client's name can collide or carry path segments; the client's
+  filename is metadata, never the key alone.
 - **The server entry builds the service** with the database client and the store's client, and puts it on the app's
   context, like any capability.
 - **Uploads and downloads are endpoints like any other**: authenticated, ownership-checked against the row's `ownerId`
-  (another user's file answers 404, not 403, so its existence is not revealed), the response's `Content-Type` set
-  explicitly.
-- **Store configuration is the runtime's**: a binding where the platform provides the store, connection settings in the
-  env file otherwise, with a local compatible service for development.
+  as Authentication says (another user's file is a 404), the response's `Content-Type` set explicitly.
+- **Store configuration is the runtime's**, so no code holds a credential the platform already holds: a binding where
+  the platform provides the store, connection settings in the env file otherwise, with a local compatible service for
+  development.
+
+## Required values
+
+| What                 | Value                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `files` table        | `id`, a unique `key`, `filename`, `contentType`, `size`, `createdAt`; with sign-in `ownerId`, indexed and referencing the user |
+| service              | `FilesService`, the only code touching the store's client or the `files` table                                                 |
+| key                  | made by the server, unique                                                                                                     |
+| default content type | `application/octet-stream`                                                                                                     |
+| another user's file  | 404                                                                                                                            |
 
 ## Conventions
 
