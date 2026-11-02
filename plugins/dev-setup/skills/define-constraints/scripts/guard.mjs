@@ -4,7 +4,7 @@
 //
 //   node guard.mjs [--base <ref>]
 //
-// Run it from the repository root. In an initiative, pass the Base commit from docs/<slug>/03-design.md. Without
+// Run it from the repository root. In an initiative, pass the Base commit from docs/<slug>/03-tech-plan.md. Without
 // --base, the base is the merge base with origin/main, main or master, which on a repo that works on main is HEAD
 // itself, so committed work would not be scanned: the guard says so when that happens.
 // Uncommitted and untracked files count as changes. Exit 0: clean · 1: findings · 2: could not run.

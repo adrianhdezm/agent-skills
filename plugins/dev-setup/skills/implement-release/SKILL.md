@@ -1,41 +1,41 @@
 ---
-name: implement-design
-description: Builds the slices of an approved docs/<slug>/03-design.md one at a time, each on its own branch, starting with the S0 setup slice (scaffold, constraints, checks, CI) when the design has one. Writes the code and one test per acceptance criterion (titled with its ID, such as B1.2), keeps a checklist with decisions and deviations in docs/<slug>/04-progress.md, runs the project's checks until they pass, then opens a pull request with the gh CLI and merges it once the checks and CI pass. With all, works through the release and goes on to verify it. Use when the user runs /implement-design, or asks to build, code or implement a designed slice or release.
+name: implement-release
+description: Builds the slices of an approved docs/<slug>/03-tech-plan.md one at a time, each on its own branch, starting with the S0 setup slice (scaffold, constraints, checks, CI) when the plan has one. Writes the code and one test per acceptance criterion (titled with its ID, such as B1.2), keeps a checklist with decisions and deviations in docs/<slug>/04-progress.md, runs the project's checks until they pass, then opens a pull request with the gh CLI and merges it once the checks and CI pass. With all, works through the release and goes on to verify it. Use when the user runs /implement-release, or asks to build, code or implement a planned slice or release.
 disable-model-invocation: true
 ---
 
-# Implement Design
+# Implement Release
 
-Phase 5 of 6: brainstorm → experiment → analyze → design → **implement** → verify.
+Phase 5 of 6: brainstorm → experiment → specify → plan → **implement** → verify.
 
-Turn the approved design into code and tests, one slice at a time, without asking for permission at each step. Each
+Turn the approved tech plan into code and tests, one slice at a time, without asking for permission at each step. Each
 slice is a feature branch: it starts from the default branch, ends in a pull request, and merges once every check
 passes, so the default branch only ever holds finished slices. The progress file is the memory of the run: it
 survives a compacted context and a new session, and the user can read it instead of the scrollback.
 
 **Done means, for each slice:** every item on its checklist is ticked, each of its criteria has a passing test whose
-title starts with the criterion ID, the tests of every tier the design gives those criteria have run and pass, all the
-project's checks pass, the guard is clean against the design's base, the Done means list in `CONSTRAINTS.md` holds,
+title starts with the criterion ID, the tests of every tier the plan gives those criteria have run and pass, all the
+project's checks pass, the guard is clean against the plan's base, the Done means list in `CONSTRAINTS.md` holds,
 and the slice's branch is merged into the default branch.
 
 ## When not to use
 
-- The design is not approved: run `/design-solution` first.
+- The tech plan is not approved: run `/plan-release` first.
 - A failure with an unclear cause: use `/debug-failure`, then come back.
 
 ## Input
 
-`/implement-design <slug> [S2 | fixes | all] [local | no commits]`. With no slice, take what `progress.mjs` names
+`/implement-release <slug> [S2 | fixes | all] [local | no commits]`. With no slice, take what `progress.mjs` names
 next: the open **Fixes from verification** section first, then the first slice that is not done. `fixes` takes the
-fixes section. `all` takes the fixes section if it is open, then every remaining slice of the designed releases in
-order, then verifies the release (see [Keep going, or stop](#keep-going-or-stop)). If `03-design.md` does not say
-`Status: Approved`, stop and point to `/design-solution`. If it has no `Base:` commit, the next slice must be S0 (its
-header says `Base: after S0`); otherwise stop and point to `/design-solution`.
+fixes section. `all` takes the fixes section if it is open, then every remaining slice of the planned releases in
+order, then verifies the release (see [Keep going, or stop](#keep-going-or-stop)). If `03-tech-plan.md` does not say
+`Status: Approved`, stop and point to `/plan-release`. If it has no `Base:` commit, the next slice must be S0 (its
+header says `Base: after S0`); otherwise stop and point to `/plan-release`.
 
 How slices reach the default branch:
 
 - **Pull requests, by default**, when the repo has a GitHub remote and `gh auth status` passes: push the branch, open a
-  PR, merge it when the checks pass. The approved design covers these pushes and merges.
+  PR, merge it when the checks pass. The approved plan covers these pushes and merges.
 - **`local`**, or no GitHub remote: merge each branch into the default branch locally, and push nothing.
 - **`no commits`**: no branches and no commits. The work stays in the tree for the user to commit.
 
@@ -57,9 +57,9 @@ has an unticked item.
 - [ ] 5. Slice closed: PR merged (or merged locally), marked done; next slice or verification
 ```
 
-1. **Read the context and branch.** Read `03-design.md` (the slice, the decisions, the corrections from the
-   experiment, the data, the contracts and the Base), the criteria text in `02-analysis.md`, `04-progress.md` if it
-   exists, the conventions file the design names, and `CONSTRAINTS.md`. Then open every file the slice touches.
+1. **Read the context and branch.** Read `03-tech-plan.md` (the slice and its sequence diagram, the decisions,
+   the corrections from the experiment, the data, the contracts, the modules class diagram and the Base), the criteria
+   text and the lifecycle statecharts in `02-spec.md`, `04-progress.md` if it exists, the conventions file the plan names, and `CONSTRAINTS.md`. Then open every file the slice touches.
 
    Check `git status`. If there are changes outside `docs/<slug>/` that this run did not make, ask the user to commit
    or stash them first, so each slice's work stays separate from theirs. Then start the slice's branch from an up to
@@ -74,7 +74,7 @@ has an unticked item.
    branch, `<slug>/fixes-<n>`, numbered on from the last one.
 
 2. **Write the slice's checklist** into `docs/<slug>/04-progress.md` before you write code. Use one item for each file
-   change the design lists, one for each criterion's test and one for the checks. Add the section
+   change the plan lists, one for each criterion's test and one for the checks. Add the section
    if it is missing. Never rewrite a slice that is already done. The fixes section already has its items, one per
    failure: work it like a slice, and add a test item for any fix whose criterion had no test.
 
@@ -82,9 +82,12 @@ has an unticked item.
    - Follow the conventions file: its architecture, its recipe for adding a resource, its naming and its test tiers.
      Copy the shape of the nearest existing example. Where a seam between two technologies is not spelled out there,
      the `apply-stack-conventions` skill's integration doc for it is (its `references/catalog.md` lists them).
-   - Honour each correction from the experiment that the design maps to this slice. Read the prototype for its
+   - Build the path the slice's sequence diagram draws: the same modules, calling each other in that order, with its
+     failure paths. Each lifecycle transition the slice's behaviours cite is made in one place and refused from every
+     other state.
+   - Honour each correction from the experiment that the plan maps to this slice. Read the prototype for its
      shape if it helps; never copy its code.
-   - For each criterion, write the test in the tier the design gives it. Start the test title with the criterion ID, so
+   - For each criterion, write the test in the tier the plan gives it. Start the test title with the criterion ID, so
      verification can trace it: `it("B1.2 rejects a second claim on a taken slot", …)`. Write the test before or with
      the code, and see it fail once for the right reason.
    - Test behaviour a caller can see, not implementation details. Prefer real dependencies to mocks.
@@ -99,16 +102,16 @@ has an unticked item.
 4. **Run every check** the project defines: `check:task` if `CONSTRAINTS.md` defines it, otherwise the `package.json`
    scripts or the conventions file (typically `typecheck`, `lint`, `test`, `build`, `format:check`).
 
-   `check:task` leaves the slow tiers to `check:full`. So also run the tests of every tier the design gives this
+   `check:task` leaves the slow tiers to `check:full`. So also run the tests of every tier the plan gives this
    slice's criteria, filtered to the slice's IDs with the runner's name filter (`vitest run -t "B3\."`,
    `playwright test --grep "B3\."`). An end-to-end criterion is proven when its slice closes, not first in
    verification. Then check that every criterion of the slice has a test titled with its ID, and run the guard against
-   the design's base:
+   the plan's base:
 
    ```bash
-   node <skill-dir>/../verify-build/scripts/trace.mjs docs/<slug>/02-analysis.md \
-     --design docs/<slug>/03-design.md --slice S2
-   node <skill-dir>/../define-constraints/scripts/guard.mjs --base <Base from 03-design.md>
+   node <skill-dir>/../verify-release/scripts/trace.mjs docs/<slug>/02-spec.md \
+     --plan docs/<slug>/03-tech-plan.md --slice S2
+   node <skill-dir>/../define-constraints/scripts/guard.mjs --base <Base from 03-tech-plan.md>
    ```
 
    Fix the code until everything passes. Never add a suppression, skip or delete a test, remove an assertion, leave a
@@ -132,18 +135,18 @@ has an unticked item.
 
 ## The setup slice (S0)
 
-S0 has no behaviours and no criteria. Its checklist is what the design's S0 lists, in this order, each with the
+S0 has no behaviours and no criteria. Its checklist is what the plan's S0 lists, in this order, each with the
 checks it must pass:
 
-1. `bootstrap-project` with the combination the design names, into the repo, which holds only `docs/` so far. It asks
+1. `bootstrap-project` with the combination the plan names, into the repo, which holds only `docs/` so far. It asks
    only what is still open.
 2. The `define-constraints` skill. Its short interview is the one point where S0 waits for the user, and "the floor
    only" is a fine answer. Its scripts give the project `check:fast`, `check:task` and `check:full`.
-3. Any missing check script the design lists, the CI workflow (`.github/workflows/checks.yml`, running `check:task` on
+3. Any missing check script the plan lists, the CI workflow (`.github/workflows/checks.yml`, running `check:task` on
    every pull request with the project's package manager), and each convention correction for the conventions file.
 4. Every check passes locally. On the pull request, CI must pass too: it is the first proof the workflow works.
 
-After S0 merges, start the next slice's branch with two changes to `03-design.md`, before any feature code: write
+After S0 merges, start the next slice's branch with two changes to `03-tech-plan.md`, before any feature code: write
 `git rev-parse --short HEAD` of the default branch as `Base:` on the header line, and open each path marked
 _(after S0)_ in the release's slices. Where the scaffold put something elsewhere, correct the path in the slice and
 record it as a deviation; then drop the mark. With `no commits`, record the HEAD the run started from as the Base, and
@@ -153,22 +156,24 @@ say under **Found** that the scaffold will show in every guard run until it is c
 
 Keep going while the next step needs nothing from the user. Put status notes in the same message as the next action.
 With `all`, when every slice of the release is done, go on to verify it in the same run: follow
-[verify-build's SKILL.md](../verify-build/SKILL.md) for that release. Its continue step brings the run back here for
+[verify-release's SKILL.md](../verify-release/SKILL.md) for that release. Its continue step brings the run back here for
 any fixes.
 
 Stop and ask only when:
 
-- the design cannot be built as written, and the fix changes a behaviour, a contract or the data. Explain why, propose
-  the change, and update `03-design.md` once the user agrees;
+- the plan cannot be built as written, and the fix changes a behaviour, a contract or the data. Explain why, propose
+  the change, and update `03-tech-plan.md` once the user agrees;
 - a check or CI still fails after `debug-failure`, or three fixes did not hold;
 - a merge has a conflict that is not mechanical, a push is rejected, or the PR needs a review or approval before it can
   merge;
-- the next step is on the **Ask first** list in `CONSTRAINTS.md` and the design does not already approve it, or it
+- the next step is on the **Ask first** list in `CONSTRAINTS.md` and the plan does not already approve it, or it
   touches auth, permissions, payments or secrets;
 - the next step is destructive or reaches outside the repo: deleting data, rewriting a migration that already ran,
   force-pushing, changing infrastructure beyond S0's CI workflow.
 
-A small departure that changes no behaviour or contract does not stop the run. Record it as a deviation.
+A small departure that changes no behaviour or contract does not stop the run. Record it as a deviation. When it
+changes a module or a call the tech plan draws, update that class or sequence diagram in `03-tech-plan.md` in the same
+slice, so the diagrams stay true to the code.
 
 ## Progress file
 
@@ -198,11 +203,11 @@ PR: #2 · merged `9c1e2f0`
 
 **Decisions**
 
-- <a choice the design left open, and why>
+- <a choice the plan left open, and why>
 
 **Deviations**
 
-- <where the code departs from the design, and why>
+- <where the code departs from the plan, and why>
 
 **Found**
 
@@ -220,7 +225,7 @@ Set the file's `Status:` to `Done <YYYY-MM-DD>` when every slice of every releas
 ## End of the run
 
 End with three headings: **Blocked on me**, **Changed** (slices finished, PRs merged, files touched) and **Found**.
-Then name the next step: `/implement-design <slug>` for the next slice, or `/verify-build <slug> <R>` when every slice
+Then name the next step: `/implement-release <slug>` for the next slice, or `/verify-release <slug> <R>` when every slice
 of the release is done and the run did not go on to verify it.
 
 ## Red flags
@@ -241,15 +246,15 @@ of the release is done and the run did not go on to verify it.
 
 - [ ] Each slice had its own branch from an up to date default branch, and merged only after its checks (and CI)
       passed
-- [ ] S0 ran first when the design has one, and the Base was recorded from the default branch after it merged
+- [ ] S0 ran first when the plan has one, and the Base was recorded from the default branch after it merged
 - [ ] The checklist was written before the code and ticked as work landed
-- [ ] Every criterion of the slice has a test titled with its ID, in the tier the design gives it, and the slice's trace
+- [ ] Every criterion of the slice has a test titled with its ID, in the tier the plan gives it, and the slice's trace
       has no gap
 - [ ] The tests of every tier the slice's criteria use ran and pass, not only `check:task`
 - [ ] Code follows the conventions file, the nearest existing example and the experiment's corrections
 - [ ] Every project check passes and the guard is clean. Nothing was weakened or skipped
 - [ ] Anything noticed outside the slice is under Found, not fixed
-- [ ] A change to behaviour, contract or data stopped the run and updated the design. Small departures are recorded as
+- [ ] A change to behaviour, contract or data stopped the run and updated the tech plan. Small departures are recorded as
       deviations
 - [ ] `progress.mjs --slice` passed before the slice was marked done
 - [ ] One commit per slice, staging only its files, unless the user said no commits

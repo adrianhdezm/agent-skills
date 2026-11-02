@@ -83,10 +83,10 @@ node <skill-dir>/scripts/guard.mjs [--base <ref>]
 `<skill-dir>` is this skill's base directory. Exit 0 is clean, 1 lists findings as `file:line kind text`, and 2 means
 it could not run. It reports new suppressions, skipped or focused tests, stubs and swallowed errors, removed
 assertions, deleted test files, and any change to `CONSTRAINTS.md`. Each finding needs a reason the user accepts, or a
-fix. `/implement-design` runs it before closing a slice, and `/verify-build` runs it for the whole initiative, both
-with `--base` set to the `Base:` commit in `03-design.md`. Without `--base` it uses the merge base with `origin/main`,
+fix. `/implement-release` runs it before closing a slice, and `/verify-release` runs it for the whole initiative, both
+with `--base` set to the `Base:` commit in `03-tech-plan.md`. Without `--base` it uses the merge base with `origin/main`,
 `main` or `master`; on a repo that works on `main` that is `HEAD` itself, so it scans only uncommitted changes and
-says so. When a design's S0 setup slice runs this skill, `implement-design` merges `CONSTRAINTS.md` with the scaffold
+says so. When a tech plan's S0 setup slice runs this skill, `implement-release` merges `CONSTRAINTS.md` with the scaffold
 and records the commit after that merge as the base, so the new file is not reported as a change.
 
 ## Template
@@ -149,7 +149,7 @@ exception lives 90 days at most.
 
 End with three headings: **Blocked on me** (a check that fails today and needs the user's call), **Changed**
 (`CONSTRAINTS.md`, the scripts, the tools installed, the `CLAUDE.md` line) and **Found** (what the trial run showed).
-When another skill called this one, such as `implement-design`, hand these back to it instead.
+When another skill called this one, such as `implement-release`, hand these back to it instead.
 
 ## Red flags
 
