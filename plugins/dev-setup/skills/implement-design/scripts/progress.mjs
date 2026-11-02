@@ -26,11 +26,13 @@ if (!existsSync(dir)) {
   process.exit(2);
 }
 
-const PHASES = ["01-brainstorm.md", "02-analysis.md", "03-design.md", "04-progress.md", "05-verification.md"];
+const PHASES = ["01-brainstorm.md", "01-experiment.md", "02-analysis.md", "03-design.md", "04-progress.md", "05-verification.md"];
+const OPTIONAL = new Set(["01-experiment.md"]); // listed only when written
 console.log("Phase files");
 for (const f of PHASES) {
   const p = join(dir, f);
   if (!existsSync(p)) {
+    if (OPTIONAL.has(f)) continue;
     console.log(`  ${f.padEnd(20)} not written`);
     continue;
   }

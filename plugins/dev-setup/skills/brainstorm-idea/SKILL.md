@@ -1,6 +1,6 @@
 ---
 name: brainstorm-idea
-description: Opens a new initiative by interviewing the user about the idea, the references that inspire it and who it is for, proposing several deliberately different directions, optionally testing the riskiest one with a throwaway proof of concept, and recording the chosen direction in docs/<slug>/01-brainstorm.md. Use when the user runs /brainstorm-idea, or has a raw idea they want to explore before any requirements exist.
+description: Opens a new initiative by interviewing the user about the idea, the references that inspire it and who it is for, proposing several deliberately different directions, and recording the chosen direction in docs/<slug>/01-brainstorm.md. Use when the user runs /brainstorm-idea, or has a raw idea they want to explore before any requirements exist.
 disable-model-invocation: true
 ---
 
@@ -8,9 +8,9 @@ disable-model-invocation: true
 
 Phase 1 of 5: **brainstorm** → analyze → design → implement → verify.
 
-This phase widens before it narrows. Collect what the user has in mind, show them options they had not thought of, test the one thing most likely to kill the idea, and stop when they have picked a direction. Leave requirements, data models and frameworks to the later phases.
+This phase widens before it narrows. Collect what the user has in mind, show them options they had not thought of, name what is most likely to kill the idea, and stop when they have picked a direction. Leave requirements, data models and frameworks to the later phases.
 
-**Done means:** the user picked a direction, and `docs/<slug>/01-brainstorm.md` records it with the references, the directions considered, what any proof of concept showed and what we are not doing.
+**Done means:** the user picked a direction, and `docs/<slug>/01-brainstorm.md` records it with the references, the directions considered, what we are not doing and the assumptions still to test.
 
 ## When not to use
 
@@ -35,9 +35,8 @@ Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names
 - [ ] 1. Project folder and slug settled
 - [ ] 2. Idea, people and references collected
 - [ ] 3. Directions proposed
-- [ ] 4. Riskiest assumption tested (or skipped, with the reason)
-- [ ] 5. Direction picked
-- [ ] 6. 01-brainstorm.md written
+- [ ] 4. Direction picked
+- [ ] 5. 01-brainstorm.md written
 ```
 
 1. **Settle the folder and the slug** as above.
@@ -55,18 +54,11 @@ Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names
 
    Be honest, not supportive. Say when a direction is weak and why. Ask the user to react, mix or add their own. Iterate while it is producing new ideas. Stop when it produces only variants.
 
-4. **Test the riskiest assumption, if it is cheap.** Do a proof of concept (PoC) only when it answers a yes/no question about the leading direction in roughly half an hour of code. Good questions: "Can the API return X?", "Does this library do Y in the browser?", "Does the interaction feel right?". Before you start, tell the user the question and the plan and ask to go ahead. Then:
-   - Build it outside the project, in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-poc` unless the user names another place. A PoC never enters the project repo.
-   - Keep it to the question. No tooling, no tests, no polish.
-   - Record the question, what you ran and the answer. A "no" is a good result: it saved the later phases.
-
-   If no question is worth a PoC, say so and skip it.
-
-5. **Converge.** Ask the user to pick a direction or a combination. Then write down two lists with them:
+4. **Converge.** Ask the user to pick a direction or a combination. Then write down two lists with them:
    - **Not doing**: the good ideas you are saying no to, each with the reason. Focus is saying no to good ideas, and this list stops the analysis phase from reopening them.
-   - **Assumptions to test**: what the direction bets is true, each with how to find out (a PoC, a conversation, a number to look up).
+   - **Assumptions to test**: what the direction bets is true, each with how to find out (an experiment in code, a conversation, a number to look up). Put the riskiest first.
 
-6. **Write `docs/<slug>/01-brainstorm.md`** from the template below. Leave out a section that has nothing in it.
+5. **Write `docs/<slug>/01-brainstorm.md`** from the template below. Leave out a section that has nothing in it.
 
 ## Template
 
@@ -102,12 +94,6 @@ Value: <…> · Feasibility: <…> · Difference: <…>
 
 …
 
-## Proof of concept
-
-- **Question:** <yes/no question>
-- **Where:** `<path>` (throwaway)
-- **Answer:** <yes / no / partly, and what showed it>
-
 ## Chosen direction
 
 <the direction, in two or three sentences, and why it won>
@@ -127,14 +113,13 @@ Value: <…> · Feasibility: <…> · Difference: <…>
 
 ## End of the run
 
-End with three headings: **Blocked on me** (what only the user can answer), **Changed** (files written) and **Found** (anything surprising, such as a PoC answer). Then name the next step: `/analyze-problem <slug>`.
+End with three headings: **Blocked on me** (what only the user can answer), **Changed** (files written) and **Found** (anything surprising). Then name the next step: `/experiment-idea <slug>` when an assumption to test can be answered with a prototype, otherwise `/analyze-problem <slug>`.
 
 ## Red flags
 
 - A batch of questions in one message, or questions without your guess
 - Directions that are variants of one idea, or none that surprised the user
 - Agreeing with every idea: a partner who never says "this one is weak" is not helping
-- A PoC that grew tooling, tests or a second question
 - An empty Not doing list
 
 ## Review Checklist
@@ -142,7 +127,6 @@ End with three headings: **Blocked on me** (what only the user can answer), **Ch
 - [ ] The user's words are quoted, not reworded
 - [ ] Questions came one at a time, each with a guess
 - [ ] 3 to 5 directions that differ in kind, at least one unusual, each with its riskiest assumption and a verdict
-- [ ] PoC built outside the repo with the user's go-ahead, or skipped with a reason
 - [ ] No frameworks, schemas or file paths in the file: those belong to later phases
 - [ ] The direction is picked by the user. Not doing and Assumptions to test are filled
 - [ ] Earlier initiatives' Next initiative, Later and Not doing items were read, and the relevant ones are quoted
