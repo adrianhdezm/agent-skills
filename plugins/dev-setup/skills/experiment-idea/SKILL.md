@@ -34,9 +34,10 @@ the answers, what each mock pretended and what changes for the analysis.
 - [ ] 6. 01-experiment.md written, brainstorm assumptions ticked
 ```
 
-1. **Read the brainstorm.** Read `docs/<slug>/01-brainstorm.md`: the **Chosen direction**, the **Assumptions to test**,
-   the **Not doing** list and the references. If `01-experiment.md` already exists, read it and continue from it: add
-   new questions, do not answer old ones again.
+1. **Read the brainstorm.** Read `docs/<slug>/01-brainstorm.md`, in the repo or, before there is one, in
+   `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/` (see `brainstorm-idea`, Where the docs live). `docs/<slug>/` below means
+   that folder. Read the **Chosen direction**, the **Assumptions to test**, the **Not doing** list and the references.
+   If `01-experiment.md` already exists, read it and continue from it: add new questions, do not answer old ones again.
 
 2. **Pick the questions.** Turn each assumption that code can check into a yes/no question about the chosen direction,
    and put the riskiest first: the one that, if false, sends the user back to the brainstorm. Good questions: "Can a
