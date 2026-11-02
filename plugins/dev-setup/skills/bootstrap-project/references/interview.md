@@ -5,7 +5,7 @@ already answered, put every open question in one message, and give each its defa
 one line and run to the end.
 
 The stacks, what each suits, how to choose between them and the combinations without a blueprint are in the
-[Stacks section of `apply-stack-conventions`](../../apply-stack-conventions/SKILL.md#stacks). This file only asks the
+[Stacks section of `consult-stack-knowledge`](../../consult-stack-knowledge/SKILL.md#stacks). This file only asks the
 questions that pick one; each answer below names the stack it leads to.
 
 ## Questions
@@ -36,17 +36,17 @@ questions that pick one; each answer below names the stack it leads to.
    only when the description names a thing (stock items, invoices), and still default to `entity`.
 6. **Anything the request names that the questions above do not cover** (a database, a library): take it as part of
    the combination; whether a doc covers it is looked up in the next step, not asked. Server code is Express or Hono:
-   a request for another server framework gets the blueprint that fits offered instead, as `apply-stack-conventions`
+   a request for another server framework gets the blueprint that fits offered instead, as `consult-stack-knowledge`
    says.
 
 An answer the questions do not lead to a stack from (Angular on Workers, a React app over its own REST API, a library
 no doc covers) is a combination without a blueprint: say so plainly and offer the nearest blueprint that
-`apply-stack-conventions` names for it. Another language: this skill does not apply.
+`consult-stack-knowledge` names for it. Another language: this skill does not apply.
 
 ## Recommending a stack
 
 When another skill (`plan-release`) or the user asks which stack fits, recommend one the way the Stacks section of
-`apply-stack-conventions` says: by what the spec says people do, matched to its **Suits applications like**
+`consult-stack-knowledge` says: by what the spec says people do, matched to its **Suits applications like**
 column, with the reason in a sentence.
 
 ## The answer

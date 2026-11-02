@@ -64,7 +64,7 @@ correction with its reason, the user picked an approach, and `docs/<slug>/01-exp
    "a web app on Cloudflare", for example: a server-rendered Hono Worker over D1, or a React Router app with a Durable
    Object holding each potluck's live state. For each approach give:
    - a one-line shape, and the stack combination it uses (from the
-     [Stacks section of `apply-stack-conventions`](../apply-stack-conventions/SKILL.md#stacks) where one fits);
+     [Stacks section of `consult-stack-knowledge`](../consult-stack-knowledge/SKILL.md#stacks) where one fits);
    - what it is good at and what it risks;
    - which questions it should answer better.
 

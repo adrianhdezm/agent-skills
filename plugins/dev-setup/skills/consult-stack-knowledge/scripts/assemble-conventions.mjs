@@ -184,7 +184,7 @@ const out = [
   '# Coding Conventions',
   '',
   `How this project is built and how to change it: ${/^[AEIOU]/i.test(kind) ? 'an' : 'a'} ${kind} project, following the`,
-  `\`apply-stack-conventions\` ${source}. It is the working guide for everyone who changes the code, people and agents`,
+  `\`consult-stack-knowledge\` ${source}. It is the working guide for everyone who changes the code, people and agents`,
   'alike. The code follows every rule here; a change that breaks one changes this file in the same commit.',
   '',
   '## Contents',

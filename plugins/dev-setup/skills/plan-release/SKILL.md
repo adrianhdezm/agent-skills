@@ -42,9 +42,9 @@ it).
 - **The conventions file is the source of truth for the stack**: `coding-conventions.md` (written by
   `bootstrap-project` for every stack), `CLAUDE.md` or `AGENTS.md`, whichever the project has. Follow its architecture, its recipe
   for adding a resource, its naming and its test tiers. Before S0 has run, use the conventions and starter examples
-  `apply-stack-conventions` hands back for the stack (step 3). Where there is no such file, follow the patterns in the
+  `consult-stack-knowledge` hands back for the stack (step 3). Where there is no such file, follow the patterns in the
   code and record each one you relied on under **Conventions used**. For how two technologies of the stack connect,
-  or the reason behind a rule, use the `apply-stack-conventions` skill's docs for that stack (its
+  or the reason behind a rule, use the `consult-stack-knowledge` skill's docs for that stack (its
   `references/catalog.md` lists them).
 - `CONSTRAINTS.md`, if the project has one: its checks, its Done means and its Boundaries. A plan that needs an
   "Ask first" item (a new dependency, a schema change on existing data) names it as a decision.
@@ -96,11 +96,11 @@ it).
    the rest of the plan. Start from the experiment's **Chosen approach** and the brainstorm's **Stack constraints**:
    they usually settle it. Fill in the `bootstrap-project` interview
    ([interview.md](../bootstrap-project/references/interview.md)) from them and the spec, and recommend a stack from
-   the [Stacks section of `apply-stack-conventions`](../apply-stack-conventions/SKILL.md#stacks), the one list of
+   the [Stacks section of `consult-stack-knowledge`](../consult-stack-knowledge/SKILL.md#stacks), the one list of
    stacks and what each suits, with the reason in one sentence. Ask the user that question alone; when the chosen
    approach already names the combination, ask them to confirm it. Something else is fine if the user names it.
 
-   Then run the `apply-stack-conventions` skill with that combination. Its hand-off names the blueprint, the docs, the
+   Then run the `consult-stack-knowledge` skill with that combination. Its hand-off names the blueprint, the docs, the
    starter examples and the assembled conventions. Read them, and plan against them: where the blueprint ships an
    example resource (the Angular stacks' `entity`), it shows exactly where each building block goes; where it ships
    none, its conventions do. Write each path as the blueprint lays it out, marked _(after S0)_, until S0 makes it real.

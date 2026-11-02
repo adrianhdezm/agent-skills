@@ -81,7 +81,7 @@ has an unticked item.
 3. **Build, item by item.** Tick each item when it lands. Add any new task you find as a new item.
    - Follow the conventions file: its architecture, its recipe for adding a resource, its naming and its test tiers.
      Copy the shape of the nearest existing example. Where a seam between two technologies is not spelled out there,
-     the `apply-stack-conventions` skill's integration doc for it is (its `references/catalog.md` lists them).
+     the `consult-stack-knowledge` skill's integration doc for it is (its `references/catalog.md` lists them).
    - Build the path the slice's sequence diagram draws: the same modules, calling each other in that order, with its
      failure paths. Each lifecycle transition the slice's behaviours cite is made in one place and refused from every
      other state.
