@@ -11,10 +11,10 @@ routes take its place and the same shape holds.
 
 ## Demonstrates
 
-| Part                             | Applies                                                                    |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| `src/app.ts`, the default export | Hono (one app, no `serve()`), Hono + Cloudflare Workers (`Bindings: Env`)  |
-| `tests/app.test.ts`              | Hono + Cloudflare Workers (through `cloudflare:workers`), Vitest (workerd) |
+| Part                             | Applies                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `src/app.ts`, the default export | Hono (one app, no `serve()`), Hono + Cloudflare Workers (`Bindings: Env`)                          |
+| `tests/app.test.ts`              | Hono + Cloudflare Workers (through `cloudflare:workers`), Cloudflare Workers + Vitest (in workerd) |
 
 ## Data
 
@@ -25,7 +25,7 @@ routes take its place and the same shape holds.
 
 ## Behaviour
 
-- The app is typed with the generated `Env`, even with no binding yet, so the first binding needs no change to it.
+- The app is `Hono<{ Bindings: Env }>` with no binding yet.
 
 ## Tests
 

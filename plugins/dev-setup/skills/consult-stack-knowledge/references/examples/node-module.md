@@ -11,11 +11,11 @@ the same shape holds.
 
 ## Demonstrates
 
-| Part                               | Applies                                                                     |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| `src/<module>.ts`, exporting only  | Node (one file has side effects), Code style (named exports, doc comments)  |
-| `src/main.ts`, the one side effect | Node (reads its input once, imports with `.ts`), the Node package layout    |
-| `tests/<module>.test.ts`           | Vitest (one `describe` named for the module, a behaviour sentence per case) |
+| Part                               | Applies                                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/<module>.ts`, exporting only  | Node (one file has side effects), [Code style](../architecture/code-style.md) (named exports, doc comments) |
+| `src/main.ts`, the one side effect | Node (the one file with side effects), Node + TypeScript (`.ts` imports)                                    |
+| `tests/<module>.test.ts`           | Vitest (one `describe` named for the module, a behaviour sentence per case)                                 |
 
 ## Data
 
@@ -28,15 +28,13 @@ the same shape holds.
 ## Behaviour
 
 - `greet` addresses the name it is given, and carries a doc comment saying what it returns.
-- `main.ts` imports the module with its `.ts` extension and prints one line; nothing else in `src/` runs on import.
+- `main.ts` prints one line.
 
 ## Tests
 
 | Tier | File                     | Covers                           |
 | ---- | ------------------------ | -------------------------------- |
 | unit | `tests/greeting.test.ts` | `greet` addresses the given name |
-
-`main.ts` has no test: its behaviour lives in the module.
 
 ## Done when
 

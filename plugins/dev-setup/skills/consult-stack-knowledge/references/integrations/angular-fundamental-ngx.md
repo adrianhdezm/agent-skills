@@ -65,6 +65,8 @@ required` adds a marker. Vitest's exact name match needs `{ exact: false }` for 
   already.
 - **`fd-pagination`'s own page-size select** emits the new size and then a clamped page in the same tick, and two
   navigations built from the same stale input undo each other: keep Per page as a separate select.
+- **`fd-pagination` renders no page buttons when there is one page**: a browser spec that clicks _Next page_ seeds more
+  than one page.
 - **`fd-dialog` declared in a template without a `DialogRef` does not close on Escape**: the app component handles Escape
   itself.
 - **The first browser test run after adding the registry** can fail one file while Vite pre-bundles `@angular/cdk/*`

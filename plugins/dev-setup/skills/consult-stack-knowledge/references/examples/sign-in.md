@@ -1,6 +1,6 @@
 ---
 kind: example
-needs: [[react-router, better-auth]]
+needs: [[react-router, better-auth, drizzle]]
 ---
 # Sign in
 
@@ -10,44 +10,43 @@ it when authentication is picked; it builds on React Router home and needs the d
 
 ## Demonstrates
 
-| Part                                                  | Applies                                                                                                                                        |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/lib/auth.ts`, `workers/app.ts`, `app/context.ts` | Better Auth (`createAuth`, `AppAuth`), Better Auth + React Router (built by the server entry onto `appContext`)                                |
-| the auth tables and the `init` migration              | Better Auth + Drizzle, [Database](../architecture/database.md) (generated, committed, applied before the app serves)                           |
-| `routes/auth.tsx`                                     | Better Auth + React Router (the `api/auth/*` splat)                                                                                            |
-| `routes/signup.tsx`, `login.tsx`, `logout.tsx`        | Better Auth + React Router (Conform forms, the reference login action), [Authentication](../architecture/authentication.md)                    |
-| the protected layout and `routes/account.tsx`         | Better Auth + React Router (middleware array, `userContext`), [Authentication](../architecture/authentication.md) (protected layouts)          |
-| `safeRedirectTo` in `app/lib/utils.ts`                | [Authentication](../architecture/authentication.md) (safe redirects)                                                                           |
-| the forms                                             | React Router + shadcn/ui (`input`, `label`, `button`, `card`), [UI components](../architecture/ui-components.md) (labels and accessible names) |
+| Part                                                  | Applies                                                                                                                                                   |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/lib/auth.ts`, `workers/app.ts`, `app/context.ts` | Better Auth (`createAuth`, `AppAuth`), Better Auth + React Router (built by the server entry onto `appContext`)                                           |
+| the auth tables and the `init` migration              | Better Auth + Drizzle, [Database](../architecture/database.md) (generated, committed, applied before the app serves)                                      |
+| `routes/auth.tsx`                                     | Better Auth + React Router (the `api/auth/*` splat)                                                                                                       |
+| `routes/signup.tsx`, `login.tsx`, `logout.tsx`        | Better Auth + React Router (Conform forms, the reference login action), [Authentication](../architecture/authentication.md)                               |
+| the protected layout and `routes/account.tsx`         | Better Auth + React Router (middleware array, `userContext`), [Authentication](../architecture/authentication.md) (protected layouts)                     |
+| `safeRedirectTo` in `app/lib/utils.ts`                | [Authentication](../architecture/authentication.md) (safe redirects)                                                                                      |
+| the forms                                             | React Router + shadcn/ui (adds `input`, `label`, `card` beside `button`), [UI components](../architecture/ui-components.md) (labels and accessible names) |
 
 ## Data
 
-| What          | Value                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
-| routes        | `api/auth/*` (splat), `/signup`, `/login`, `/logout` (action only), and `/account` under the protected layout |
-| signup fields | `name` (required), `email` (an email), `password` (at least 8 characters)                                     |
-| login fields  | `email`, `password`; `redirectTo` from the query string                                                       |
-| account page  | the heading "Account" and "Signed in as `<email>`", with a "Sign out" button posting to `/logout`             |
-| auth tables   | `user`, `session`, `account`, `verification`, with uuid ids (`advanced.database.generateId: 'uuid'`)          |
+| What          | Value                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| routes        | `api/auth/*` (splat), `/signup`, `/login`, `/logout` (action only), and `/account` under the protected layout                |
+| signup fields | `name` (required), `email` (an email), `password` (at least 8 characters)                                                    |
+| login fields  | `email`, `password`; `redirectTo` from the query string                                                                      |
+| account page  | the heading "Account" and "Signed in as `<email>`", with a "Sign out" button posting to `/logout`                            |
+| auth tables   | `users`, `sessions`, `accounts`, `verifications` (Better Auth's `user`, `session`, `account`, `verification`), with uuid ids |
 
 ## Behaviour
 
 - An anonymous request for `/account` redirects to `/login?redirectTo=%2Faccount`.
-- Signing up creates the user and redirects to `/login` (no automatic sign-in). An email already taken also redirects
-  to `/login`, as Better Auth answers it with automatic sign-in off, so sign-up does not reveal which emails exist.
+- Signing up creates the user and redirects to `/login` (no automatic sign-in).
 - A right password redirects to the safe `redirectTo` (or `/`) with the session cookie set; a wrong one answers the
   login page again with "Invalid email or password" and no password in its HTML.
-- A `redirectTo` that is absolute or starts with `//` is ignored: the redirect goes to `/`.
 - `/account` shows the signed-in user's email, read from `userContext`; signing out clears the session and redirects
   to `/login`, after which `/account` redirects again.
 
 ## Tests
 
-| Tier          | File                                 | Covers                                                                                         |
-| ------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| unit, browser | `tests/unit/lib/utils.test.ts`       | `safeRedirectTo` keeps `/account`, turns `//evil.com`, `https://evil.com` and nothing into `/` |
-| unit, browser | `tests/unit/routes/login.test.tsx`   | the form's labelled fields; an action error shows on the form                                  |
-| unit, browser | `tests/unit/routes/account.test.tsx` | the email a stubbed loader returns, and the Sign out button                                    |
+| Tier          | File                                   | Covers                                                                                                   |
+| ------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| unit, browser | `tests/unit/lib/utils.test.ts`         | `safeRedirectTo` keeps `/account`, turns `//evil.com`, `https://evil.com` and nothing into `/`           |
+| unit, browser | `tests/unit/routes/login.test.tsx`     | the form's labelled fields; an action error shows on the form; `redirectTo` is kept on the form's action |
+| unit, browser | `tests/unit/routes/protected.test.tsx` | an anonymous request for a route under the layout is redirected to `/login?redirectTo=…`                 |
+| unit, browser | `tests/unit/routes/account.test.tsx`   | the email a stubbed loader returns, and the Sign out button                                              |
 
 ## Done when
 

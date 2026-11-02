@@ -269,16 +269,8 @@ export default defineConfig({
 
 ### HTTP contract
 
-| Route                  | Success                                                | Errors                                                                      |
-| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
-| `GET /`                | 200 `{ service, status }`                              | —                                                                           |
-| `GET /health`          | 200 `{ status: 'ok', db: 'up', latencyMs, timestamp }` | 503 `Database connection failed`                                            |
-| `GET /entities`        | 200 `PaginatedResult<Entity>`                          | 400 `Unknown query params: …`, `filter must be valid JSON`, `Invalid query` |
-| `POST /entities`       | 201 the created row                                    | 400 `Invalid body`; 400 malformed JSON, 413 over 100 kB                     |
-| `GET /entities/:id`    | 200 the row                                            | 400 `Invalid id`; 404 `Entity not found: <id>`                              |
-| `PATCH /entities/:id`  | 200 the updated row                                    | 400 `Invalid id` / `Invalid body` (including no updatable field); 404       |
-| `DELETE /entities/:id` | 204, no body                                           | 400 `Invalid id`; 404                                                       |
-| anything else          | —                                                      | 404 `Not Found: <METHOD> <path>`                                            |
+Routes follow the REST API concept; the `entity` resource's routes, answers and errors are the Entity CRUDL example's,
+the template every later resource copies.
 
 ### Testing tiers
 

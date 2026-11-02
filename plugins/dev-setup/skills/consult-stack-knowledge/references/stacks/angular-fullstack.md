@@ -129,7 +129,7 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 | API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `"**/*.{ts,js,mjs,json,md,yml,yaml}"`; `start` `node --env-file=../.env dist/server.js`; `db:generate`, `db:migrate` as the Drizzle doc says |
 | API configs           | the tsconfigs, `eslint.config.mjs` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | web package           | the Angular app blueprint's values with `<name>` = `web`, minus `packageManager` and the CLI's `prettier` and `typescript` entries (the catalog has them); the browser calls the API directly and Nginx proxies nothing                                                                                                                                                                                                                                                                                                                                                                                        |
-| e2e                   | `@playwright/test@1`; the example's End to end values; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| e2e                   | `@playwright/test@1`; its Reference code below; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Reference code
 
@@ -868,16 +868,8 @@ and `web/e2e/utils/env.ts` (both servers, which `playwright.config.ts` reads), a
 
 ### HTTP contract
 
-| Route                  | Success                                                | Errors                                                                      |
-| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
-| `GET /`                | 200 `{ service, status }`                              | —                                                                           |
-| `GET /health`          | 200 `{ status: 'ok', db: 'up', latencyMs, timestamp }` | 503 `Database connection failed`                                            |
-| `GET /entities`        | 200 `PaginatedResult<Entity>`                          | 400 `Unknown query params: …`, `filter must be valid JSON`, `Invalid query` |
-| `POST /entities`       | 201 the created row                                    | 400 `Invalid body`; 400 malformed JSON, 413 over 100 kB                     |
-| `GET /entities/:id`    | 200 the row                                            | 400 `Invalid id`; 404 `Entity not found: <id>`                              |
-| `PATCH /entities/:id`  | 200 the updated row                                    | 400 `Invalid id` / `Invalid body` (including no updatable field); 404       |
-| `DELETE /entities/:id` | 204, no body                                           | 400 `Invalid id`; 404                                                       |
-| anything else          | —                                                      | 404 `Not Found: <METHOD> <path>`                                            |
+Routes follow the REST API concept; the `entity` resource's routes, answers and errors are the Entity CRUDL example's,
+the template every later resource copies.
 
 ### Testing tiers
 
