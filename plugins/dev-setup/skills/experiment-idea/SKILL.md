@@ -49,6 +49,7 @@ the answers, what each mock pretended and what changes for the analysis.
    - the questions, in order, each with its yes and no;
    - what the prototype is: a page to click through when the question is about how it feels, a script or CLI when it
      is about data or an API;
+   - whether it is minimal or scaffolded (below), and for a scaffold, which combination and why;
    - each external service it touches, and whether it is mocked or real (see below);
    - a time box (default: about two hours of code) and where it goes.
 
@@ -56,12 +57,16 @@ the answers, what each mock pretended and what changes for the analysis.
 
 4. **Build it** in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-experiment`, unless the user names another place. It never
    enters the project repo. If the folder exists, ask before you reuse it. Then:
-   - Use the smallest stack that answers the questions: TypeScript that Node 24 runs directly (`node main.ts`), and a
-     single HTML page served by `node:http` when there is something to click. Add a dependency only when a question is
-     about that dependency.
+   - **Minimal, by default.** TypeScript that Node 24 runs directly (`node main.ts`), and a single HTML page served by
+     `node:http` when there is something to click. Add a dependency only when a question is about that dependency.
+   - **Scaffolded, only when a question depends on the stack**, such as "Does library X run on Workers?" or "Does
+     this interaction feel right in a real React UI?". Run `bootstrap-project` into the experiment folder with the
+     lightest combination that answers it, and leave out the database unless a question needs one. The stack stays a
+     design decision: a scaffold here does not choose it for the project.
    - Put every external service behind a strategy (below). Fake the rest of the world with in-memory data seeded from
      the brainstorm's own examples.
-   - No tests, linting, build step or styling beyond what a question needs. Hard-coded values are fine.
+   - No tests, linting, build step or styling beyond what a question needs, and none added to a scaffold. Hard-coded
+     values are fine.
    - Write a short `README.md` there: the command to run it, the questions, and how to switch each strategy.
 
 5. **Answer the questions.** Run the prototype and look at what it does. When a question is about how something feels,
@@ -166,13 +171,14 @@ back "no".
 - A vendor SDK called straight from the prototype's code instead of through its interface
 - Keys, tokens or real customer data written into the prototype
 - Tests, linting, a framework or styling nobody's question needs
+- A scaffold when no question depends on the stack
 - The prototype in the project repo, or code from it copied into the project
 - A mock whose pretence is not written down
 
 ## Review Checklist
 
 - [ ] Every question comes from an assumption in `01-brainstorm.md` and states its yes and no before the build
-- [ ] The user agreed the questions, the services to mock and the time box before the build
+- [ ] The user agreed the questions, the services to mock, minimal or scaffolded, and the time box before the build
 - [ ] The prototype lives outside the repo and runs from the command in its `README.md`
 - [ ] Every external service sits behind one interface, with a mock strategy and a switch
 - [ ] Every answer cites what showed it. The user's reactions are quoted, not reworded

@@ -126,15 +126,16 @@ you dropped, and the assumptions it bets on, riskiest first.
 
 Run it when an assumption from the brainstorm can be checked with code, and a "no" would change the direction.
 
-**You:** agree the questions, what gets mocked and the time box, then try the prototype when a question is about how
-it feels.
+**You:** agree the questions, what gets mocked, minimal or scaffolded, and the time box, then try the prototype when a
+question is about how it feels.
 
 **Claude:** turns each assumption into a yes/no question, with what would count as a yes and a no written down before
 it builds. It builds the smallest prototype that answers them in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-experiment`,
-outside your project. Every external service (payments, maps, an LLM, a partner API) sits behind an interface with a
-mock strategy, so the prototype runs with no accounts or keys; an environment variable switches one to the real
-service when the question is about that service. On a "no" to the riskiest question, it offers to go back to the
-brainstorm.
+outside your project: plain Node and one HTML page by default, or a `bootstrap-project` scaffold in the lightest
+combination when a question depends on the stack, such as "does library X run on Workers?". Every external service
+(payments, maps, an LLM, a partner API) sits behind an interface with a mock strategy, so the prototype runs with no
+accounts or keys; an environment variable switches one to the real service when the question is about that service. On
+a "no" to the riskiest question, it offers to go back to the brainstorm.
 
 **You get:** `01-experiment.md`, with each question, its answer and what showed it, what each mock pretended about
 the real service, and what changes for the analysis. The answered assumptions are ticked in `01-brainstorm.md`.
