@@ -1,6 +1,6 @@
 ---
 name: bootstrap-project
-description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the apply-stack-conventions skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, or when design-solution settles the stack.
+description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the apply-stack-conventions skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, when a design's S0 setup slice sets up the project, or when an experiment approach needs a scaffold.
 ---
 
 # Bootstrap Project
@@ -90,7 +90,7 @@ End with three headings: **Blocked on me** (a check that still fails, a port to 
 write, a gap that needs the user's choice), **Changed** (the project path, the combination, the docs and examples used,
 and what was created) and **Found**: each gap with what was used instead, and anything that differed from a doc (a moved
 peer range, a new build script to allow), each naming the doc in `apply-stack-conventions` to add or update. When
-another skill called this one, such as `design-solution`, hand these back to it instead.
+another skill called this one, such as `implement-design` or `experiment-idea`, hand these back to it instead.
 
 ## Review Checklist
 

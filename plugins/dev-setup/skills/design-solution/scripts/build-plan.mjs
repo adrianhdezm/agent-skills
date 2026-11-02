@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 // Checks a design plan JSON against the analysis and the design, and builds the interactive review page from it.
 //
-//   node build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--out <file.html>] [--standalone]
+//   node build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--release <R2>]
+//     [--out <file.html>] [--standalone]
 //
 // Errors stop the build; warnings do not. The build refuses an analysis that is not approved, a behaviour that no
 // level-1 claim covers or that two cover, a behaviour in no slice or in two, a criterion with no test tier or with
-// two, and a slice that depends on a later one. --standalone adds the doctype and head that a published Artifact
-// gets from its host, so the file also opens straight from disk.
+// two, and a slice that depends on a later one. When the analysis has releases, --release names the one this plan
+// reviews: its level-1 claims cover exactly that release's behaviours, the design's slices cover that release and
+// every one before it, and no slice holds a behaviour of a later release or of two releases. S0 is the setup slice
+// (scaffold, constraints, CI): it comes first and delivers no behaviour. --standalone adds the doctype and head that
+// a published Artifact gets from its host, so the file also opens straight from disk.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseAnalysis, live } from "../../analyze-problem/scripts/analysis.mjs";
+import { parseAnalysis, live, releaseOf } from "../../analyze-problem/scripts/analysis.mjs";
 import { parseDesign } from "./design.mjs";
 
 const args = process.argv.slice(2);
-const VALUED = ["--analysis", "--design", "--out"];
+const VALUED = ["--analysis", "--design", "--out", "--release"];
 const flag = (name) => {
   const i = args.indexOf(name);
   return i === -1 ? undefined : args[i + 1];
@@ -23,8 +27,9 @@ const flag = (name) => {
 const planPath = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]));
 const analysisPath = flag("--analysis");
 const designPath = flag("--design");
+const releaseArg = flag("--release");
 if (!planPath || !analysisPath || !designPath) {
-  console.error("usage: build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--out <file.html>] [--standalone]");
+  console.error("usage: build-plan.mjs <plan.json> --analysis <02-analysis.md> --design <03-design.md> [--release <R2>] [--out <file.html>] [--standalone]");
   process.exit(2);
 }
 const outPath = flag("--out") ?? join(dirname(planPath), basename(planPath).replace(/\.plan\.json$|\.json$/, "") + ".html");
@@ -122,7 +127,24 @@ const behaviours = live(analysis);
 const ids = behaviours.map((b) => b.id);
 const dropped = new Set(analysis.behaviours.filter((b) => b.dropped).map((b) => b.id));
 if (ids.length === 0) errors.push(`coverage: found no "### B<n>" headings in ${analysisPath}`);
-for (const b of ids) {
+
+// Releases: the plan reviews one; the design holds it and every release before it.
+const releaseFor = releaseOf(analysis);
+const releaseIds = (analysis.releases ?? []).map((r) => r.id);
+let inPlan = ids; // behaviours the level-1 claims cover
+let inDesign = ids; // behaviours that must sit in a slice
+if (analysis.releases && !releaseArg) {
+  errors.push(`release: ${analysisPath} has releases (${releaseIds.join(", ")}); pass --release <R> for the one this plan reviews`);
+} else if (releaseArg && !analysis.releases) {
+  errors.push(`release: ${analysisPath} has no "## Releases" section, so there is no ${releaseArg}`);
+} else if (releaseArg) {
+  const upTo = releaseIds.indexOf(releaseArg);
+  if (upTo === -1) errors.push(`release: ${releaseArg} is not in ${analysisPath} (${releaseIds.join(", ")})`);
+  const designed = new Set(releaseIds.slice(0, upTo + 1));
+  inPlan = ids.filter((b) => releaseFor.get(b) === releaseArg);
+  inDesign = ids.filter((b) => designed.has(releaseFor.get(b)));
+}
+for (const b of inPlan) {
   const by = coveredBy.get(b) ?? [];
   if (by.length === 0) errors.push(`coverage: ${b} from the analysis is not covered by any level-1 claim`);
   if (by.length > 1) errors.push(`coverage: ${b} is covered by claims ${by.join(" and ")}; a behaviour belongs to one level-1 claim`);
@@ -130,13 +152,16 @@ for (const b of ids) {
 for (const b of coveredBy.keys()) {
   if (dropped.has(b)) errors.push(`coverage: ${b} is dropped in the analysis`);
   else if (!ids.includes(b)) errors.push(`coverage: ${b} is not a behaviour in the analysis`);
+  else if (!inPlan.includes(b)) errors.push(`coverage: ${b} ships in ${releaseFor.get(b)}; this plan reviews ${releaseArg}`);
 }
 
 // The design: every behaviour in one slice, every criterion with one test tier, no forward dependencies.
 const KNOWN_TIERS = ["unit", "integration", "component", "contract", "end to end", "end-to-end", "e2e", "api", "browser"];
 const design = parseDesign(read(designPath));
 if (design.slices.length === 0) errors.push(`design: no "### S<n>: … (B1, B2)" headings under "## Slices" in ${designPath}`);
-if (!design.base) warnings.push('design: no "Base: <commit>" on the header line; implementation and verification diff against it');
+if (!design.base && !design.slices.some((s) => s.id === "S0")) {
+  warnings.push('design: no "Base: <commit>" on the header line; implementation and verification diff against it');
+}
 const order = new Map();
 const sliceOf = new Map(); // B -> [S]
 const tierOf = new Map(); // B1.1 -> [{ slice, tier }]
@@ -144,19 +169,32 @@ for (const [i, s] of design.slices.entries()) {
   if (order.has(s.id)) errors.push(`design: ${s.id} is used twice`);
   order.set(s.id, i);
 }
-for (const s of design.slices) {
-  if (s.covers.length === 0) errors.push(`design ${s.id}: list the behaviours it delivers in its heading, "### ${s.id}: … (B1, B2)"`);
+let lastRelease = -1;
+for (const [i, s] of design.slices.entries()) {
+  const setup = s.id === "S0";
+  if (setup) {
+    if (i !== 0) errors.push("design S0: the setup slice comes first");
+    if (s.covers.length) errors.push(`design S0: the setup slice delivers no behaviour; move ${s.covers.join(", ")} to a later slice`);
+  } else if (s.covers.length === 0) errors.push(`design ${s.id}: list the behaviours it delivers in its heading, "### ${s.id}: … (B1, B2)"`);
   for (const b of s.covers) {
     sliceOf.set(b, [...(sliceOf.get(b) ?? []), s.id]);
     if (dropped.has(b)) errors.push(`design ${s.id}: ${b} is dropped in the analysis`);
     else if (!ids.includes(b)) errors.push(`design ${s.id}: ${b} is not a behaviour in the analysis`);
+    else if (!inDesign.includes(b)) errors.push(`design ${s.id}: ${b} ships in ${releaseFor.get(b)}, after ${releaseArg}; design it with that release`);
+  }
+  const rels = [...new Set(s.covers.map((b) => releaseFor.get(b)).filter(Boolean))];
+  if (rels.length > 1) errors.push(`design ${s.id}: mixes ${rels.join(" and ")}; a slice ships in one release`);
+  else if (rels.length === 1) {
+    const at = releaseIds.indexOf(rels[0]);
+    if (at < lastRelease) warnings.push(`design ${s.id}: ships in ${rels[0]} but comes after a slice of ${releaseIds[lastRelease]}; order slices by release`);
+    lastRelease = Math.max(lastRelease, at);
   }
   if (s.dependsOn === null) warnings.push(`design ${s.id}: no "Depends on:" line`);
   for (const d of s.dependsOn ?? []) {
     if (!order.has(d)) errors.push(`design ${s.id}: depends on ${d}, which is not a slice`);
     else if (order.get(d) >= order.get(s.id)) errors.push(`design ${s.id}: depends on ${d}, which comes after it; reorder the slices`);
   }
-  if (s.tests.length === 0) errors.push(`design ${s.id}: no "- Tests: B1.1 unit · B1.2 integration" line`);
+  if (s.tests.length === 0 && !setup) errors.push(`design ${s.id}: no "- Tests: B1.1 unit · B1.2 integration" line`);
   for (const part of s.stray) errors.push(`design ${s.id}: "${part}" on the Tests line is not "<criterion ID> <tier>"`);
   for (const t of s.tests) {
     tierOf.set(t.id, [...(tierOf.get(t.id) ?? []), { slice: s.id, tier: t.tier }]);
@@ -166,13 +204,14 @@ for (const s of design.slices) {
     if (!s.covers.includes(b)) errors.push(`design ${s.id}: tests ${t.id}, but ${b} is not in ${s.id}`);
   }
 }
-for (const b of ids) {
+for (const b of inDesign) {
   const in_ = sliceOf.get(b) ?? [];
   if (in_.length === 0) errors.push(`design: ${b} is in no slice`);
   if (in_.length > 1) errors.push(`design: ${b} is in ${in_.join(" and ")}; every behaviour is in exactly one slice`);
 }
 const criteria = behaviours.flatMap((b) => b.criteria.map((c) => c.id));
 for (const c of criteria) {
+  if (!inDesign.includes(c.split(".")[0])) continue;
   const t = tierOf.get(c) ?? [];
   if (t.length === 0) errors.push(`design: ${c} has no test tier on any slice's Tests line`);
   if (t.length > 1) errors.push(`design: ${c} has a tier in ${t.map((x) => x.slice).join(" and ")}; give it one`);

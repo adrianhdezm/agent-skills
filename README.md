@@ -29,75 +29,79 @@ plugins/<plugin>/
 ### `dev-setup`
 
 Skills for configuring a machine with Claude Code — hooks, guardrails, and
-tooling conventions — plus five phase skills that take a project from idea to
+tooling conventions — plus six phase skills that take a project from idea to
 a verified build (see [From idea to verified build](#from-idea-to-verified-build)).
 
 | Skill                       | What it does                                                                                                                                                                                                               |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze-problem`           | Phase 2: interviews fork by fork and writes a framework-free analysis with numbered behaviours (B1…) and testable acceptance criteria (B1.1…)                                                                              |
+| `analyze-problem`           | Phase 3: writes the PRD: every feature as numbered behaviours (B1…) with testable acceptance criteria (B1.1…), cut into releases (R1…), framework-free                                                                     |
 | `apply-stack-conventions`   | Resolves the stack, lists the concept, technology, integration and example docs that apply, and assembles `coding-conventions.md` for the calling skill                                                                    |
 | `bootstrap-project`         | Scaffolds a project from a short interview by looking up the stack conventions for each technology, pairing and starter example, filling gaps with reported defaults; every check passing                                  |
-| `brainstorm-idea`           | Phase 1: collects the idea and its references, proposes directions that differ in kind, and records the chosen direction with the assumptions it bets on                                                                   |
+| `brainstorm-idea`           | Phase 1: collects the idea, the product as you picture it, the stack constraints and references, proposes directions that differ in kind, and records the chosen one                                                       |
 | `confirm-my-goal`           | Plays back the goal, problem and scope in its own words, flags assumptions, and waits for confirmation before acting; runs only via `/confirm-my-goal`                                                                     |
 | `debug-failure`             | Finds the root cause of a failure: reproduces it, narrows it down (bisecting a regression), writes a failing test, fixes the cause and proves it with every check                                                          |
 | `define-constraints`        | Writes the project's quality bar into `CONSTRAINTS.md` (floor, checks with commands, measured values, done means, boundaries), wires `check:fast` / `check:task` / `check:full`, and guards the diff against a lowered bar |
-| `design-solution`           | Phase 3: maps each behaviour onto the project's real building blocks, puts the open forks on an interactive HTML plan, and writes the decisions and ordered vertical slices; scaffolds first when no code exists           |
-| `experiment-idea`           | Optional, between phases 1 and 2: builds a throwaway prototype outside the project, with external services mocked behind strategies, to answer the brainstorm's riskiest assumptions                                       |
-| `implement-design`          | Phase 4: builds the design slice by slice, with one test per criterion titled by its ID and a progress checklist that survives new sessions                                                                                |
+| `design-solution`           | Phase 4: the release's tech lead: maps each behaviour onto real building blocks, puts the forks on an interactive plan, and orders the slices, with an S0 setup task first                                                 |
+| `experiment-idea`           | Phase 2: builds a thin, throwaway version of the idea in two approaches within the stack constraints, compares them, and records your code corrections (C1…)                                                               |
+| `implement-design`          | Phase 5: builds the release slice by slice, each on its own branch and pull request, with one test per criterion titled by its ID; goes on to verify                                                                       |
 | `simplify-code`             | Makes recently changed code easier to read without changing behaviour, one change at a time with the tests run after each; leaves `simplify-ignore` blocks alone                                                           |
 | `setting-up-git-guardrails` | Installs a PreToolUse hook that blocks destructive git commands (force-push, `reset --hard`, `clean -f`, `branch -D`, whole-tree `checkout`/`restore`)                                                                     |
 | `setting-up-npm-block`      | Installs a PreToolUse hook that redirects `npm` to `pnpm`, active only in repos with a `pnpm-lock.yaml`                                                                                                                    |
-| `verify-build`              | Phase 5: traces each criterion to a test, runs every check, exercises each behaviour in the running app, checks design conformance and reviews the diff; failures become fix tasks                                         |
+| `verify-build`              | Phase 6: traces each criterion to a test, runs every check, exercises each behaviour in the running app and reviews the diff; works the fixes until Ready                                                                  |
 | `writing-a-skill`           | Guidance for authoring new skills                                                                                                                                                                                          |
 
 The plugin also registers the `chrome-devtools` MCP server.
 
 ## From idea to verified build
 
-Five skills, one for each phase. You run each one yourself with its slash command; none of them starts on its own.
-Each one writes a file into `docs/<slug>/` and the next one reads it, so you can stop after any phase and pick it up in
-a new session. When you start with no repo, that folder lives in the plugin's data until the design phase gives the
-project its repo.
+Six skills, one for each phase: explore the idea (brainstorm, experiment), write it down (analyze, design), then build
+and prove it (implement, verify). You start each one with its slash command. The last two hand over to each other:
+`/implement-design <slug> all` builds a whole release and goes on to verify it, and verification works its own fixes
+until the release is ready. Each phase writes a file into `docs/<slug>/` and the next one reads it, so you can stop
+after any phase and pick it up in a new session. When you start with no repo, that folder lives in the plugin's data
+until the design phase gives the project its repo.
 
 ```mermaid
 flowchart LR
-    B["<b>1 · /brainstorm-idea</b><br/>what and why<br/><i>you: describe, react, pick</i>"]
-    A["<b>2 · /analyze-problem</b><br/>what people can do<br/><i>you: answer the forks</i>"]
-    D["<b>3 · /design-solution</b><br/>which building blocks<br/><i>you: decide on the plan</i>"]
-    I["<b>4 · /implement-design</b><br/>code and tests<br/><i>runs on its own</i>"]
-    V["<b>5 · /verify-build</b><br/>does it really work?<br/><i>you: read the verdict in<br/>05-verification.md</i>"]
+    B["<b>1 · /brainstorm-idea</b><br/>the idea, the product as you<br/>picture it, the stack<br/><i>you: describe, react, pick</i>"]
+    EX["<b>2 · /experiment-idea</b><br/>a thin version, two ways<br/><i>you: try it, correct the code,<br/>pick an approach</i>"]
+    A["<b>3 · /analyze-problem</b><br/>the PRD: every feature,<br/>cut into releases<br/><i>you: answer the forks</i>"]
+    D["<b>4 · /design-solution</b><br/>the release as ordered tasks,<br/>S0 setup first<br/><i>you: decide on the plan</i>"]
+    I["<b>5 · /implement-design</b><br/>a branch and a PR per slice<br/><i>runs on its own</i>"]
+    V["<b>6 · /verify-build</b><br/>does the release really work?<br/><i>runs on its own until Ready</i>"]
 
-    B -- "01-brainstorm.md" --> A
-    B -. "optional" .-> EX
+    B -- "01-brainstorm.md" --> EX
     EX -- "01-experiment.md" --> A
     A -- "02-analysis.md" --> D
     D -- "03-design.md + plan" --> I
-    I -- "code + 04-progress.md" --> V
+    I -- "merged slices + 04-progress.md" --> V
     V -- "fix tasks" --> I
+    V -. "next release" .-> D
 
-    EX["/experiment-idea<br/><i>a throwaway prototype<br/>answers the riskiest bets</i>"]
-    DC["/define-constraints<br/><i>writes CONSTRAINTS.md;<br/>its guard runs in 4 and 5</i>"]
+    DC["/define-constraints<br/><i>runs in S0; its guard<br/>runs in 5 and 6</i>"]
     SD["/simplify-code<br/><i>when a slice is heavy</i><br/>/debug-failure<br/><i>when a failure is unclear</i>"]
 
-    D -. "once, after scaffolding" .-> DC
+    I -. "in S0" .-> DC
     I -. "as needed" .-> SD
 
     classDef support stroke-dasharray: 4 3
-    class EX,DC,SD support
+    class DC,SD support
 ```
 
-Solid boxes are the five phases, and the label on each arrow is the file that phase leaves in `docs/<slug>/`. Dashed
-boxes are the optional experiment between the first two phases and the supporting skills a phase calls.
+Solid boxes are the six phases, and the label on each arrow is the file that phase leaves in `docs/<slug>/`. Dashed
+boxes are the supporting skills a phase calls. The analysis covers the whole product; design, implement and verify
+then go round once per release.
 
-You stay in the loop where your judgement matters: the interviews in the first two phases, and the decisions on the
-design plan. Implementation runs on its own and stops only when it is blocked, or before anything on the project's
-"Ask first" list or anything destructive.
+You stay in the loop where your judgement matters: the interviews, trying the prototypes and correcting their code,
+and the decisions on the design plan. Implementation and verification run on their own and stop only when they are
+blocked, before anything on the project's "Ask first" list or anything destructive, or when a failure needs your
+decision.
 
 Three supporting skills plug into the phases. You can also run each of them on its own:
 
 | Skill                 | Where the phases use it                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------------------- |
-| `/define-constraints` | Design runs it once, right after scaffolding. Implement and verify run its guard                |
+| `/define-constraints` | Implement runs it in the S0 setup slice. Implement and verify run its guard                     |
 | `/simplify-code`      | Implement runs it at the end of a slice, when the code works but is heavier than it needs to be |
 | `/debug-failure`      | Implement runs it when a check fails and the cause is not plain from the first error            |
 
@@ -105,52 +109,58 @@ Three supporting skills plug into the phases. You can also run each of them on i
 
 - Install the plugin (see [Install](#install)). Consider `setting-up-git-guardrails` first, since the implementation
   phase runs commands without asking each time.
-- Have Node 24+ and pnpm 11+. For a full-stack app, have Docker running.
+- Have Node 24+ and pnpm 11+. For a full-stack app, have Docker running. Have `gh` installed and logged in: the design
+  phase finds or creates the repo with it, and the implementation phase opens and merges a pull request per slice.
 - Pick a **slug** for the initiative: `v1` for a first version, or a feature name such as `billing` later. Every file
   of the initiative lives in `docs/<slug>/`.
 - You do not need a repo yet. Start the brainstorm in the project's repo when there is one, and its docs go in
   `docs/<slug>/` there. Start it anywhere else, and they go in an idea folder,
   `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/`, where you can also drop notes and screenshots under `references/`. The design
-  phase then finds the repo the idea belongs to, or creates a new one with the GitHub CLI, moves the folder into it and
-  scaffolds the code. For that, have `gh` installed and logged in.
+  phase then finds the repo the idea belongs to, or creates a new one with the GitHub CLI, and moves the folder into
+  it.
 
 ### 1. Brainstorm: `/brainstorm-idea <slug>`
 
 **You:** describe the idea in your own words, who has the problem, and anything that inspires it: links, screenshots,
-products you like. Then react to the directions Claude proposes, and pick one.
+products you like. Say how you picture the product (the first moment someone uses it, the screens that matter) and
+what the stack must be or avoid, such as "a web app on Cloudflare". Then react to the directions Claude proposes, and
+pick one.
 
 **Claude:** reads your references, and what earlier initiatives handed on (their **Next initiative**, **Later** and
 **Not doing** lists), and proposes 3 to 5 directions that differ in kind, at least one of them unusual,
-each with its riskiest assumption.
+each with its riskiest assumption. It records the stack you stated, and picks no framework for you.
 
-**You get:** `01-brainstorm.md`, with your words quoted, the directions considered, the chosen direction with the ones
-you dropped, and the assumptions it bets on, riskiest first.
+**You get:** `01-brainstorm.md`, with your words quoted, the **Product concept** and the **Stack constraints**, the
+directions considered, the chosen direction with the ones you dropped, and the assumptions it bets on, riskiest first.
 
-### Optional: Experiment, `/experiment-idea <slug>`
+### 2. Experiment: `/experiment-idea <slug>`
 
-Run it when an assumption from the brainstorm can be checked with code, and a "no" would change the direction.
+**You:** agree the thin path, the questions, the approaches, what gets mocked and the time box. Then try each
+prototype, read its code and change what you would do differently, or tell Claude what to change. Pick the approach.
 
-**You:** agree the questions, what gets mocked, minimal or scaffolded, and the time box, then try the prototype when a
-question is about how it feels.
+**Claude:** builds the **thin path** of your product concept (three to six steps, everything else faked) in two
+approaches that differ in shape within your stack constraints: on Cloudflare, say, a server-rendered Worker over D1
+against a React Router app with a Durable Object per potluck. Each lives in
+`${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-experiment/<approach>/`, outside your project, on a `bootstrap-project` scaffold
+when the constraints name a platform. Before it builds, it turns each assumption into a yes/no question with what would
+count as a yes and a no written down. Every external service (payments, maps, an LLM, a partner API) sits behind an
+interface with a mock strategy, so the prototypes run with no accounts or keys. It snapshots the built code with a
+sandbox-only `git init`, so after you edit it, the diff shows every **correction** (C1, C2, …), each recorded with your
+reason and its kind: behaviour (the analysis takes it), design (the design follows it) or convention (S0 writes it into
+the conventions file). On a "no" to the riskiest question in every approach, it offers to go back to the brainstorm.
 
-**Claude:** turns each assumption into a yes/no question, with what would count as a yes and a no written down before
-it builds. It builds the smallest prototype that answers them in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-experiment`,
-outside your project: plain Node and one HTML page by default, or a `bootstrap-project` scaffold in the lightest
-combination when a question depends on the stack, such as "does library X run on Workers?". Every external service
-(payments, maps, an LLM, a partner API) sits behind an interface with a mock strategy, so the prototype runs with no
-accounts or keys; an environment variable switches one to the real service when the question is about that service. On
-a "no" to the riskiest question, it offers to go back to the brainstorm.
+**You get:** `01-experiment.md`, with the thin path, each question answered per approach and what showed it, a
+comparison, the chosen approach, your corrections, what each mock pretended, and what the analysis and the design must
+take from it. The answered assumptions are ticked in `01-brainstorm.md`.
 
-**You get:** `01-experiment.md`, with each question, its answer and what showed it, what each mock pretended about
-the real service, and what changes for the analysis. The answered assumptions are ticked in `01-brainstorm.md`.
+### 3. Analyze: `/analyze-problem <slug>`
 
-### 2. Analyze: `/analyze-problem <slug>`
+**You:** approve the list of behaviours and the releases, then answer the forks one at a time. Each fork comes with a
+recommended default, so "yes, the default" is a fine answer.
 
-**You:** approve the list of behaviours, then answer the forks one at a time. Each fork comes with a recommended
-default, so "yes, the default" is a fine answer.
-
-**Claude:** turns the direction into behaviours a person can see, with no frameworks, tables or endpoints. Each
-behaviour gets an ID and acceptance criteria:
+**Claude:** writes the product requirements document: every feature the product needs, not only the first version,
+as behaviours a person can see, with no frameworks, tables or endpoints. Each behaviour gets an ID and acceptance
+criteria:
 
 ```markdown
 ### B3: A teammate can vote for one place and change their vote.
@@ -159,63 +169,79 @@ behaviour gets an ID and acceptance criteria:
 - B3.2 Given a teammate voted for A, when they vote for B, then A goes down by one and B goes up by one.
 ```
 
-Every open question from the brainstorm gets an answer here, and each assumption still untested is listed as a
-constraint. A script then checks the file: the shape the later scripts read, unique IDs with no gaps, Given/When/Then
-in every criterion, and that no ID disappeared since the last commit.
+Then it cuts them into **releases**, in the order they ship. R1 is the smallest set someone would use for real,
+usually the experiment's thin path plus what makes it safe:
 
-**You get:** `02-analysis.md`, with actors, behaviours, the domain in plain words, flows, screens, constraints,
-non-goals, and a **Later** list so the first version stays small.
+```markdown
+## Releases
 
-### 3. Design: `/design-solution <slug>`
+- **R1: First poll**: B1, B2, B3 · a team picks lunch in one poll
+- **R2: Regulars**: B4, B5 · favourite places come back each week
+```
+
+Every open question from the brainstorm gets an answer here, each behaviour correction from the experiment becomes a
+behaviour or a criterion, and each assumption still untested is listed as a constraint, with the stack constraints.
+A script then checks the file: the shape the later scripts read, unique IDs with no gaps, Given/When/Then in every
+criterion, every behaviour in exactly one release, and that no ID disappeared since the last commit.
+
+**You get:** `02-analysis.md`, with goals and how to tell they worked, actors, behaviours, releases, the domain in
+plain words, flows, screens, constraints and non-goals.
+
+### 4. Design: `/design-solution <slug> [R1]`
 
 **You:** if the docs are still in the idea folder, pick the repo first: one of yours that Claude found with `gh`, or a
-new private one. If the project has no code yet, pick the stack next: Claude recommends a combination from the
-`bootstrap-project` interview (a Node package, a Hono Worker, a REST API on Node with Express or Hono, React Router on Workers or on Node, an
-Angular app or the Angular full stack, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
-claim and press **Respond**. Then press **Send to Claude**, or copy the response and paste it into the chat.
+new private one. If the project has no code yet, confirm the stack, which usually comes straight from the approach you
+picked in the experiment. Then open the interactive plan, answer its 2 to 5 decisions, comment on any claim and press
+**Respond**. Then press **Send to Claude**, or copy the response and paste it into the chat.
 
-**Claude:** clones that repo, or creates it with `gh repo create`, and moves the idea folder into its `docs/<slug>/`,
-leaving a `MOVED.md` behind. It scaffolds the project if needed, and runs `/define-constraints` to write the quality bar into
-`CONSTRAINTS.md` (four questions, each with a default; "the floor only" is a fine answer). Then it maps every behaviour
-onto the project's real building blocks: tables and migrations, data access, contracts, routes, state, components, and
-the test tier for each criterion. It follows the project's conventions file (such as `coding-conventions.md` from
-`bootstrap-project`), decides the contract, UI and security rules for each behaviour, and checks the official docs
-for any API it is unsure of. It cuts the work into small **vertical slices**, each one visible end to end when it is
-done, with the riskiest one early, and builds the plan page. It does not start until the analysis says `Approved`.
-It commits the scaffold and `CONSTRAINTS.md` on their own and records that commit as the design's `Base:`, the point
-every later diff and guard run starts from. A script checks that every behaviour sits in one claim and one slice, that
-every criterion has one test tier, and that no slice depends on a later one.
+**Claude:** acts as the tech lead for one release (the first not yet designed, unless you name one). It clones the
+repo, or creates it with `gh repo create`, and moves the idea folder into its `docs/<slug>/`, leaving a `MOVED.md`
+behind. It maps every behaviour of the release onto the project's real building blocks: tables and migrations, data
+access, contracts, routes, state, components, and the test tier for each criterion. It follows the project's
+conventions file, or, before there is code, the conventions and starter examples of the chosen stack; honours each
+design and convention correction from the experiment by its C number; decides the contract, UI and security rules
+for each behaviour; and checks the official docs for any API it is unsure of. It cuts the release into ordered tasks,
+small **vertical slices**, each visible end to end when it is done, with the riskiest one early. When the project is
+not set up yet, the first task is **S0**: the scaffold through `bootstrap-project`, `CONSTRAINTS.md` through
+`/define-constraints`, the check scripts, and a CI workflow that runs them on every pull request. A script checks that
+every behaviour of the release sits in one claim and one slice, that no slice holds a later release's behaviour, that
+every criterion has one test tier, that S0 comes first, and that no slice depends on a later one. Once you approve, it
+commits the docs on the default branch.
 
-**You get:** `CONSTRAINTS.md` if the project had none, `03-design.md` (decisions, schema, contracts, modules, ordered
-slices, risks, sources, and the base commit) and `03-design.html`, the review
-page, published as a private artifact. The design is marked `Approved` once nothing is open.
+**You get:** `03-design.md` (decisions, what it takes from the experiment, schema, contracts, modules, ordered slices,
+risks, sources, and the base commit, or `after S0`) and the release's review page, `03-design.R1.html`, published as a
+private artifact. The design is marked `Approved` once nothing is open. A later release adds its decisions and slices
+to the same file.
 
-### 4. Implement: `/implement-design <slug> [S2 | fixes | all]`
+### 5. Implement: `/implement-design <slug> [S2 | fixes | all] [local | no commits]`
 
-**You:** start it, and read `04-progress.md` instead of the scrollback when you want to know where it stands. It
-commits each slice on its own; say "no commits" if you do not want that.
+**You:** start it, usually with `all`, and read `04-progress.md` instead of the scrollback when you want to know where
+it stands. Add `local` to merge without pushing, or `no commits` to leave everything uncommitted.
 
-**Claude:** builds one slice at a time. It writes the slice's checklist first, then writes each test before or with
-its code, titled with the criterion ID (`it("B3.2 moves my vote from A to B", …)`). It runs `check:fast` after each
-item, and uses `/debug-failure` when a failure is not plain. It closes the slice only when `check:task` passes, the
-tests of every tier the slice's criteria use have run (end to end included), every criterion has a titled test, the
-guard finds no lowered bar since the base (no new suppressions, skipped tests or removed assertions), and no checklist
-item is open. If the code is heavier than it
-needs to be, it runs `/simplify-code` on the slice. It touches only what the slice needs and lists anything else it
-noticed. A small departure from the design is recorded as a deviation. A change to behaviour, contract or data stops
-the run and asks you first.
+**Claude:** builds one slice at a time, each on its own branch (`<slug>/s2-…`) from an up to date default branch. S0
+goes first when the design has one; after it merges, the design's `Base:` is set to that commit, the point every later
+diff and guard run starts from. For each slice it writes the checklist first, then writes each test before or with its
+code, titled with the criterion ID (`it("B3.2 moves my vote from A to B", …)`). It runs `check:fast` after each item,
+and uses `/debug-failure` when a failure is not plain. It closes the slice only when `check:task` passes, the tests of
+every tier the slice's criteria use have run (end to end included), every criterion has a titled test, the guard finds
+no lowered bar since the base (no new suppressions, skipped tests or removed assertions), and no checklist item is
+open. If the code is heavier than it needs to be, it runs `/simplify-code` on the slice. Then it pushes the branch,
+opens a pull request with `gh`, waits for CI, and squash-merges it. It touches only what the slice needs and lists
+anything else it noticed. A small departure from the design is recorded as a deviation. A change to behaviour,
+contract or data stops the run and asks you first. With `all`, when the release's last slice merges, it goes straight
+on to verification.
 
-**You get:** working code and tests, one commit per slice, plus `04-progress.md` with ticked checklists, decisions,
-deviations and anything it found. With no slice named, it starts with any open fixes from verification, then the next
-slice.
+**You get:** one merged pull request per slice, working code and tests on the default branch, plus `04-progress.md`
+with ticked checklists, the PR of each slice, decisions, deviations and anything it found. With no slice named, it
+starts with any open fixes from verification, then the next slice.
 
-### 5. Verify: `/verify-build <slug>`
+### 6. Verify: `/verify-build <slug> [R1 | S2] [--since <commit>] [--once]`
 
 **You:** read the verdict and the "Not confirmed" and "Not blocking" lists, and decide what to do about them.
 
-**Claude:** checks what green tests alone do not prove:
+**Claude:** checks what green tests alone do not prove, for the release, on the default branch:
 
-- traces every criterion ID to the tests whose titles name it, and reads those tests;
+- traces every criterion ID of the release to the tests whose titles name it, and reads those tests;
 - runs every project check (`check:full`), the guard since the design's base, and each item of the **Done means**
   list from `CONSTRAINTS.md`;
 - starts the app and walks each behaviour as a user would, in the browser through the `chrome-devtools` MCP server,
@@ -225,37 +251,42 @@ slice.
   architecture, security and performance, labelling each finding **Critical** or **Required** (blocks) or
   **Optional** or **Nit** (does not).
 
-It changes no code. Each failure becomes a checklist item under **Fixes from verification** in `04-progress.md`. On a
-**Ready** verdict it closes the initiative: accepted deviations go into the design, accepted gaps are listed, and a
-**Next initiative** section hands the Later list and untested assumptions to the next brainstorm.
+It changes no code before the verdict is written. Each failure becomes a checklist item under **Fixes from
+verification** in `04-progress.md`. Then it **continues**: it builds the fixes on their own branch the way
+implementation does, merges them, and verifies again with `--since`, walking only the behaviours the fixes touched, as
+a new row in the file's **Runs** table. It stops at **Ready**, after three rounds that do not get there, or at a
+failure only you can decide. `--once` writes the verdict and stops. On **Ready** it closes the release: accepted
+deviations go into the design, accepted gaps are listed, and it names the next release to design. After the last
+release, a **Next initiative** section hands the Later list and untested assumptions to the next brainstorm.
 
 **You get:** `05-verification.md` with a verdict (**Ready**, **Ready with fixes** or **Not ready**), a table of every
-criterion with its test, its live result and its evidence, and screenshots in `evidence/`. If there are fixes, run
-`/implement-design <slug>` again: it starts with them. Then run `/verify-build <slug> --since <commit>`: it walks
-again only the behaviours the fixes touched, and adds a row to the file's **Runs** table, so earlier verdicts stay on
-record.
+criterion with its test, its live result and its evidence, screenshots in `evidence/`, and a row per round in the
+**Runs** table.
 
 ### How the IDs tie it together
 
-The IDs from the analysis carry through every phase, so nothing gets lost between them:
+The IDs carry through every phase, so nothing gets lost between them:
 
-| Phase     | What happens to B3.2                                                                 |
-| --------- | ------------------------------------------------------------------------------------ |
-| Analyze   | written as a criterion: "Given a teammate voted for A, when they vote for B, …"      |
-| Design    | B3 is listed on slice S2, and B3.2 gets a test tier (integration)                    |
-| Implement | the test is titled `B3.2 moves my vote from A to B`                                  |
-| Verify    | traced to `tests/app.test.ts`, walked in the browser, screenshot `evidence/B3.2.png` |
+| Phase      | What happens                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| Experiment | you rename a route handler and say why: correction C2 (design)                                     |
+| Analyze    | B3.2 written as a criterion: "Given a teammate voted for A, when they vote for B, …"; B3 is in R1  |
+| Design     | B3 is listed on slice S2, B3.2 gets a test tier (integration), and D4 honours C2                   |
+| Implement  | S2 is built on `v1/s2-…`; the test is titled `B3.2 moves my vote from A to B`; PR #3 merges        |
+| Verify     | B3.2 traced to `tests/app.test.ts`, walked in the browser, screenshot `evidence/B3.2.png`; R1 Ready |
 
 ### What a finished initiative looks like
 
 ```
 docs/v1/
 ├── 01-brainstorm.md
-├── 01-experiment.md        only if you ran /experiment-idea
+├── 01-experiment.md
 ├── 02-analysis.md
 ├── 03-design.md
-├── 03-design.plan.json     the plan's data; 03-design.html is built from it
-├── 03-design.html
+├── 03-design.R1.plan.json  each release's plan data; its .html page is built from it
+├── 03-design.R1.html
+├── 03-design.R2.plan.json
+├── 03-design.R2.html
 ├── 04-progress.md
 ├── 05-verification.md
 └── evidence/
@@ -263,13 +294,19 @@ docs/v1/
     └── …
 ```
 
+The brainstorm and the experiment share the `01` prefix: together they explore the idea before anything is specified.
+
 ### Tips
 
 - **Where does it stand?** `node <plugin>/skills/implement-design/scripts/progress.mjs docs/<slug>` prints the
-  Status line of each phase file, each slice's state and open items, and what comes next.
+  Status line of each phase file, each slice's state and open items, each release with its slices, and what comes
+  next.
 - **Every run ends the same way**, with three headings: **Blocked on me**, **Changed** and **Found**, then the command
   to run next. Read **Blocked on me** first.
-- **Keep the first version small.** Push ideas to **Later** in the analysis. The next initiative can pick them up.
+- **Keep R1 small, not the analysis.** Describe every feature in the analysis; let the releases decide what ships
+  first.
+- **Correct the prototype's code freely.** It is throwaway, and every edit you make there becomes a recorded
+  correction that the analysis and the design must honour.
 - **"Not opened; default kept"** in a plan response means you did not look at that decision. Claude will ask about it
   in chat if it matters.
 - **Changing your mind** about a behaviour means updating the analysis. IDs never get renumbered: a removed behaviour

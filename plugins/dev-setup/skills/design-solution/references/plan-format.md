@@ -1,8 +1,9 @@
 # Plan Format
 
-The review page is built from one JSON file, `docs/<slug>/03-design.plan.json`. `scripts/build-plan.mjs` checks it and
-writes `03-design.html`. This file gives the shape, the exhibits, the claim rules and the response the reader sends
-back.
+The review page for a release is built from one JSON file, `docs/<slug>/03-design.<R>.plan.json` (such as
+`03-design.R1.plan.json`, or `03-design.plan.json` when the analysis has no releases). `scripts/build-plan.mjs` checks
+it and writes the page next to it (`03-design.R1.html`). This file gives the shape, the exhibits, the claim rules and
+the response the reader sends back.
 
 ## Contents
 
@@ -48,7 +49,8 @@ back.
 - `why`: the user's own words, quoted from the brainstorm or the analysis. Do not reword them.
 - `files`: the count of files the design adds, changes or deletes.
 - `claims`: the tree. Its level-1 claims are the summary.
-- `shared`: a record or module that several claims use, such as the schema. Leave it out when there is none.
+- `shared`: a record or module that several claims use, such as the schema, and the S0 setup task when the design has
+  one (a `list` exhibit of what it sets up). Leave it out when there is none.
 - `scope`: what does not change. Required.
 
 ## 2. Claims

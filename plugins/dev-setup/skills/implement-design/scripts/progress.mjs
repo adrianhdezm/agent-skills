@@ -3,14 +3,17 @@
 //
 //   node progress.mjs <docs/<slug>> [--slice <S2 | fixes>]
 //
-// Prints the Status line of each phase file, then each slice of the design with its state in 04-progress.md, then
-// what to build next: the open "Fixes from verification" section first, then the first slice not done.
+// Prints the Status line of each phase file, each release of the analysis with its slices, then each slice of the
+// design with its state in 04-progress.md, then what to build next: the open "Fixes from verification" section
+// first, then the first slice not done; when every designed slice is done, the release to verify and the one to
+// design next.
 // Errors: a section marked done with an unticked item, a section whose state is not "done" or "in progress", or a
 // section in the progress file that is not a slice of the design. With --slice, also exits 1 when that section has
 // an unticked item, so a slice cannot be closed with work left on it. Exit 0: clean · 1: errors · 2: could not run.
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { parseAnalysis, releaseOf } from "../../analyze-problem/scripts/analysis.mjs";
 import { parseDesign } from "../../design-solution/scripts/design.mjs";
 
 const args = process.argv.slice(2);
@@ -27,12 +30,10 @@ if (!existsSync(dir)) {
 }
 
 const PHASES = ["01-brainstorm.md", "01-experiment.md", "02-analysis.md", "03-design.md", "04-progress.md", "05-verification.md"];
-const OPTIONAL = new Set(["01-experiment.md"]); // listed only when written
 console.log("Phase files");
 for (const f of PHASES) {
   const p = join(dir, f);
   if (!existsSync(p)) {
-    if (OPTIONAL.has(f)) continue;
     console.log(`  ${f.padEnd(20)} not written`);
     continue;
   }
@@ -85,12 +86,35 @@ for (const id of rows) {
   if (s.state === "done" && open.length) errors.push(`${id} is marked done with ${open.length} unticked item(s)`);
 }
 
+// Releases: which slices ship each one. S0 sets the project up for the first.
+const analysisPath = join(dir, "02-analysis.md");
+const analysis = existsSync(analysisPath) ? parseAnalysis(readFileSync(analysisPath, "utf8")) : { releases: null };
+const releaseFor = releaseOf(analysis);
+const releases = (analysis.releases ?? []).map((r, i) => ({
+  ...r,
+  slices: design.slices.filter((s) => (s.id === "S0" ? i === 0 : releaseFor.get(s.covers[0]) === r.id)).map((s) => s.id)
+}));
+if (releases.length) {
+  console.log("\nReleases");
+  for (const r of releases) {
+    const done = r.slices.filter((id) => sections.get(id)?.state === "done").length;
+    console.log(`  ${r.id.padEnd(4)} ${r.name.padEnd(28)} ${r.slices.length ? `${r.slices.join(", ")} · ${done}/${r.slices.length} done` : "not designed"}`);
+  }
+}
+
 const fixes = sections.get("fixes");
 const next =
   fixes && (fixes.state !== "done" || fixes.items.some((i) => !i.done))
     ? "fixes"
     : order.find((id) => sections.get(id)?.state !== "done") ?? null;
-console.log(`\nNext: ${next === "fixes" ? "Fixes from verification" : next ?? "every slice is done; run /verify-build"}`);
+let allDone = "every slice is done; run /verify-build";
+const designed = releases.filter((r) => r.slices.length);
+if (designed.length) {
+  const later = releases.find((r) => !r.slices.length);
+  const slug = basename(resolve(dir));
+  allDone = `every slice of ${designed.at(-1).id} is done; run /verify-build ${slug} ${designed.at(-1).id}${later ? `, then /design-solution ${slug} ${later.id}` : ""}`;
+}
+console.log(`\nNext: ${next === "fixes" ? "Fixes from verification" : next ?? allDone}`);
 
 if (only) {
   const s = sections.get(only);
