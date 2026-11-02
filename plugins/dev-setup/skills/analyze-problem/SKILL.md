@@ -39,7 +39,7 @@ Scripts in three phases read this file, so its shape is fixed: a behaviour is a 
 - [ ] 6. 02-analysis.md written and checked
 ```
 
-1. **Read the inputs.** Read `docs/<slug>/01-brainstorm.md` if it exists, including its **Open for analysis** and **Assumptions to test** lists: each open question gets answered in this phase, and each untested assumption becomes a constraint or a fork. Read `docs/<slug>/01-experiment.md` too, if it exists: an assumption it answered "no" or "partly" is a fork to raise with the user, and each pretence under its **Mocked services** becomes a constraint as "Assumed, not tested: …". If the brainstorm does not exist, ask the user for the idea, the people and the references, as the brainstorm phase would. Read any notes, briefs or designs they point to. If the repo already has code, read enough to know what exists today. A behaviour the code already has is still listed, marked _(exists)_, so verification covers it.
+1. **Read the inputs.** The docs live in the repo's `docs/<slug>/` or, before there is a repo, in `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/` (see `brainstorm-idea`, Where the docs live). `docs/<slug>/` below means that folder, and this phase writes there too: the design phase moves it into the repo. Read `docs/<slug>/01-brainstorm.md` if it exists, including its **Open for analysis** and **Assumptions to test** lists: each open question gets answered in this phase, and each untested assumption becomes a constraint or a fork. Read `docs/<slug>/01-experiment.md` too, if it exists: an assumption it answered "no" or "partly" is a fork to raise with the user, and each pretence under its **Mocked services** becomes a constraint as "Assumed, not tested: …". If the brainstorm does not exist, ask the user for the idea, the people and the references, as the brainstorm phase would. Read any notes, briefs or designs they point to, and everything in `docs/<slug>/references/`. If the repo already has code, read enough to know what exists today. A behaviour the code already has is still listed, marked _(exists)_, so verification covers it.
 
    **Check the scope.** If the direction bundles capabilities that could ship and be checked separately (each with its own users or data, such as accounts, billing and reports), propose splitting it into several initiatives, each with its own slug, and an order to build them in. Analyze one initiative at a time.
 
@@ -67,7 +67,8 @@ Scripts in three phases read this file, so its shape is fixed: a behaviour is a 
    `<skill-dir>` is this skill's base directory. The script checks the Status line, the heading and bullet shape the
    later scripts read, that B numbers are unique with no gaps, that every behaviour has a criterion with Given, When
    and Then, and, against the committed version of the file, that no ID disappeared. A warning that an ID changed
-   since the last commit means: if its meaning changed, drop it and add a new number.
+   since the last commit means: if its meaning changed, drop it and add a new number. In the idea folder there is no
+   commit to compare against, so that last check starts once the design moves the docs into a repo.
 
 ## Template
 

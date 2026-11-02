@@ -1,6 +1,6 @@
 ---
 name: brainstorm-idea
-description: Opens a new initiative by interviewing the user about the idea, the references that inspire it and who it is for, proposing several deliberately different directions, and recording the chosen direction in docs/<slug>/01-brainstorm.md. Use when the user runs /brainstorm-idea, or has a raw idea they want to explore before any requirements exist.
+description: Opens a new initiative by interviewing the user about the idea, the references that inspire it and who it is for, proposing several deliberately different directions, and recording the chosen direction in 01-brainstorm.md, under docs/<slug>/ in the project's repo or, when there is no repo yet, in an idea folder in the plugin's data. Use when the user runs /brainstorm-idea, or has a raw idea they want to explore before any requirements exist.
 disable-model-invocation: true
 ---
 
@@ -19,12 +19,16 @@ This phase widens before it narrows. Collect what the user has in mind, show the
 
 ## Where the docs live
 
-Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names the initiative in kebab case (`v1`, `potluck`, `billing`). Each phase reads only the files of the phases before it, plus the repo, so work can stop and resume in a new session.
+Every phase writes into one folder per initiative, where `<slug>` names the initiative in kebab case (`v1`, `potluck`, `billing`). Each phase reads only the files of the phases before it, plus the repo, so work can stop and resume in a new session. Which folder depends on how the brainstorm starts:
 
-- If the current directory is the project, use it.
-- If there is no project yet, ask where it will live (default `~/Code/<slug>`), create the folder and run `git init`. The scaffold comes later, in the design phase. The scaffold skills accept a folder that holds only `docs/`.
-- If `docs/<slug>/01-brainstorm.md` exists, read it and continue from it instead of starting over.
-- If earlier initiatives exist under `docs/`, read what they handed on: the **Next initiative** section of each
+- **In the project's repo:** the current directory is the repo the idea belongs to. Write into its `docs/<slug>/`.
+- **With no repo yet:** there is none, or the current directory belongs to something else. Write into the idea folder, `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/`. Do not create a repo or run `git init`: an idea can be dropped before it needs one, and the design phase finds or creates the repo and moves the folder into it.
+
+If you cannot tell which case it is, ask, with the idea folder as the default. In this file and the next phases, `docs/<slug>/` means whichever of the two holds the initiative.
+
+- If `01-brainstorm.md` exists in that folder, read it and continue from it instead of starting over. If the idea folder holds only `MOVED.md`, the initiative already lives in the repo it names: continue there.
+- Tell the user the folder's full path. Anything they want the later phases to see (notes, briefs, screenshots, exports) goes in its `references/` folder.
+- If earlier initiatives exist under the repo's `docs/`, read what they handed on: the **Next initiative** section of each
   `05-verification.md`, the **Later** list of each `02-analysis.md` and the **Not doing** list of each
   `01-brainstorm.md`. Offer the items that touch this idea as references, and quote them in the file. Do not reopen a
   Not doing item without saying so.
@@ -32,7 +36,7 @@ Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names
 ## Workflow
 
 ```
-- [ ] 1. Project folder and slug settled
+- [ ] 1. Docs folder and slug settled
 - [ ] 2. Idea, people and references collected
 - [ ] 3. Directions proposed
 - [ ] 4. Direction picked
@@ -41,7 +45,7 @@ Every phase writes into `docs/<slug>/` at the project root, where `<slug>` names
 
 1. **Settle the folder and the slug** as above.
 
-2. **Collect.** Start from what earlier initiatives handed on, if any (see above). Then ask the user to dump everything: the idea in their own words, who has the problem, what they do today, and references (products, links, screenshots, repos, half-remembered "like X but for Y"). Read or fetch every reference they give. If one will not open, say so and ask for another way in: never describe a reference from its name alone. Quote the user's own words in the file. Do not reword them. Then interview:
+2. **Collect.** Start from what earlier initiatives handed on, if any (see above). Then ask the user to dump everything: the idea in their own words, who has the problem, what they do today, and references (products, links, screenshots, repos, half-remembered "like X but for Y"). Read or fetch every reference they give, and everything in `references/`. Copy a file they hand you into `references/`, so it travels with the docs. If one will not open, say so and ask for another way in: never describe a reference from its name alone. Quote the user's own words in the file. Do not reword them. Then interview:
    - Ask one question at a time, about the problem or the people, not the build. Attach your guess and why: the user corrects a wrong guess faster than they answer a blank question.
    - Listen for what the user thinks they should want: "scalable", "modern", "the way most apps do it". Then ask: "If you did not have to justify this to anyone, what would you want?"
    - Stop when you can predict their answer to your next three questions.
@@ -121,9 +125,11 @@ End with three headings: **Blocked on me** (what only the user can answer), **Ch
 - Directions that are variants of one idea, or none that surprised the user
 - Agreeing with every idea: a partner who never says "this one is weak" is not helping
 - An empty Not doing list
+- A repo created or `git init` run during the brainstorm
 
 ## Review Checklist
 
+- [ ] The docs are in the repo's `docs/<slug>/`, or in the idea folder when there is no repo, and the user knows the path
 - [ ] The user's words are quoted, not reworded
 - [ ] Questions came one at a time, each with a guess
 - [ ] 3 to 5 directions that differ in kind, at least one unusual, each with its riskiest assumption and a verdict

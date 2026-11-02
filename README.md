@@ -56,7 +56,8 @@ The plugin also registers the `chrome-devtools` MCP server.
 
 Five skills, one for each phase. You run each one yourself with its slash command; none of them starts on its own.
 Each one writes a file into `docs/<slug>/` and the next one reads it, so you can stop after any phase and pick it up in
-a new session.
+a new session. When you start with no repo, that folder lives in the plugin's data until the design phase gives the
+project its repo.
 
 ```mermaid
 flowchart LR
@@ -107,8 +108,11 @@ Three supporting skills plug into the phases. You can also run each of them on i
 - Have Node 24+ and pnpm 11+. For a full-stack app, have Docker running.
 - Pick a **slug** for the initiative: `v1` for a first version, or a feature name such as `billing` later. Every file
   of the initiative lives in `docs/<slug>/`.
-- You do not need a repo yet. The first phase creates the project folder if there is none, and the design phase
-  scaffolds the code.
+- You do not need a repo yet. Start the brainstorm in the project's repo when there is one, and its docs go in
+  `docs/<slug>/` there. Start it anywhere else, and they go in an idea folder,
+  `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/`, where you can also drop notes and screenshots under `references/`. The design
+  phase then finds the repo the idea belongs to, or creates a new one with the GitHub CLI, moves the folder into it and
+  scaffolds the code. For that, have `gh` installed and logged in.
 
 ### 1. Brainstorm: `/brainstorm-idea <slug>`
 
@@ -164,12 +168,14 @@ non-goals, and a **Later** list so the first version stays small.
 
 ### 3. Design: `/design-solution <slug>`
 
-**You:** if the project has no code yet, pick the stack first: Claude recommends a combination from the
+**You:** if the docs are still in the idea folder, pick the repo first: one of yours that Claude found with `gh`, or a
+new private one. If the project has no code yet, pick the stack next: Claude recommends a combination from the
 `bootstrap-project` interview (a Node package, a Hono Worker, a REST API on Node with Express or Hono, React Router on Workers or on Node, an
 Angular app or the Angular full stack, or your own). Then open the interactive plan, answer its 2 to 5 decisions, comment on any
 claim and press **Respond**. Then press **Send to Claude**, or copy the response and paste it into the chat.
 
-**Claude:** scaffolds the project if needed, and runs `/define-constraints` to write the quality bar into
+**Claude:** clones that repo, or creates it with `gh repo create`, and moves the idea folder into its `docs/<slug>/`,
+leaving a `MOVED.md` behind. It scaffolds the project if needed, and runs `/define-constraints` to write the quality bar into
 `CONSTRAINTS.md` (four questions, each with a default; "the floor only" is a fine answer). Then it maps every behaviour
 onto the project's real building blocks: tables and migrations, data access, contracts, routes, state, components, and
 the test tier for each criterion. It follows the project's conventions file (such as `coding-conventions.md` from
