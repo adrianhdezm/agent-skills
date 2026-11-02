@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [typescript, eslint]
+---
 # TypeScript + ESLint
 
 Linting with type information through typescript-eslint: every linted file belongs to a TypeScript project, the

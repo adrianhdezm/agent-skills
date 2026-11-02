@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # Data access
 
 How code reads and writes the database, whatever the ORM or runtime: one layer touches the database, everything above it

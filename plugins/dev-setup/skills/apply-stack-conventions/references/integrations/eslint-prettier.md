@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [eslint, prettier]
+---
 # ESLint + Prettier
 
 Prettier formats, ESLint judges: the two never overlap, and each has its own check. Every stack uses it.

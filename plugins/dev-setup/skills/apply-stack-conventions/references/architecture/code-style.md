@@ -1,3 +1,7 @@
+---
+kind: concept
+always: true
+---
 # Code style
 
 How code is written, whatever the language tooling: comments that explain decisions, named exports, small units,

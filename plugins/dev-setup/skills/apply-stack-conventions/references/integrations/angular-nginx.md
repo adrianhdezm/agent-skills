@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, nginx]
+---
 # Angular + Nginx
 
 The Angular build served by Nginx: the browser bundle copied into Nginx's root, the router reached through the SPA

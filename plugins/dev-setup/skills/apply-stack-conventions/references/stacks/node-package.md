@@ -1,3 +1,7 @@
+---
+kind: stack
+technologies: [pnpm, typescript, node, eslint, prettier, vitest]
+---
 # Node package
 
 A single-package TypeScript project that Node 24 runs as it is: a library, a CLI or a script. Nothing is built,

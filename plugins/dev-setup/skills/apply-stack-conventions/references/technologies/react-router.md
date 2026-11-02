@@ -1,3 +1,10 @@
+---
+kind: technology
+role: framework
+detect:
+  files: [react-router.config.ts]
+aliases: ['React Router', react-router, 'reactRouter(']
+---
 # React Router
 
 React Router 8 in framework mode, server-rendered: routes whose loaders and actions are the backend, a typed context,

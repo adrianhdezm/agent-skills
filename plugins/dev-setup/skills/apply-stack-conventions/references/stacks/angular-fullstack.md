@@ -1,3 +1,9 @@
+---
+kind: stack
+technologies: [pnpm, typescript, node, express, pino, postgres, drizzle, angular, ngrx, tailwind, storybook, nginx, docker-compose, eslint, prettier, vitest]
+optional:
+  angular-fundamental-ngx: [fundamental-ngx]
+---
 # Angular full stack
 
 A pnpm-workspace monorepo: an Express 5 + Drizzle + Postgres API in `api/` and the Angular web package in `web/`, run by

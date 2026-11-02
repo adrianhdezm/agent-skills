@@ -1,3 +1,11 @@
+---
+kind: technology
+role: library
+realises: [ui-components]
+detect:
+  files: [components.json]
+aliases: [shadcn]
+---
 # shadcn
 
 The shadcn CLI and its registries: primitives copied into the app as source, with their dependencies, and their imports

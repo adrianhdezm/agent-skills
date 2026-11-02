@@ -1,3 +1,10 @@
+---
+kind: technology
+role: toolchain
+detect:
+  files: ['tsconfig*.json']
+aliases: [TypeScript]
+---
 # TypeScript
 
 How TypeScript is configured and pinned: one project per runtime, checked without emitting.

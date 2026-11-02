@@ -1,3 +1,7 @@
+---
+kind: stack
+technologies: [pnpm, typescript, node, express, pino, postgres, drizzle, docker-compose, eslint, prettier, vitest]
+---
 # REST API on Node
 
 A single-package Express 5 + Drizzle + Postgres REST API, compiled by `tsc` and run on Node, next to Postgres in Docker

@@ -1,3 +1,12 @@
+---
+kind: technology
+role: library
+realises: [database, data-access]
+detect:
+  dependencies: [drizzle-orm]
+  files: [drizzle.config.ts]
+aliases: [Drizzle, drizzle]
+---
 # Drizzle
 
 Drizzle ORM with zod: the schema, migrations, and a DAO layer with typed list queries. The engine it talks to, and how

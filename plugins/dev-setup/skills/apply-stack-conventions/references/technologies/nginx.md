@@ -1,3 +1,10 @@
+---
+kind: technology
+role: runtime
+detect:
+  files: [nginx.conf]
+aliases: [Nginx, nginx]
+---
 # Nginx
 
 Nginx as the server of a single-page app's static build: one `nginx.conf`, an SPA fallback, and no proxy.

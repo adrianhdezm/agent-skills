@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [hono, pino]
+---
 # Hono + Pino
 
 Pino inside a Hono API on Node: a small request-log middleware on the one logger, and the error handler logging there

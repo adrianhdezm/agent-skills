@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, eslint]
+---
 # Angular + ESLint
 
 angular-eslint's presets for an Angular package: TypeScript and inline templates linted together, selector prefixes per

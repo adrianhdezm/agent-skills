@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # Authentication
 
 How users sign in and how the app decides what they may see: an established library owns sessions, the server entry

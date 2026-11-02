@@ -1,3 +1,7 @@
+---
+kind: example
+needs: [[react-router, better-auth]]
+---
 # Sign in
 
 Email and password sign-in on a React Router app: sign up, log in, a protected page that knows who is signed in, and

@@ -1,3 +1,9 @@
+---
+kind: integration
+connects: [hono, drizzle]
+realises: [data-access, rest-api]
+unless: [react-router]
+---
 # Hono + Drizzle
 
 A Hono API over the Drizzle DAO layer: the server entry builds the DAOs once and hands them to `createApp(context)`,

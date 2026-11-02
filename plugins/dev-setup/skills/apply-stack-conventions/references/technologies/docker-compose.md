@@ -1,3 +1,10 @@
+---
+kind: technology
+role: runtime
+detect:
+  files: [docker-compose.yml, compose.yml]
+aliases: [Docker, Compose, docker-compose, 'docker compose']
+---
 # Docker Compose
 
 How apps and the services they need run in containers: small, reproducible images built in two stages, one Compose file

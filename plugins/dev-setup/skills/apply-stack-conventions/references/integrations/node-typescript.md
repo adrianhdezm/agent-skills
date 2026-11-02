@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [node, typescript]
+---
 # Node + TypeScript
 
 How TypeScript runs on Node: as it is, with the types stripped by Node 24, or compiled by `tsc` to `dist/`. The Node

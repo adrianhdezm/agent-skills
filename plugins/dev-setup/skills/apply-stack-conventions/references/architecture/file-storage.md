@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # File storage
 
 How an app stores uploaded files: bytes in an object store, metadata in the database, one service that keeps the two in

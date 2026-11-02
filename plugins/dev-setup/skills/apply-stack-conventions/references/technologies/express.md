@@ -1,3 +1,11 @@
+---
+kind: technology
+role: framework
+realises: [rest-api]
+detect:
+  dependencies: [express]
+aliases: [Express, 'express()', '`express`']
+---
 # Express
 
 Express 5 as an HTTP API: an app factory, a context singleton, controllers that validate with zod and call the data

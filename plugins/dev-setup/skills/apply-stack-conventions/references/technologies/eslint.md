@@ -1,3 +1,10 @@
+---
+kind: technology
+role: tooling
+detect:
+  files: ['eslint.config.*']
+aliases: [ESLint, eslint]
+---
 # ESLint
 
 How code is linted: flat config, one shared rule set, framework presets on top, and overrides that say why.

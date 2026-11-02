@@ -1,3 +1,11 @@
+---
+kind: technology
+role: service
+realises: [file-storage]
+detect:
+  dependencies: [@aws-sdk/client-s3]
+aliases: [RustFS, S3]
+---
 # S3 storage
 
 S3-compatible object storage: the AWS SDK v3 client, configured from the root `.env`, against any S3-compatible service.

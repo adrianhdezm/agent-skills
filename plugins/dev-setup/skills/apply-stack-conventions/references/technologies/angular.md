@@ -1,3 +1,10 @@
+---
+kind: technology
+role: framework
+detect:
+  files: [angular.json]
+aliases: [Angular, @angular/]
+---
 # Angular
 
 Angular 22 as a single-page app: the CLI scaffold and its cleanup, standalone signal components with inline templates,

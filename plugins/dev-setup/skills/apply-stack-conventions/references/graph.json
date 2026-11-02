@@ -1,0 +1,3565 @@
+{
+  "concepts": {
+    "authentication": {
+      "id": "authentication",
+      "title": "Authentication",
+      "file": "architecture/authentication.md",
+      "kind": "concept"
+    },
+    "code-style": {
+      "id": "code-style",
+      "title": "Code style",
+      "file": "architecture/code-style.md",
+      "always": true,
+      "kind": "concept"
+    },
+    "data-access": {
+      "id": "data-access",
+      "title": "Data access",
+      "file": "architecture/data-access.md",
+      "kind": "concept"
+    },
+    "database": {
+      "id": "database",
+      "title": "Database",
+      "file": "architecture/database.md",
+      "kind": "concept"
+    },
+    "file-storage": {
+      "id": "file-storage",
+      "title": "File storage",
+      "file": "architecture/file-storage.md",
+      "kind": "concept"
+    },
+    "rest-api": {
+      "id": "rest-api",
+      "title": "REST API",
+      "file": "architecture/rest-api.md",
+      "kind": "concept"
+    },
+    "ui-components": {
+      "id": "ui-components",
+      "title": "UI components",
+      "file": "architecture/ui-components.md",
+      "kind": "concept"
+    }
+  },
+  "technologies": {
+    "angular": {
+      "id": "angular",
+      "title": "Angular",
+      "file": "technologies/angular.md",
+      "role": "framework",
+      "detect": {
+        "files": [
+          "angular.json"
+        ]
+      },
+      "aliases": [
+        "Angular",
+        "@angular/"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`schematics[\"@schematics/angular:component\"].style: \"css\"`; `styles: [\"src/styles.css\"]`, `inlineStyleLanguage: \"css\"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "better-auth": {
+      "id": "better-auth",
+      "title": "Better Auth",
+      "file": "technologies/better-auth.md",
+      "role": "library",
+      "realises": [
+        "authentication"
+      ],
+      "detect": {
+        "dependencies": [
+          "better-auth"
+        ]
+      },
+      "aliases": [
+        "Better Auth",
+        "better-auth",
+        "betterAuth"
+      ],
+      "kind": "technology",
+      "owns": []
+    },
+    "cloudflare-d1": {
+      "id": "cloudflare-d1",
+      "title": "Cloudflare D1",
+      "file": "technologies/cloudflare-d1.md",
+      "role": "service",
+      "family": "cloudflare-workers",
+      "realises": [
+        "database"
+      ],
+      "detect": {
+        "fileContains": [
+          "wrangler.jsonc=d1_databases"
+        ]
+      },
+      "aliases": [
+        "D1"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`\"d1_databases\": [{ \"binding\": \"APP_DB\", \"database_name\": \"<name>\", \"database_id\": \"<id>\", \"migrations_table\": \"__migrations__\", \"migrations_dir\": \"db/migrations\" }]`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "cloudflare-r2": {
+      "id": "cloudflare-r2",
+      "title": "Cloudflare R2",
+      "file": "technologies/cloudflare-r2.md",
+      "role": "service",
+      "family": "cloudflare-workers",
+      "realises": [
+        "file-storage"
+      ],
+      "detect": {
+        "fileContains": [
+          "wrangler.jsonc=r2_buckets"
+        ]
+      },
+      "aliases": [
+        "R2"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`\"r2_buckets\": [{ \"binding\": \"APP_FILES\", \"bucket_name\": \"<name>\" }]`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "cloudflare-workers": {
+      "id": "cloudflare-workers",
+      "title": "Cloudflare Workers",
+      "file": "technologies/cloudflare-workers.md",
+      "role": "runtime",
+      "detect": {
+        "files": [
+          "wrangler.jsonc",
+          "wrangler.toml"
+        ]
+      },
+      "aliases": [
+        "Worker",
+        "Workers",
+        "workerd",
+        "Wrangler",
+        "wrangler",
+        "Cloudflare"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "Value",
+          "source": "Required values"
+        }
+      ]
+    },
+    "docker-compose": {
+      "id": "docker-compose",
+      "title": "Docker Compose",
+      "file": "technologies/docker-compose.md",
+      "role": "runtime",
+      "detect": {
+        "files": [
+          "docker-compose.yml",
+          "compose.yml"
+        ]
+      },
+      "aliases": [
+        "Docker",
+        "Compose",
+        "docker-compose",
+        "docker compose"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "drizzle": {
+      "id": "drizzle",
+      "title": "Drizzle",
+      "file": "technologies/drizzle.md",
+      "role": "library",
+      "realises": [
+        "database",
+        "data-access"
+      ],
+      "detect": {
+        "dependencies": [
+          "drizzle-orm"
+        ],
+        "files": [
+          "drizzle.config.ts"
+        ]
+      },
+      "aliases": [
+        "Drizzle",
+        "drizzle"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__', schema: 'public' }`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "eslint": {
+      "id": "eslint",
+      "title": "ESLint",
+      "file": "technologies/eslint.md",
+      "role": "tooling",
+      "detect": {
+        "files": [
+          "eslint.config.*"
+        ]
+      },
+      "aliases": [
+        "ESLint",
+        "eslint"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "express": {
+      "id": "express",
+      "title": "Express",
+      "file": "technologies/express.md",
+      "role": "framework",
+      "realises": [
+        "rest-api"
+      ],
+      "detect": {
+        "dependencies": [
+          "express"
+        ]
+      },
+      "aliases": [
+        "Express",
+        "express()",
+        "`express`"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`module`/`moduleResolution` `\"NodeNext\"`, `lib`/`target` `\"ES2024\"`, `outDir: \"dist\"`, `rootDir: \"src\"`, `types: [\"node\"]`, `strict`, `skipLibCheck`, `sourceMap`, `composite: true` with its own `tsBuildInfoFile`, `include: [\"src/**/*.ts\"]` (which picks up `express.d.ts`)",
+          "source": "Required values"
+        },
+        {
+          "holds": "extends the app project with `composite: false`, `noEmit: true`, `rootDir: \".\"`, its own `tsBuildInfoFile`; includes the config files and `tests/**/*.ts`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "hono": {
+      "id": "hono",
+      "title": "Hono",
+      "file": "technologies/hono.md",
+      "role": "framework",
+      "detect": {
+        "dependencies": [
+          "hono"
+        ]
+      },
+      "aliases": [
+        "Hono",
+        "hono"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "nginx": {
+      "id": "nginx",
+      "title": "Nginx",
+      "file": "technologies/nginx.md",
+      "role": "runtime",
+      "detect": {
+        "files": [
+          "nginx.conf"
+        ]
+      },
+      "aliases": [
+        "Nginx",
+        "nginx"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`listen 80`, `root /usr/share/nginx/html`, `location / { try_files $uri $uri/ /index.html; }`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "ngrx": {
+      "id": "ngrx",
+      "title": "NgRx",
+      "file": "technologies/ngrx.md",
+      "role": "library",
+      "family": "angular",
+      "detect": {
+        "dependencies": [
+          "@ngrx/store"
+        ]
+      },
+      "aliases": [
+        "NgRx",
+        "@ngrx/"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "node": {
+      "id": "node",
+      "title": "Node",
+      "file": "technologies/node.md",
+      "role": "runtime",
+      "detect": {
+        "manifest": [
+          "engines.node"
+        ],
+        "scripts": [
+          "node .*\\.ts"
+        ]
+      },
+      "aliases": [
+        "Node"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`>=24`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "pino": {
+      "id": "pino",
+      "title": "Pino",
+      "file": "technologies/pino.md",
+      "role": "library",
+      "detect": {
+        "dependencies": [
+          "pino"
+        ]
+      },
+      "aliases": [
+        "Pino",
+        "pino"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "a commented `# LOG_LEVEL=debug`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "pnpm": {
+      "id": "pnpm",
+      "title": "pnpm",
+      "file": "technologies/pnpm.md",
+      "role": "toolchain",
+      "detect": {
+        "files": [
+          "pnpm-workspace.yaml"
+        ],
+        "manifest": [
+          "packageManager"
+        ]
+      },
+      "aliases": [
+        "pnpm"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`>=24`, at the root",
+          "source": "Required values"
+        }
+      ]
+    },
+    "postgres": {
+      "id": "postgres",
+      "title": "Postgres",
+      "file": "technologies/postgres.md",
+      "role": "service",
+      "realises": [
+        "database"
+      ],
+      "detect": {
+        "dependencies": [
+          "pg"
+        ]
+      },
+      "aliases": [
+        "Postgres",
+        "PostgresQL",
+        "postgres:",
+        "`pg`"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`DB_PASSWORD=s3cr3t`, `DB_PORT=5432`, `DATABASE_URL=postgres://postgres:s3cr3t@localhost:5432/app`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "prettier": {
+      "id": "prettier",
+      "title": "Prettier",
+      "file": "technologies/prettier.md",
+      "role": "tooling",
+      "detect": {
+        "files": [
+          ".prettierrc"
+        ]
+      },
+      "aliases": [
+        "Prettier",
+        "prettier"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "react-router": {
+      "id": "react-router",
+      "title": "React Router",
+      "file": "technologies/react-router.md",
+      "role": "framework",
+      "detect": {
+        "files": [
+          "react-router.config.ts"
+        ]
+      },
+      "aliases": [
+        "React Router",
+        "react-router",
+        "reactRouter("
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`",
+          "source": "Required values"
+        },
+        {
+          "holds": "includes `react-router.config.ts` and the build and test configs",
+          "source": "Required values"
+        }
+      ]
+    },
+    "s3-storage": {
+      "id": "s3-storage",
+      "title": "S3 storage",
+      "file": "technologies/s3-storage.md",
+      "role": "service",
+      "realises": [
+        "file-storage"
+      ],
+      "detect": {
+        "dependencies": [
+          "@aws-sdk/client-s3"
+        ]
+      },
+      "aliases": [
+        "RustFS",
+        "S3"
+      ],
+      "kind": "technology",
+      "owns": []
+    },
+    "shadcn": {
+      "id": "shadcn",
+      "title": "shadcn",
+      "file": "technologies/shadcn.md",
+      "role": "library",
+      "realises": [
+        "ui-components"
+      ],
+      "detect": {
+        "files": [
+          "components.json"
+        ]
+      },
+      "aliases": [
+        "shadcn"
+      ],
+      "kind": "technology",
+      "owns": [
+        {
+          "holds": "`paths` matching the aliases in `components.json` (`~/*` or `@/*`)",
+          "source": "Required values"
+        }
+      ]
+    },
+    "storybook": {
+      "id": "storybook",
+      "title": "Storybook",
+      "file": "technologies/storybook.md",
+      "role": "tooling",
+      "realises": [
+        "ui-components"
+      ],
+      "detect": {
+        "files": [
+          ".storybook/"
+        ]
+      },
+      "aliases": [
+        "Storybook",
+        "@storybook/",
+        "storybook@"
+      ],
+      "kind": "technology",
+      "owns": []
+    },
+    "tailwind": {
+      "id": "tailwind",
+      "title": "Tailwind",
+      "file": "technologies/tailwind.md",
+      "role": "library",
+      "realises": [
+        "ui-components"
+      ],
+      "detect": {
+        "dependencies": [
+          "tailwindcss"
+        ]
+      },
+      "aliases": [
+        "Tailwind",
+        "tailwindcss"
+      ],
+      "kind": "technology",
+      "owns": []
+    },
+    "typescript": {
+      "id": "typescript",
+      "title": "TypeScript",
+      "file": "technologies/typescript.md",
+      "role": "toolchain",
+      "detect": {
+        "files": [
+          "tsconfig*.json"
+        ]
+      },
+      "aliases": [
+        "TypeScript"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "vite": {
+      "id": "vite",
+      "title": "Vite",
+      "file": "technologies/vite.md",
+      "role": "tooling",
+      "detect": {
+        "files": [
+          "vite.config.ts"
+        ]
+      },
+      "aliases": [
+        "Vite",
+        "vite"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`defineConfig({ plugins: [...], resolve: { tsconfigPaths: true } })`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "vitest": {
+      "id": "vitest",
+      "title": "Vitest",
+      "file": "technologies/vitest.md",
+      "role": "tooling",
+      "detect": {
+        "files": [
+          "vitest.config.*"
+        ]
+      },
+      "aliases": [
+        "Vitest",
+        "vitest"
+      ],
+      "kind": "technology",
+      "realises": [],
+      "owns": []
+    },
+    "fundamental-ngx": {
+      "id": "fundamental-ngx",
+      "kind": "technology",
+      "external": true,
+      "title": "fundamental-ngx",
+      "realises": [],
+      "role": "library",
+      "owns": [],
+      "via": "angular-fundamental-ngx"
+    }
+  },
+  "integrations": {
+    "angular-api-contract": {
+      "id": "angular-api-contract",
+      "title": "Angular + the API contract",
+      "file": "integrations/angular-api-contract.md",
+      "connects": [
+        "angular"
+      ],
+      "realises": [
+        "rest-api"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "`apiBaseUrl` per build",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the only importer of `environment`; `selectApiBaseUrl`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the API's types, by name and shape",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the only `HttpClient` user; full URLs from `selectApiBaseUrl`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`parseListInput`, `toParams`: the URL ⇄ list input format",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`httpErrorMessage(err)`, the API's `message` or the response's",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "angular-eslint": {
+      "id": "angular-eslint",
+      "title": "Angular + ESLint",
+      "file": "integrations/angular-eslint.md",
+      "connects": [
+        "angular",
+        "eslint"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "angular-fundamental-ngx": {
+      "id": "angular-fundamental-ngx",
+      "title": "Angular + Fundamental NGX",
+      "file": "integrations/angular-fundamental-ngx.md",
+      "connects": [
+        "angular",
+        "fundamental-ngx"
+      ],
+      "realises": [
+        "ui-components"
+      ],
+      "detect": {
+        "dependencies": [
+          "@fundamental-ngx/core"
+        ]
+      },
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the registry's style, the stylesheet, the `@/app/…` aliases",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`paths: { \"@/*\": [\"./src/*\"] }`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "registry code, one folder per component, never edited by hand",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the registry's `cn`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the theme attributes on `<html>`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`tsconfigPaths`, so tests and stories resolve `@/`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`tsconfigPaths`, so tests and stories resolve `@/`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`\"paths\": { \"@/*\": [\"./src/*\"] }`: the components import each other as `@/app/components/ui/…`; `erasableSyntaxOnly` and `noUncheckedIndexedAccess` `false`, for the registry's code",
+          "source": "Required values"
+        },
+        {
+          "holds": "`style: \"new-york\"`, `rsc: false`, `tsx: true`, `tailwind: { config: \"\", css: \"src/styles.css\", baseColor: \"neutral\", cssVariables: true }`, aliases `components: \"@/app/components\"`, `ui: \"@/app/components/ui\"`, `utils: \"@/app/lib/utils\"`, `lib: \"@/app/lib\"`",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "angular-nginx": {
+      "id": "angular-nginx",
+      "title": "Angular + Nginx",
+      "file": "integrations/angular-nginx.md",
+      "connects": [
+        "angular",
+        "nginx"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "angular-prettier": {
+      "id": "angular-prettier",
+      "title": "Angular + Prettier",
+      "file": "integrations/angular-prettier.md",
+      "connects": [
+        "angular",
+        "prettier"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "angular-storybook": {
+      "id": "angular-storybook",
+      "title": "Angular + Storybook",
+      "file": "integrations/angular-storybook.md",
+      "connects": [
+        "angular",
+        "storybook"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "targets `storybook` (`@storybook/angular-vite:start-storybook`, `configDir: \".storybook\"`, `browserTarget: \"<name>:build\"`, `port: 6006`) and `build-storybook` (`…:build-storybook`, `outputDir: \"storybook-static\"`)",
+          "source": "Required values"
+        },
+        {
+          "holds": "stories `../src/**/*.stories.ts`, `framework: '@storybook/angular-vite'`",
+          "source": "Required values"
+        },
+        {
+          "holds": "imports `../src/styles.css`",
+          "source": "Required values"
+        },
+        {
+          "holds": "extends `../tsconfig.app.json` with `types: [\"node\"]`, `moduleResolution: \"bundler\"`, including the sources, the stories and the two config files; `typings.d.ts` declares `*.md`",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "angular-tailwind": {
+      "id": "angular-tailwind",
+      "title": "Angular + Tailwind",
+      "file": "integrations/angular-tailwind.md",
+      "connects": [
+        "angular",
+        "tailwind"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`{ \"plugins\": { \"@tailwindcss/postcss\": {} } }`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`@layer theme, base, components, utilities;` then `tailwindcss/theme.css`, `preflight.css` and `utilities.css`, each into its layer; Preflight on",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "angular-vitest": {
+      "id": "angular-vitest",
+      "title": "Angular + Vitest",
+      "file": "integrations/angular-vitest.md",
+      "connects": [
+        "angular",
+        "vitest"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`{ \"builder\": \"@analogjs/vitest-angular:test\", \"options\": { \"project\": [\"unit\"] }, \"configurations\": { \"browser\": { \"project\": [\"browser\"] } } }`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`plugins: [angular()]` from `@analogjs/vite-plugin-angular`; project `unit`: `environment: 'jsdom'`, `include: ['src/**/*.spec.ts']`, `exclude: ['src/**/*.browser.spec.ts']`, `setupFiles: ['src/test-setup.ts']`; project `browser`: `include: ['src/**/*.browser.spec.ts']`, `setupFiles: ['src/testing/browser-setup.ts']`, Chromium browser mode; both `extends: true`",
+          "source": "Required values"
+        },
+        {
+          "holds": "extends `./tsconfig.json`; `types: [\"vitest/globals\", \"vite/client\"]`; includes `src/**/*.spec.ts`, `src/test-setup.ts`, `src/testing/**/*.ts`, `src/**/*.d.ts`. `tsconfig.app.json` excludes the same files",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "better-auth-drizzle": {
+      "id": "better-auth-drizzle",
+      "title": "Better Auth + Drizzle",
+      "file": "integrations/better-auth-drizzle.md",
+      "connects": [
+        "better-auth",
+        "drizzle"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "better-auth-react-router": {
+      "id": "better-auth-react-router",
+      "title": "Better Auth + React Router",
+      "file": "integrations/better-auth-react-router.md",
+      "connects": [
+        "better-auth",
+        "react-router"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`createAuth(db, …)`: the `betterAuth` options and adapter; `AppAuth`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "calls `createAuth` per request on Workers, once at module scope on Node",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`auth: AppAuth` on `appContext`; `userContext`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the splat route's loader and action",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the credentials forms and sign-out",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the credentials forms and sign-out",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the credentials forms and sign-out",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`safeRedirectTo`",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "cloudflare-workers-vite": {
+      "id": "cloudflare-workers-vite",
+      "title": "Cloudflare Workers + Vite",
+      "file": "integrations/cloudflare-workers-vite.md",
+      "connects": [
+        "cloudflare-workers",
+        "vite"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "cloudflare-workers-vitest": {
+      "id": "cloudflare-workers-vitest",
+      "title": "Cloudflare Workers + Vitest",
+      "file": "integrations/cloudflare-workers-vitest.md",
+      "connects": [
+        "cloudflare-workers",
+        "vitest"
+      ],
+      "unless": [
+        "react-router"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`",
+          "source": "Required values"
+        },
+        {
+          "holds": "extends the Worker project, adds `tests`, `types: [\"./worker-configuration.d.ts\", \"@cloudflare/vitest-plugin/types\"]`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "drizzle-d1": {
+      "id": "drizzle-d1",
+      "title": "Drizzle + Cloudflare D1",
+      "file": "integrations/drizzle-d1.md",
+      "connects": [
+        "drizzle",
+        "cloudflare-d1"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`dialect: 'sqlite'`, the remote driver reading the `CLOUDFLARE_*` settings",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "drizzle-postgres": {
+      "id": "drizzle-postgres",
+      "title": "Drizzle + Postgres",
+      "file": "integrations/drizzle-postgres.md",
+      "connects": [
+        "drizzle",
+        "postgres"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset)",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "drizzle-s3-storage": {
+      "id": "drizzle-s3-storage",
+      "title": "Drizzle + S3 storage",
+      "file": "integrations/drizzle-s3-storage.md",
+      "connects": [
+        "drizzle",
+        "s3-storage"
+      ],
+      "realises": [
+        "file-storage"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the `files` table with its indexed `ownerId`, and its list input schemas",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`FilesService`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the service on a Testcontainers Postgres and an in-memory store",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "eslint-prettier": {
+      "id": "eslint-prettier",
+      "title": "ESLint + Prettier",
+      "file": "integrations/eslint-prettier.md",
+      "connects": [
+        "eslint",
+        "prettier"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "express-docker-compose": {
+      "id": "express-docker-compose",
+      "title": "Express + Docker Compose",
+      "file": "integrations/express-docker-compose.md",
+      "connects": [
+        "express",
+        "docker-compose"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "express-drizzle": {
+      "id": "express-drizzle",
+      "title": "Express + Drizzle",
+      "file": "integrations/express-drizzle.md",
+      "connects": [
+        "express",
+        "drizzle"
+      ],
+      "realises": [
+        "data-access",
+        "rest-api"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the pool, the Drizzle client, every DAO, the `AppContext`, shutdown",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`AppContext { db: DbClient; <resource>Dao: <Resource>Dao }`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`Express.Locals { context: AppContext }`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "list decoding, `safeParse` against the resource's schemas, the 404 mapping",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`normalizeQuery`, the one HTTP-aware helper of the data layer",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`createStubContext()`: a `vi.fn()` per DAO method",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the real app on the real DAOs and a Testcontainers Postgres",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "express-pino": {
+      "id": "express-pino",
+      "title": "Express + Pino",
+      "file": "integrations/express-pino.md",
+      "connects": [
+        "express",
+        "pino"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "hono-cloudflare-workers": {
+      "id": "hono-cloudflare-workers",
+      "title": "Hono + Cloudflare Workers",
+      "file": "integrations/hono-cloudflare-workers.md",
+      "connects": [
+        "hono",
+        "cloudflare-workers"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`main` pointing at the Hono entry (`./src/app.ts` or `./workers/app.ts`)",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the generated `Env` the app's `Bindings` use",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`exports.default.fetch(new Request(…))` from `cloudflare:workers`",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "hono-drizzle": {
+      "id": "hono-drizzle",
+      "title": "Hono + Drizzle",
+      "file": "integrations/hono-drizzle.md",
+      "connects": [
+        "hono",
+        "drizzle"
+      ],
+      "realises": [
+        "data-access",
+        "rest-api"
+      ],
+      "unless": [
+        "react-router"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the pool, the Drizzle client, every DAO, `createApp(context)`, `serve`, shutdown",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`createApp(context)`: the context middleware, the shared middleware, every route",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`AppContext` and `AppEnv` (`Variables: { context: AppContext }`)",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "list decoding, `safeParse` against the resource's schemas, the 404 mapping",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`errorHandler` and `notFoundHandler`, the one place an error becomes a response",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`createStubContext()`: a `vi.fn()` per DAO method",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`createApp(stub.context).request(…)`, so a handler test also covers its route",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the real app on the real DAOs and a Testcontainers Postgres",
+          "source": "Where it lives"
+        }
+      ]
+    },
+    "hono-node": {
+      "id": "hono-node",
+      "title": "Hono + Node",
+      "file": "integrations/hono-node.md",
+      "connects": [
+        "hono",
+        "node"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "the dev and production branches, chosen by `NODE_ENV === 'development'`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the `ssr` environment's `input: './workers/app.ts'`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "in an API: the composition root, `serve()`, and closing the server, then the pool, on a signal",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "hono-pino": {
+      "id": "hono-pino",
+      "title": "Hono + Pino",
+      "file": "integrations/hono-pino.md",
+      "connects": [
+        "hono",
+        "pino"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`requestLog`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`errorHandler`, logging as above",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`app.use(requestLog)` after the context",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "hono-react-router": {
+      "id": "hono-react-router",
+      "title": "Hono + React Router",
+      "file": "integrations/hono-react-router.md",
+      "connects": [
+        "hono",
+        "react-router"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "the Hono app: one `app.all('*', …)` handler, `createRequestHandler`, default export",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`appContext = createContext<…>()`, the one type every loader and action reads",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "references `@react-router/dev/vite/env`, so `virtual:react-router/server-build` types",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`context.get(appContext)` in loaders and actions",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "nginx-docker-compose": {
+      "id": "nginx-docker-compose",
+      "title": "Nginx + Docker Compose",
+      "file": "integrations/nginx-docker-compose.md",
+      "connects": [
+        "nginx",
+        "docker-compose"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "node-typescript": {
+      "id": "node-typescript",
+      "title": "Node + TypeScript",
+      "file": "integrations/node-typescript.md",
+      "connects": [
+        "node",
+        "typescript"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "postgres-docker-compose": {
+      "id": "postgres-docker-compose",
+      "title": "Postgres + Docker Compose",
+      "file": "integrations/postgres-docker-compose.md",
+      "connects": [
+        "postgres",
+        "docker-compose"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "the `db` service",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`CREATE DATABASE app;`, its only line: the `postgres` superuser owns it, so no grant is needed",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the bind-mounted data, git- and docker-ignored",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT`, `DATABASE_URL`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT`, `DATABASE_URL`",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-docker-compose": {
+      "id": "react-router-docker-compose",
+      "title": "React Router + Docker Compose",
+      "file": "integrations/react-router-docker-compose.md",
+      "connects": [
+        "react-router",
+        "docker-compose"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "react-router-drizzle": {
+      "id": "react-router-drizzle",
+      "title": "React Router + Drizzle",
+      "file": "integrations/react-router-drizzle.md",
+      "connects": [
+        "react-router",
+        "drizzle"
+      ],
+      "realises": [
+        "data-access"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the tables, both sides of every `relations()`, the exported `schema`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the contract: `Dao`, `RelationQuery`, `PaginatedResult`, `IdInput`, and the list-input builders and translator",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the entity's table, input schemas, filter, sort and list input, default sort, inferred types",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "one DAO per table, implementing the contract",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "one read-only query per cross-table read",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "one service per business workflow",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the database client's type on `appContext`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "DAOs, queries and services against a real database",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-eslint": {
+      "id": "react-router-eslint",
+      "title": "React Router + ESLint",
+      "file": "integrations/react-router-eslint.md",
+      "connects": [
+        "react-router",
+        "eslint"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "react-router-prettier": {
+      "id": "react-router-prettier",
+      "title": "React Router + Prettier",
+      "file": "integrations/react-router-prettier.md",
+      "connects": [
+        "react-router",
+        "prettier"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "react-router-shadcn": {
+      "id": "react-router-shadcn",
+      "title": "React Router + shadcn/ui",
+      "file": "integrations/react-router-shadcn.md",
+      "connects": [
+        "react-router",
+        "shadcn"
+      ],
+      "realises": [
+        "ui-components"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "the shadcn style, the stylesheet, the aliases",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`paths: { \"~/*\": [\"./app/*\"] }`, for the CLI",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "Tailwind, `tw-animate-css`, the dark variant, the tokens",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`cn`, re-exported from the `cn` package",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the shadcn primitives, the project's code once added",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`prettier-plugin-tailwindcss` with `tailwindStylesheet`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`style: \"base-nova\"`, `rsc: false`, `tsx: true`, `tailwind: { config: \"\", css: \"app/app.css\", baseColor: \"neutral\", cssVariables: true, prefix: \"\" }`, `rtl: false`, aliases `components: \"~/components\"`, `utils: \"~/lib/utils\"`, `ui: \"~/components/ui\"`, `lib: \"~/lib\"`, `hooks: \"~/hooks\"`, `iconLibrary: \"lucide\"`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`\"compilerOptions\": { \"paths\": { \"~/*\": [\"./app/*\"] } }`, for the CLI",
+          "source": "Required values"
+        },
+        {
+          "holds": "copied from `<skill-dir>/references/assets/react-router-app.css`: Tailwind, `tw-animate-css`, the dark variant, shadcn's tokens for light and dark, plus `surface`, `code` and `selection` tokens and two wide breakpoints",
+          "source": "Required values"
+        },
+        {
+          "holds": "`export { cn } from 'cn';`, with a doc comment, as the registry's own `utils` item has it",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-storybook": {
+      "id": "react-router-storybook",
+      "title": "React Router + Storybook",
+      "file": "integrations/react-router-storybook.md",
+      "connects": [
+        "react-router",
+        "storybook"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "stories `../app/components/**/*.stories.tsx`, `framework: '@storybook/react-vite'`, a `viteFinal` that removes `reactRouter()` and any runtime plugin and keeps `resolve.tsconfigPaths`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`/// <reference types=\"vite/client\" />`, then imports `../app/app.css` (the node project has no Vite types otherwise)",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-vite": {
+      "id": "react-router-vite",
+      "title": "React Router + Vite",
+      "file": "integrations/react-router-vite.md",
+      "connects": [
+        "react-router",
+        "vite"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "`reactRouter()` from `@react-router/dev/vite`, last; `resolve.tsconfigPaths: true`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`/// <reference types=\"@react-router/dev/vite/env\" />`",
+          "source": "Where it lives"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-vitest": {
+      "id": "react-router-vitest",
+      "title": "React Router + Vitest",
+      "file": "integrations/react-router-vitest.md",
+      "connects": [
+        "react-router",
+        "vitest"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [
+        {
+          "holds": "one inline project `unit`: `plugins: [react()]`, `resolve.tsconfigPaths: true`, `include: ['tests/unit/**/*.test.{ts,tsx}']`, Chromium browser mode",
+          "source": "Required values"
+        },
+        {
+          "holds": "extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "s3-storage-docker-compose": {
+      "id": "s3-storage-docker-compose",
+      "title": "S3 storage + Docker Compose",
+      "file": "integrations/s3-storage-docker-compose.md",
+      "connects": [
+        "s3-storage",
+        "docker-compose"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    },
+    "typescript-eslint": {
+      "id": "typescript-eslint",
+      "title": "TypeScript + ESLint",
+      "file": "integrations/typescript-eslint.md",
+      "connects": [
+        "typescript",
+        "eslint"
+      ],
+      "kind": "integration",
+      "realises": [],
+      "owns": [],
+      "unless": []
+    }
+  },
+  "examples": {
+    "entity-crudl": {
+      "id": "entity-crudl",
+      "title": "Entity CRUDL",
+      "file": "examples/entity-crudl.md",
+      "needs": [
+        [
+          "express",
+          "drizzle"
+        ],
+        [
+          "hono",
+          "node",
+          "drizzle"
+        ],
+        [
+          "angular"
+        ]
+      ],
+      "unless": [
+        "react-router"
+      ],
+      "kind": "example"
+    },
+    "file-upload": {
+      "id": "file-upload",
+      "title": "File upload",
+      "file": "examples/file-upload.md",
+      "needs": [
+        [
+          "react-router",
+          "cloudflare-r2"
+        ],
+        [
+          "react-router",
+          "s3-storage",
+          "drizzle"
+        ]
+      ],
+      "kind": "example",
+      "unless": []
+    },
+    "hono-hello": {
+      "id": "hono-hello",
+      "title": "Hono hello",
+      "file": "examples/hono-hello.md",
+      "needs": [
+        [
+          "hono",
+          "cloudflare-workers"
+        ]
+      ],
+      "unless": [
+        "react-router"
+      ],
+      "kind": "example"
+    },
+    "node-module": {
+      "id": "node-module",
+      "title": "Node module",
+      "file": "examples/node-module.md",
+      "needs": [
+        [
+          "node"
+        ]
+      ],
+      "unless": [
+        "hono",
+        "express",
+        "react-router",
+        "angular"
+      ],
+      "kind": "example"
+    },
+    "react-router-home": {
+      "id": "react-router-home",
+      "title": "React Router home",
+      "file": "examples/react-router-home.md",
+      "needs": [
+        [
+          "react-router"
+        ]
+      ],
+      "kind": "example",
+      "unless": []
+    },
+    "sign-in": {
+      "id": "sign-in",
+      "title": "Sign in",
+      "file": "examples/sign-in.md",
+      "needs": [
+        [
+          "react-router",
+          "better-auth"
+        ]
+      ],
+      "kind": "example",
+      "unless": []
+    }
+  },
+  "stacks": {
+    "angular-app": {
+      "id": "angular-app",
+      "title": "Angular app",
+      "file": "stacks/angular-app.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "angular",
+        "ngrx",
+        "tailwind",
+        "storybook",
+        "nginx",
+        "docker-compose",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "optional": {
+        "angular-fundamental-ngx": [
+          "fundamental-ngx"
+        ]
+      },
+      "kind": "stack",
+      "requires": {},
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "ui-components",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "angular",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "ngrx",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "tailwind",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-tailwind",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "storybook",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-storybook",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "nginx",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-nginx",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "nginx-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-fundamental-ngx",
+          "optional": true,
+          "group": "angular-fundamental-ngx"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-api-contract",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "entity-crudl",
+          "optional": false
+        }
+      ],
+      "owns": [
+        {
+          "holds": "`<title>` is `<App name>`",
+          "source": "Required values"
+        },
+        {
+          "holds": "under Reference code: the Angular + ESLint presets, selectors, overrides and ignores",
+          "source": "Required values"
+        }
+      ]
+    },
+    "angular-fullstack": {
+      "id": "angular-fullstack",
+      "title": "Angular full stack",
+      "file": "stacks/angular-fullstack.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "node",
+        "express",
+        "pino",
+        "postgres",
+        "drizzle",
+        "angular",
+        "ngrx",
+        "tailwind",
+        "storybook",
+        "nginx",
+        "docker-compose",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "optional": {
+        "angular-fundamental-ngx": [
+          "fundamental-ngx"
+        ]
+      },
+      "kind": "stack",
+      "requires": {},
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "database",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "data-access",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "node",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-typescript",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "express",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pino",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "postgres",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-postgres",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-pino",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "ui-components",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "angular",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "ngrx",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "tailwind",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-tailwind",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "storybook",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-storybook",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "nginx",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-nginx",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-fundamental-ngx",
+          "optional": true,
+          "group": "angular-fundamental-ngx"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-api-contract",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "postgres-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "nginx-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "angular-vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "entity-crudl",
+          "optional": false
+        }
+      ],
+      "owns": [
+        {
+          "holds": "`packages: [api, web]`; `allowBuilds` with `esbuild: true` and `'@parcel/watcher'`, `cpu-features`, `lmdb`, `msgpackr-extract`, `protobufjs`, `ssh2` all `false`; the catalog",
+          "source": "Required values"
+        },
+        {
+          "holds": "`name`, `version: \"0.0.0\"`, `private: true`, `engines.node: \">=24\"`, `packageManager`; no Prettier or ESLint of its own",
+          "source": "Required values"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `WEB_PORT=4200`, a commented `LOG_LEVEL`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`name: \"api\"`, `version: \"0.0.0\"`, `private`, `type: \"module\"`, written by hand; dependencies from the Express and Drizzle docs",
+          "source": "Required values"
+        }
+      ]
+    },
+    "hono-node-api": {
+      "id": "hono-node-api",
+      "title": "Hono API on Node",
+      "file": "stacks/hono-node-api.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "node",
+        "hono",
+        "pino",
+        "postgres",
+        "drizzle",
+        "docker-compose",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "kind": "stack",
+      "optional": {},
+      "requires": {},
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "database",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "data-access",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "node",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-typescript",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "hono",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-node",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pino",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "postgres",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-postgres",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-pino",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "postgres-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "entity-crudl",
+          "optional": false
+        }
+      ],
+      "owns": [
+        {
+          "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
+          "source": "Layout"
+        },
+        {
+          "holds": "`createApp(context)`: middleware, every route, the not-found and error handlers",
+          "source": "Layout"
+        },
+        {
+          "holds": "one file per resource, one handler per route",
+          "source": "Layout"
+        },
+        {
+          "holds": "one DAO per table",
+          "source": "Layout"
+        },
+        {
+          "holds": "the client, the schema registry, one schema file per resource",
+          "source": "Layout"
+        },
+        {
+          "holds": "`unit/` mirrors `src/`; `db/` per DAO; `api/` per resource; `utils/`",
+          "source": "Layout"
+        },
+        {
+          "holds": "`scripts/init.sql`, the bind-mounted data, and the generated `migrations/`",
+          "source": "Layout"
+        },
+        {
+          "holds": "`allowBuilds` with `esbuild: true` and `cpu-features`, `protobufjs`, `ssh2` all `false`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`",
+          "source": "Required values"
+        },
+        {
+          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and the Docker Compose doc's `migrate` and `api` services, in that order",
+          "source": "Required values"
+        }
+      ]
+    },
+    "hono-worker": {
+      "id": "hono-worker",
+      "title": "Hono Worker",
+      "file": "stacks/hono-worker.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "hono",
+        "cloudflare-workers",
+        "vite",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "concepts": [
+        "rest-api"
+      ],
+      "kind": "stack",
+      "optional": {},
+      "requires": {},
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "hono",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "cloudflare-workers",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vite",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "cloudflare-workers-vite",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-cloudflare-workers",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "cloudflare-workers-vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "hono-hello",
+          "optional": false
+        }
+      ],
+      "owns": [
+        {
+          "holds": "`main: \"./src/app.ts\"`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "node-api": {
+      "id": "node-api",
+      "title": "REST API on Node",
+      "file": "stacks/node-api.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "node",
+        "express",
+        "pino",
+        "postgres",
+        "drizzle",
+        "docker-compose",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "kind": "stack",
+      "optional": {},
+      "requires": {},
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "database",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "data-access",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "node",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-typescript",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "express",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pino",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "postgres",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-postgres",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-drizzle",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-pino",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "postgres-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "express-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "entity-crudl",
+          "optional": false
+        }
+      ],
+      "owns": [
+        {
+          "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
+          "source": "Layout"
+        },
+        {
+          "holds": "`createApp(context)`: middleware, every route, the not-found and error handlers",
+          "source": "Layout"
+        },
+        {
+          "holds": "one file per resource, one handler per route",
+          "source": "Layout"
+        },
+        {
+          "holds": "one DAO per table",
+          "source": "Layout"
+        },
+        {
+          "holds": "the client, the schema registry, one schema file per resource",
+          "source": "Layout"
+        },
+        {
+          "holds": "`unit/` mirrors `src/`; `db/` per DAO; `api/` per resource; `utils/`",
+          "source": "Layout"
+        },
+        {
+          "holds": "`scripts/init.sql`, the bind-mounted data, and the generated `migrations/`",
+          "source": "Layout"
+        },
+        {
+          "holds": "`allowBuilds` with `esbuild: true` and `cpu-features`, `protobufjs`, `ssh2` all `false`",
+          "source": "Required values"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`",
+          "source": "Required values"
+        },
+        {
+          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and the Docker Compose doc's `migrate` and `api` services, in that order",
+          "source": "Required values"
+        }
+      ]
+    },
+    "node-package": {
+      "id": "node-package",
+      "title": "Node package",
+      "file": "stacks/node-package.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "node",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "kind": "stack",
+      "optional": {},
+      "requires": {},
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "node",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-typescript",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "node-module",
+          "optional": false
+        }
+      ],
+      "owns": []
+    },
+    "react-router-cloudflare": {
+      "id": "react-router-cloudflare",
+      "title": "React Router on Workers",
+      "file": "stacks/react-router-cloudflare.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "react-router",
+        "vite",
+        "tailwind",
+        "shadcn",
+        "hono",
+        "cloudflare-workers",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "optional": {
+        "database": [
+          "cloudflare-d1",
+          "drizzle"
+        ],
+        "authentication": [
+          "better-auth"
+        ],
+        "file-storage": [
+          "cloudflare-r2"
+        ],
+        "storybook": [
+          "storybook"
+        ]
+      },
+      "requires": {
+        "authentication": [
+          "database"
+        ],
+        "file-storage": [
+          "database",
+          "authentication"
+        ]
+      },
+      "kind": "stack",
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "database",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "data-access",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "authentication",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "better-auth",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "better-auth-drizzle",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "better-auth-react-router",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "file-storage",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "ui-components",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "react-router",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vite",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-vite",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "tailwind",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "shadcn",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-shadcn",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "hono",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-react-router",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "storybook",
+          "optional": true,
+          "group": "storybook"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-storybook",
+          "optional": true,
+          "group": "storybook"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "cloudflare-workers",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "cloudflare-workers-vite",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-cloudflare-workers",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-drizzle",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "cloudflare-d1",
+          "optional": true,
+          "group": "database"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "drizzle",
+          "optional": true,
+          "group": "database"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-d1",
+          "optional": true,
+          "group": "database"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "cloudflare-r2",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "react-router-home",
+          "optional": false
+        },
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "sign-in",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "file-upload",
+          "optional": true,
+          "group": "file-storage"
+        }
+      ],
+      "owns": [
+        {
+          "holds": "the Worker: builds the context per request and hands it to React Router",
+          "source": "Layout"
+        },
+        {
+          "holds": "`appContext`: the bindings and the execution context",
+          "source": "Layout"
+        },
+        {
+          "holds": "route modules, declared in `app/routes.ts`",
+          "source": "Layout"
+        },
+        {
+          "holds": "app components; `app/components/ui/` the shadcn primitives",
+          "source": "Layout"
+        },
+        {
+          "holds": "pure helpers",
+          "source": "Layout"
+        },
+        {
+          "holds": "mirrors `app/`; runs in Chromium",
+          "source": "Layout"
+        },
+        {
+          "holds": "`main: \"./workers/app.ts\"`, `vars: { \"APP_NAME\": \"<App name>\" }`, `observability: { \"enabled\": true }`",
+          "source": "Required values"
+        }
+      ]
+    },
+    "react-router-docker": {
+      "id": "react-router-docker",
+      "title": "React Router on Node",
+      "file": "stacks/react-router-docker.md",
+      "technologies": [
+        "pnpm",
+        "typescript",
+        "react-router",
+        "vite",
+        "tailwind",
+        "shadcn",
+        "hono",
+        "node",
+        "docker-compose",
+        "postgres",
+        "eslint",
+        "prettier",
+        "vitest"
+      ],
+      "optional": {
+        "database": [
+          "drizzle"
+        ],
+        "authentication": [
+          "better-auth"
+        ],
+        "file-storage": [
+          "s3-storage"
+        ],
+        "storybook": [
+          "storybook"
+        ]
+      },
+      "requires": {
+        "authentication": [
+          "database"
+        ],
+        "file-storage": [
+          "database",
+          "authentication"
+        ]
+      },
+      "kind": "stack",
+      "concepts": [],
+      "composition": [
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "code-style",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "pnpm",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "typescript",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "database",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "data-access",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "authentication",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "better-auth",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "better-auth-drizzle",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "better-auth-react-router",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "file-storage",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "ui-components",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "react-router",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vite",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-vite",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "tailwind",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "shadcn",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-shadcn",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "hono",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-react-router",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "storybook",
+          "optional": true,
+          "group": "storybook"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-storybook",
+          "optional": true,
+          "group": "storybook"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "node",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-typescript",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "hono-node",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "postgres",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "postgres-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-docker-compose",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-drizzle",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "drizzle",
+          "optional": true,
+          "group": "database"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-postgres",
+          "optional": true,
+          "group": "database"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "s3-storage",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "s3-storage-docker-compose",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "drizzle-s3-storage",
+          "optional": true,
+          "group": "file-storage"
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "typescript-eslint",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-eslint",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-prettier",
+          "optional": false
+        },
+        {
+          "layer": "technologies",
+          "kind": "technology",
+          "id": "vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-vitest",
+          "optional": false
+        }
+      ],
+      "examples": [
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "react-router-home",
+          "optional": false
+        },
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "sign-in",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "examples",
+          "kind": "example",
+          "id": "file-upload",
+          "optional": true,
+          "group": "file-storage"
+        }
+      ],
+      "owns": [
+        {
+          "holds": "runs `workers/app.ts`: Vite middleware in development, the build in production",
+          "source": "Layout"
+        },
+        {
+          "holds": "the Hono app: builds the context once and hands each request to React Router",
+          "source": "Layout"
+        },
+        {
+          "holds": "`appContext`: the server's configuration, later its database client",
+          "source": "Layout"
+        },
+        {
+          "holds": "route modules, declared in `app/routes.ts`",
+          "source": "Layout"
+        },
+        {
+          "holds": "app components; `app/components/ui/` the shadcn primitives",
+          "source": "Layout"
+        },
+        {
+          "holds": "mirrors `app/`; runs in Chromium",
+          "source": "Layout"
+        },
+        {
+          "holds": "`scripts/init.sql`, and the bind-mounted Postgres data",
+          "source": "Layout"
+        },
+        {
+          "holds": "`DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `NODE_ENV=development`, `APP_NAME=<App name>`; with authentication `AUTH_SECRET=` (empty) and `BETTER_AUTH_URL=http://localhost:3000`; with file storage `RUSTFS_PORT=9000`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (empty), `S3_BUCKET=app-files`",
+          "source": "Required values"
+        },
+        {
+          "holds": "the Postgres + Docker Compose `db` service with the data at `./db/data`, and the React Router + Docker Compose `app` service",
+          "source": "Required values"
+        }
+      ]
+    }
+  },
+  "order": {
+    "concept": [
+      "code-style",
+      "database",
+      "data-access",
+      "rest-api",
+      "authentication",
+      "file-storage",
+      "ui-components"
+    ],
+    "technology": [
+      "pnpm",
+      "typescript",
+      "eslint",
+      "prettier",
+      "vitest",
+      "node",
+      "docker-compose",
+      "hono",
+      "cloudflare-workers",
+      "react-router",
+      "tailwind",
+      "shadcn",
+      "vite",
+      "storybook",
+      "nginx",
+      "angular",
+      "ngrx",
+      "express",
+      "pino",
+      "postgres",
+      "cloudflare-d1",
+      "drizzle",
+      "better-auth",
+      "cloudflare-r2",
+      "s3-storage",
+      "fundamental-ngx"
+    ],
+    "integration": [
+      "hono-react-router",
+      "hono-cloudflare-workers",
+      "hono-node",
+      "react-router-shadcn",
+      "react-router-drizzle",
+      "express-drizzle",
+      "express-pino",
+      "hono-drizzle",
+      "hono-pino",
+      "angular-api-contract",
+      "angular-fundamental-ngx",
+      "node-typescript",
+      "typescript-eslint",
+      "eslint-prettier",
+      "react-router-eslint",
+      "react-router-prettier",
+      "react-router-vite",
+      "react-router-vitest",
+      "angular-eslint",
+      "angular-prettier",
+      "angular-vitest",
+      "angular-tailwind",
+      "angular-storybook",
+      "angular-nginx",
+      "react-router-storybook",
+      "cloudflare-workers-vite",
+      "cloudflare-workers-vitest",
+      "postgres-docker-compose",
+      "nginx-docker-compose",
+      "express-docker-compose",
+      "react-router-docker-compose",
+      "drizzle-postgres",
+      "drizzle-d1",
+      "better-auth-drizzle",
+      "better-auth-react-router",
+      "s3-storage-docker-compose",
+      "drizzle-s3-storage"
+    ],
+    "example": [
+      "node-module",
+      "hono-hello",
+      "react-router-home",
+      "sign-in",
+      "file-upload",
+      "entity-crudl"
+    ],
+    "stack": [
+      "angular-app",
+      "angular-fullstack",
+      "hono-node-api",
+      "hono-worker",
+      "node-api",
+      "node-package",
+      "react-router-cloudflare",
+      "react-router-docker"
+    ]
+  }
+}

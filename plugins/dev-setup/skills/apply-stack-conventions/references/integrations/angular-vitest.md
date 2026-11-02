@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, vitest]
+---
 # Angular + Vitest
 
 Angular's tests on Vitest through Analog's builder: `ng test` runs a `unit` project in jsdom and a `browser` project in

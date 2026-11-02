@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [postgres, docker-compose]
+---
 # Postgres + Docker Compose
 
 Postgres as the `db` service of the root Compose file: healthchecked, its database created by an init script, its data

@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, prettier]
+---
 # Angular + Prettier
 
 Prettier in an Angular package: the Angular parser for HTML, and the file types the package formats. Both Angular stacks

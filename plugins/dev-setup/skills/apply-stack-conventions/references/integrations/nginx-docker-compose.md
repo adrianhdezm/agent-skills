@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [nginx, docker-compose]
+---
 # Nginx + Docker Compose
 
 A static web app's image: built on `node:24-alpine`, served from `nginx:1.27-alpine`, and run as a Compose service that

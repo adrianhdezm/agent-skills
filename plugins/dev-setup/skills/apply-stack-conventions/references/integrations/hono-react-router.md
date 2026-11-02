@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [hono, react-router]
+---
 # Hono + React Router
 
 Hono as React Router's server entry: one Hono app hands every request to React Router with a typed context. Both React

@@ -1,3 +1,10 @@
+---
+kind: technology
+role: library
+detect:
+  dependencies: [pino]
+aliases: [Pino, pino]
+---
 # Pino
 
 Pino as a long-lived server process's logger: one instance writing JSON lines to stdout, its level from the

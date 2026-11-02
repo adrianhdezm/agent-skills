@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [drizzle, postgres]
+---
 # Drizzle + Postgres
 
 Drizzle over Postgres: the `node-postgres` client on the shared pool, the `postgresql` dialect for migrations, Postgres

@@ -1,3 +1,10 @@
+---
+kind: technology
+role: tooling
+detect:
+  files: [vite.config.ts]
+aliases: [Vite, vite]
+---
 # Vite
 
 Vite as the dev server and the build: one `vite.config.ts`, plugins in a deliberate order, path aliases from the

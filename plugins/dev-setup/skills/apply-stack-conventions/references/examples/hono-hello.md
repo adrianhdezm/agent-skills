@@ -1,3 +1,8 @@
+---
+kind: example
+needs: [[hono, cloudflare-workers]]
+unless: [react-router]
+---
 # Hono hello
 
 The first route of a Hono Worker: one `GET /` answered by the Worker's real entry, and a test that reaches it the way

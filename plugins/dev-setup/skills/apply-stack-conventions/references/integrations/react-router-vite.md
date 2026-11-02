@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, vite]
+---
 # React Router + Vite
 
 React Router's framework mode as a Vite plugin: `reactRouter()` last among the plugins, the `~/` alias through the

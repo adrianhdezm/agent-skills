@@ -1,3 +1,15 @@
+---
+kind: stack
+technologies: [pnpm, typescript, react-router, vite, tailwind, shadcn, hono, node, docker-compose, postgres, eslint, prettier, vitest]
+optional:
+  database: [drizzle]
+  authentication: [better-auth]
+  file-storage: [s3-storage]
+  storybook: [storybook]
+requires:
+  authentication: [database]
+  file-storage: [database, authentication]
+---
 # React Router on Node
 
 A server-rendered React Router app on Node, next to Postgres in Docker Compose, styled with Tailwind and shadcn/ui.

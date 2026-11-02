@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # UI components
 
 How a frontend is built from components, whatever the framework or component library: two tiers of components, imports

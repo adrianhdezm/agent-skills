@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, storybook]
+---
 # Angular + Storybook
 
 Storybook in an Angular package: the Vite builder through Analog, so stories share the compile path of the app and its

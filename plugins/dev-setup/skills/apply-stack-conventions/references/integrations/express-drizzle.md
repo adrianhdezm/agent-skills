@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [express, drizzle]
+realises: [data-access, rest-api]
+---
 # Express + Drizzle
 
 An Express API over the Drizzle DAO layer: the composition root builds the DAOs once, controllers reach them through the

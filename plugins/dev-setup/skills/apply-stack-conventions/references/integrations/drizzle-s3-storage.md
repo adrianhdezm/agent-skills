@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [drizzle, s3-storage]
+realises: [file-storage]
+---
 # Drizzle + S3 storage
 
 The file service on Node: object bytes in an S3-compatible store through the AWS SDK, metadata in the `files` table

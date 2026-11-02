@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # REST API
 
 How an HTTP API is shaped, and what its clients can rely on: resources and methods, one error body, inputs validated at

@@ -1,3 +1,7 @@
+---
+kind: example
+needs: [[react-router, cloudflare-r2], [react-router, s3-storage, drizzle]]
+---
 # File upload
 
 Upload, list, download and delete files on a React Router app, bytes in the object store and metadata in the `files`
