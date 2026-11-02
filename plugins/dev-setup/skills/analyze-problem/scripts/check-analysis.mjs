@@ -5,7 +5,8 @@
 //
 // Errors: no "Status: Approved <date>" line; an ID line in a form the scripts cannot read; a duplicate or missing B
 // number; a behaviour with no criterion; a criterion filed under the wrong behaviour, or without Given, When and
-// Then. Against the committed version of the file (HEAD by default), an ID that disappeared instead of being marked
+// Then; a release with no behaviours, a gap in the R numbers, or a live behaviour in no release or in two. Against the
+// committed version of the file (HEAD by default), an ID that disappeared instead of being marked
 // _(dropped)_ is an error, and a changed title or criterion is a warning: a change of meaning needs a new number.
 // Exit 0: clean · 1: errors · 2: could not run.
 
@@ -67,6 +68,27 @@ for (let n = 1; n <= (numbers.at(-1) ?? 0); n++) {
   if (!numbers.includes(n)) errors.push(`B${n} is missing: a removed behaviour keeps its heading, marked _(dropped)_`);
 }
 
+// Releases: every live behaviour ships in exactly one, and they are numbered R1, R2, … in the order they ship.
+if (a.releases === null) {
+  warnings.push('releases: no "## Releases" section; the design treats every behaviour as one release');
+} else {
+  if (a.releases.length === 0) errors.push('releases: the "## Releases" section has no "- **R1: <name>**: B1, B2 · <goal>" line');
+  const inRelease = new Map();
+  a.releases.forEach((r, i) => {
+    if (r.id !== `R${i + 1}`) errors.push(at(r.line, `${r.id} is release ${i + 1}; number releases R1, R2, … in the order they ship`));
+    if (!r.name) errors.push(at(r.line, `${r.id} has no name`));
+    if (r.covers.length === 0) errors.push(at(r.line, `${r.id} lists no behaviours`));
+    for (const b of r.covers) {
+      const beh = seen.has(b) ? a.behaviours.find((x) => x.id === b) : null;
+      if (!beh) errors.push(at(r.line, `${r.id} lists ${b}, which is not a behaviour`));
+      else if (beh.dropped) errors.push(at(r.line, `${r.id} lists ${b}, which is dropped`));
+      if (inRelease.has(b)) errors.push(at(r.line, `${b} is in ${inRelease.get(b)} and ${r.id}; a behaviour ships in one release`));
+      else inRelease.set(b, r.id);
+    }
+  });
+  for (const b of a.behaviours) if (!b.dropped && !inRelease.has(b.id)) errors.push(at(b.line, `${b.id} is in no release`));
+}
+
 // Stable IDs, against the committed version of this file.
 let previous = null;
 try {
@@ -105,6 +127,6 @@ const criteria = a.behaviours.filter((b) => !b.dropped).reduce((n, b) => n + b.c
 for (const w of warnings) console.log(`warning: ${w}`);
 for (const e of errors) console.log(`error: ${e}`);
 console.log(
-  `\n${count} behaviours · ${criteria} criteria · ${previous === null ? "no committed version to compare" : `IDs compared with ${against}`} · ${errors.length} error(s), ${warnings.length} warning(s)`
+  `\n${count} behaviours · ${criteria} criteria · ${a.releases?.length ?? 0} releases · ${previous === null ? "no committed version to compare" : `IDs compared with ${against}`} · ${errors.length} error(s), ${warnings.length} warning(s)`
 );
 process.exit(errors.length ? 1 : 0);

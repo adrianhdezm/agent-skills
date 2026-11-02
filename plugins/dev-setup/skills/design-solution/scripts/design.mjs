@@ -8,6 +8,8 @@
 //
 //   ## Slices
 //
+//   ### S0: The project builds, lints and tests from one command (setup)
+//
 //   ### S1: A host can create a potluck and share its link (B1, B2)
 //
 //   - Tests: B1.1 unit · B1.2 integration · B2.1 end to end
