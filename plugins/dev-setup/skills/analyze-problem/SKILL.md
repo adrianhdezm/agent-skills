@@ -39,7 +39,7 @@ Scripts in three phases read this file, so its shape is fixed: a behaviour is a 
 - [ ] 6. 02-analysis.md written and checked
 ```
 
-1. **Read the inputs.** Read `docs/<slug>/01-brainstorm.md` if it exists, including its **Open for analysis** and **Assumptions to test** lists: each open question gets answered in this phase, and each untested assumption becomes a constraint or a fork. If it does not, ask the user for the idea, the people and the references, as the brainstorm phase would. Read any notes, briefs or designs they point to. If the repo already has code, read enough to know what exists today. A behaviour the code already has is still listed, marked _(exists)_, so verification covers it.
+1. **Read the inputs.** Read `docs/<slug>/01-brainstorm.md` if it exists, including its **Open for analysis** and **Assumptions to test** lists: each open question gets answered in this phase, and each untested assumption becomes a constraint or a fork. Read `docs/<slug>/01-experiment.md` too, if it exists: an assumption it answered "no" or "partly" is a fork to raise with the user, and each pretence under its **Mocked services** becomes a constraint as "Assumed, not tested: …". If the brainstorm does not exist, ask the user for the idea, the people and the references, as the brainstorm phase would. Read any notes, briefs or designs they point to. If the repo already has code, read enough to know what exists today. A behaviour the code already has is still listed, marked _(exists)_, so verification covers it.
 
    **Check the scope.** If the direction bundles capabilities that could ship and be checked separately (each with its own users or data, such as accounts, billing and reports), propose splitting it into several initiatives, each with its own slug, and an order to build them in. Analyze one initiative at a time.
 
@@ -142,7 +142,7 @@ End with three headings: **Blocked on me**, **Changed** and **Found**. Then name
 - [ ] Every behaviour has at least one Given/When/Then criterion with an observable result
 - [ ] IDs are stable: nothing renumbered, dropped items marked, a changed meaning got a new number
 - [ ] Every Open for analysis item is answered in a behaviour, a constraint or a non-goal, or moved to Later. Untested
-      assumptions are listed under Constraints
+      assumptions, and the experiment's mocked services, are listed under Constraints
 - [ ] `check-analysis.mjs` reports no errors
 - [ ] No frameworks, tables, endpoints or file paths anywhere in the file
 - [ ] Contradictions between sources were raised with the user, not resolved silently

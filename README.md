@@ -37,11 +37,12 @@ a verified build (see [From idea to verified build](#from-idea-to-verified-build
 | `analyze-problem`           | Phase 2: interviews fork by fork and writes a framework-free analysis with numbered behaviours (B1…) and testable acceptance criteria (B1.1…)                                                                              |
 | `apply-stack-conventions`   | Resolves the stack, lists the concept, technology, integration and example docs that apply, and assembles `coding-conventions.md` for the calling skill                                                                    |
 | `bootstrap-project`         | Scaffolds a project from a short interview by looking up the stack conventions for each technology, pairing and starter example, filling gaps with reported defaults; every check passing                                  |
-| `brainstorm-idea`           | Phase 1: collects the idea and its references, proposes directions that differ in kind, optionally tests the riskiest assumption with a throwaway PoC, and records the chosen direction                                    |
+| `brainstorm-idea`           | Phase 1: collects the idea and its references, proposes directions that differ in kind, and records the chosen direction with the assumptions it bets on                                                                   |
 | `confirm-my-goal`           | Plays back the goal, problem and scope in its own words, flags assumptions, and waits for confirmation before acting; runs only via `/confirm-my-goal`                                                                     |
 | `debug-failure`             | Finds the root cause of a failure: reproduces it, narrows it down (bisecting a regression), writes a failing test, fixes the cause and proves it with every check                                                          |
 | `define-constraints`        | Writes the project's quality bar into `CONSTRAINTS.md` (floor, checks with commands, measured values, done means, boundaries), wires `check:fast` / `check:task` / `check:full`, and guards the diff against a lowered bar |
 | `design-solution`           | Phase 3: maps each behaviour onto the project's real building blocks, puts the open forks on an interactive HTML plan, and writes the decisions and ordered vertical slices; scaffolds first when no code exists           |
+| `experiment-idea`           | Optional, between phases 1 and 2: builds a throwaway prototype outside the project, with external services mocked behind strategies, to answer the brainstorm's riskiest assumptions                                       |
 | `implement-design`          | Phase 4: builds the design slice by slice, with one test per criterion titled by its ID and a progress checklist that survives new sessions                                                                                |
 | `simplify-code`             | Makes recently changed code easier to read without changing behaviour, one change at a time with the tests run after each; leaves `simplify-ignore` blocks alone                                                           |
 | `setting-up-git-guardrails` | Installs a PreToolUse hook that blocks destructive git commands (force-push, `reset --hard`, `clean -f`, `branch -D`, whole-tree `checkout`/`restore`)                                                                     |
@@ -66,11 +67,14 @@ flowchart LR
     V["<b>5 · /verify-build</b><br/>does it really work?<br/><i>you: read the verdict in<br/>05-verification.md</i>"]
 
     B -- "01-brainstorm.md" --> A
+    B -. "optional" .-> EX
+    EX -- "01-experiment.md" --> A
     A -- "02-analysis.md" --> D
     D -- "03-design.md + plan" --> I
     I -- "code + 04-progress.md" --> V
     V -- "fix tasks" --> I
 
+    EX["/experiment-idea<br/><i>a throwaway prototype<br/>answers the riskiest bets</i>"]
     DC["/define-constraints<br/><i>writes CONSTRAINTS.md;<br/>its guard runs in 4 and 5</i>"]
     SD["/simplify-code<br/><i>when a slice is heavy</i><br/>/debug-failure<br/><i>when a failure is unclear</i>"]
 
@@ -78,11 +82,11 @@ flowchart LR
     I -. "as needed" .-> SD
 
     classDef support stroke-dasharray: 4 3
-    class DC,SD support
+    class EX,DC,SD support
 ```
 
 Solid boxes are the five phases, and the label on each arrow is the file that phase leaves in `docs/<slug>/`. Dashed
-boxes are the supporting skills a phase calls.
+boxes are the optional experiment between the first two phases and the supporting skills a phase calls.
 
 You stay in the loop where your judgement matters: the interviews in the first two phases, and the decisions on the
 design plan. Implementation runs on its own and stops only when it is blocked, or before anything on the project's
@@ -113,11 +117,27 @@ products you like. Then react to the directions Claude proposes, and pick one.
 
 **Claude:** reads your references, and what earlier initiatives handed on (their **Next initiative**, **Later** and
 **Not doing** lists), and proposes 3 to 5 directions that differ in kind, at least one of them unusual,
-each with its riskiest assumption. If one assumption can be tested in about half an hour of code, it offers a
-throwaway proof of concept in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-poc`, outside your project.
+each with its riskiest assumption.
 
-**You get:** `01-brainstorm.md`, with your words quoted, the directions considered, what the PoC showed, and the
-chosen direction with the ones you dropped.
+**You get:** `01-brainstorm.md`, with your words quoted, the directions considered, the chosen direction with the ones
+you dropped, and the assumptions it bets on, riskiest first.
+
+### Optional: Experiment, `/experiment-idea <slug>`
+
+Run it when an assumption from the brainstorm can be checked with code, and a "no" would change the direction.
+
+**You:** agree the questions, what gets mocked and the time box, then try the prototype when a question is about how
+it feels.
+
+**Claude:** turns each assumption into a yes/no question, with what would count as a yes and a no written down before
+it builds. It builds the smallest prototype that answers them in `${CLAUDE_PLUGIN_DATA}/sandbox/<slug>-experiment`,
+outside your project. Every external service (payments, maps, an LLM, a partner API) sits behind an interface with a
+mock strategy, so the prototype runs with no accounts or keys; an environment variable switches one to the real
+service when the question is about that service. On a "no" to the riskiest question, it offers to go back to the
+brainstorm.
+
+**You get:** `01-experiment.md`, with each question, its answer and what showed it, what each mock pretended about
+the real service, and what changes for the analysis. The answered assumptions are ticked in `01-brainstorm.md`.
 
 ### 2. Analyze: `/analyze-problem <slug>`
 
@@ -224,6 +244,7 @@ The IDs from the analysis carry through every phase, so nothing gets lost betwee
 ```
 docs/v1/
 ├── 01-brainstorm.md
+├── 01-experiment.md        only if you ran /experiment-idea
 ├── 02-analysis.md
 ├── 03-design.md
 ├── 03-design.plan.json     the plan's data; 03-design.html is built from it
