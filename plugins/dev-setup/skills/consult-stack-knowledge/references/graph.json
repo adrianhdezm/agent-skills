@@ -1569,12 +1569,15 @@
       "needs": [
         [
           "react-router",
-          "cloudflare-r2"
+          "cloudflare-r2",
+          "drizzle",
+          "better-auth"
         ],
         [
           "react-router",
           "s3-storage",
-          "drizzle"
+          "drizzle",
+          "better-auth"
         ]
       ],
       "kind": "example",
@@ -1618,7 +1621,9 @@
       "file": "examples/react-router-home.md",
       "needs": [
         [
-          "react-router"
+          "react-router",
+          "hono",
+          "shadcn"
         ]
       ],
       "kind": "example",
@@ -1631,7 +1636,8 @@
       "needs": [
         [
           "react-router",
-          "better-auth"
+          "better-auth",
+          "drizzle"
         ]
       ],
       "kind": "example",
