@@ -1,4 +1,4 @@
-# Maintaining the conventions
+# Maintaining the knowledge base
 
 How the docs under `references/` are laid out, how they form a graph, and how to change them. Agents running the skill
 do not read this file.
@@ -62,7 +62,7 @@ React Router + Drizzle ahead of the `database` group) is allowed, since the asse
 Examples. `resolve-stack.mjs` matches a project to a blueprint when every detected technology belongs to it and
 whatever required technology is missing is toolchain or tooling.
 
-## Changing the conventions
+## Changing the knowledge
 
 - **A rule that holds whatever the technology goes in its architecture doc.** A fact about one technology goes in its
   technology doc. A fact about where code from one technology calls into another goes in that pair's integration doc,

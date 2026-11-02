@@ -1,12 +1,12 @@
 ---
 name: bootstrap-project
-description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the apply-stack-conventions skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, when a tech plan's S0 setup slice sets up the project, or when an experiment approach needs a scaffold.
+description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the consult-stack-knowledge skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, when a tech plan's S0 setup slice sets up the project, or when an experiment approach needs a scaffold.
 ---
 
 # Bootstrap Project
 
 One skill for every new project. A short interview settles the combination of technologies; the
-`apply-stack-conventions` skill turns it into the stack, the docs and examples that apply, the gaps and an assembled
+`consult-stack-knowledge` skill turns it into the stack, the docs and examples that apply, the gaps and an assembled
 `coding-conventions.md`; this skill builds the project from that hand-off. It keeps no list of stacks or docs of its
 own: a new stack, technology, integration or example is added there, and found here through the hand-off.
 
@@ -34,7 +34,7 @@ Copy this checklist and tick it off:
    the spec or the calling skill already answers; ask the rest in one message, each with its default. When the user
    asks which stack fits, recommend one as the interview says. State the result in its one-line form.
 
-2. **Get the docs and examples** by running the `apply-stack-conventions` skill with the combination, including each
+2. **Get the docs and examples** by running the `consult-stack-knowledge` skill with the combination, including each
    optional entry (database, authentication, file storage, Storybook, Fundamental NGX) the request asks for. Its
    hand-off names the stack, the blueprint, the docs and examples (absolute paths), the gaps and the assembled
    `coding-conventions.md`. Read the blueprint and every doc and example it lists, then quote its `Stack`, `Docs` (by
@@ -77,7 +77,7 @@ Then offer to commit the scaffold on its own, so later diffs show only the featu
 ## Adding to an existing project
 
 Do not run `pnpm init` and do not overwrite anything. Settle only what the project is becoming that its files do not
-show, and run the `apply-stack-conventions` skill on it as in step 2: it resolves the stack from the project's files and
+show, and run the `consult-stack-knowledge` skill on it as in step 2: it resolves the stack from the project's files and
 reports where its `coding-conventions.md` has drifted from the docs. Then set the missing fields and scripts with
 `pnpm pkg set` (ask before replacing a script, a `packageManager` or a Compose file), merge `allowBuilds`, install,
 write each config the project lacks and merge the rest, saying what changed. Follow the blueprint's Scaffold notes for
@@ -89,7 +89,7 @@ the sources, place the conventions, then format and check.
 End with three headings: **Blocked on me** (a check that still fails, a port to free, a file the harness would not
 write, a gap that needs the user's choice), **Changed** (the project path, the combination, the docs and examples used,
 and what was created) and **Found**: each gap with what was used instead, and anything that differed from a doc (a moved
-peer range, a new build script to allow), each naming the doc in `apply-stack-conventions` to add or update. When
+peer range, a new build script to allow), each naming the doc in `consult-stack-knowledge` to add or update. When
 another skill called this one, such as `implement-release` or `experiment-idea`, hand these back to it instead.
 
 ## Review Checklist
@@ -99,7 +99,7 @@ another skill called this one, such as `implement-release` or `experiment-idea`,
       `packageManager` is set
 - [ ] Config files follow the docs' and the blueprint's required values; reference code was written as given
 - [ ] Each example's data, behaviour and tests hold, built by applying the docs it names
-- [ ] `coding-conventions.md` is the one `apply-stack-conventions` assembled, not written by hand
+- [ ] `coding-conventions.md` is the one `consult-stack-knowledge` assembled, not written by hand
 - [ ] `pnpm format`, then every check, pass; nothing was emitted into the tree
 - [ ] The smoke test passed
 - [ ] The run ended with **Blocked on me**, **Changed** and **Found**, every gap under **Found**

@@ -1,19 +1,20 @@
 ---
-name: apply-stack-conventions
-description: "Owns the house TypeScript stacks as a knowledge graph of concepts, technologies, integrations, examples and stack blueprints. Recommends the stack that fits a project, resolves which one a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it) with a script that reads the project's files or the technologies named, lists the docs that apply, assembles its coding-conventions.md, hands all of it to the calling skill, and answers which conventions, pitfalls and required values govern a file or a topic in a project. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, when a project's coding-conventions.md has to be assembled again, or when a session asks which rule applies to a file, how something is done in this stack, or why a convention holds."
+name: consult-stack-knowledge
+description: "Consults the house knowledge base of TypeScript stacks: a graph of concept, technology, integration, example and stack docs. Recommends the stack that fits a project; resolves which stack a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it) from the project's files or the technologies named; lists the docs that apply and assembles coding-conventions.md for the calling skill; and answers which conventions, pitfalls and required values govern a file or a topic in a project. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, when a project's coding-conventions.md has to be assembled again, or when a session asks which rule applies to a file, how something is done in this stack, or why a convention holds."
 ---
 
-# Apply Stack Conventions
+# Consult Stack Knowledge
 
-Turns a project, or a combination of technologies, into its stack, the docs that apply and an assembled
-`coding-conventions.md`, and hands them to the skill that asked; and answers, for a file or a topic in a project, which
-docs govern it. It does not build or change the project: the caller reads the docs and does the work. `<skill-dir>` is
-this skill's base directory; every doc lives under `<skill-dir>/references/`, and
-[references/catalog.md](references/catalog.md) lists them all.
+The house stacks as a knowledge base: concept, technology, integration, example and stack docs under
+`<skill-dir>/references/` (`<skill-dir>` is this skill's base directory), joined into a graph by each doc's frontmatter,
+and the scripts that ask it. For a project, or a combination of technologies, it answers which stack that is, which
+docs apply and what `coding-conventions.md` they assemble into, and hands that to the skill that asked; for a file or a
+topic in a project, it answers which docs govern it and what they say. Which docs apply is computed from the graph, not
+recalled. It does not build or change the project: the caller reads the docs and does the work.
+[references/catalog.md](references/catalog.md) lists every doc.
 
-The docs form a graph: each doc's frontmatter names what it realises, connects, needs or is built from, and the scripts
-below answer from it, so which docs apply is computed, not recalled. The two tables below are the one list of stacks.
-Other skills (`bootstrap-project`'s interview, `experiment-idea`, `plan-release`) link here rather than keep their own.
+The two tables below are the one list of stacks. Other skills (`bootstrap-project`'s interview, `experiment-idea`,
+`plan-release`) link here rather than keep their own.
 
 ## Stacks
 
