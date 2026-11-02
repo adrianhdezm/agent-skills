@@ -32,23 +32,23 @@ Skills for configuring a machine with Claude Code — hooks, guardrails, and
 tooling conventions — plus six phase skills that take a project from idea to
 a verified build (see [From idea to verified build](#from-idea-to-verified-build)).
 
-| Skill                       | What it does                                                                                                                                                                                                               |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze-problem`           | Phase 3: writes the PRD: every feature as numbered behaviours (B1…) with testable acceptance criteria (B1.1…), cut into releases (R1…), framework-free                                                                     |
-| `apply-stack-conventions`   | Resolves the stack, lists the concept, technology, integration and example docs that apply, and assembles `coding-conventions.md` for the calling skill                                                                    |
-| `bootstrap-project`         | Scaffolds a project from a short interview by looking up the stack conventions for each technology, pairing and starter example, filling gaps with reported defaults; every check passing                                  |
-| `brainstorm-idea`           | Phase 1: collects the idea, the product as you picture it, the stack constraints and references, proposes directions that differ in kind, and records the chosen one                                                       |
-| `confirm-my-goal`           | Plays back the goal, problem and scope in its own words, flags assumptions, and waits for confirmation before acting; runs only via `/confirm-my-goal`                                                                     |
-| `debug-failure`             | Finds the root cause of a failure: reproduces it, narrows it down (bisecting a regression), writes a failing test, fixes the cause and proves it with every check                                                          |
-| `define-constraints`        | Writes the project's quality bar into `CONSTRAINTS.md` (floor, checks with commands, measured values, done means, boundaries), wires `check:fast` / `check:task` / `check:full`, and guards the diff against a lowered bar |
-| `design-solution`           | Phase 4: the release's tech lead: maps each behaviour onto real building blocks, puts the forks on an interactive plan, and orders the slices, with an S0 setup task first                                                 |
-| `experiment-idea`           | Phase 2: builds a thin, throwaway version of the idea in two approaches within the stack constraints, compares them, and records your code corrections (C1…)                                                               |
-| `implement-design`          | Phase 5: builds the release slice by slice, each on its own branch and pull request, with one test per criterion titled by its ID; goes on to verify                                                                       |
-| `simplify-code`             | Makes recently changed code easier to read without changing behaviour, one change at a time with the tests run after each; leaves `simplify-ignore` blocks alone                                                           |
-| `setting-up-git-guardrails` | Installs a PreToolUse hook that blocks destructive git commands (force-push, `reset --hard`, `clean -f`, `branch -D`, whole-tree `checkout`/`restore`)                                                                     |
-| `setting-up-npm-block`      | Installs a PreToolUse hook that redirects `npm` to `pnpm`, active only in repos with a `pnpm-lock.yaml`                                                                                                                    |
-| `verify-build`              | Phase 6: traces each criterion to a test, runs every check, exercises each behaviour in the running app and reviews the diff; works the fixes until Ready                                                                  |
-| `writing-a-skill`           | Guidance for authoring new skills                                                                                                                                                                                          |
+| Skill                     | What it does                                                                                                                                                                                                               |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `analyze-problem`         | Phase 3: writes the PRD: every feature as numbered behaviours (B1…) with testable acceptance criteria (B1.1…), cut into releases (R1…), framework-free                                                                     |
+| `apply-stack-conventions` | Resolves the stack, lists the concept, technology, integration and example docs that apply, and assembles `coding-conventions.md` for the calling skill                                                                    |
+| `bootstrap-project`       | Scaffolds a project from a short interview by looking up the stack conventions for each technology, pairing and starter example, filling gaps with reported defaults; every check passing                                  |
+| `brainstorm-idea`         | Phase 1: collects the idea, the product as you picture it, the stack constraints and references, proposes directions that differ in kind, and records the chosen one                                                       |
+| `confirm-my-goal`         | Plays back the goal, problem and scope in its own words, flags assumptions, and waits for confirmation before acting; runs only via `/confirm-my-goal`                                                                     |
+| `debug-failure`           | Finds the root cause of a failure: reproduces it, narrows it down (bisecting a regression), writes a failing test, fixes the cause and proves it with every check                                                          |
+| `define-constraints`      | Writes the project's quality bar into `CONSTRAINTS.md` (floor, checks with commands, measured values, done means, boundaries), wires `check:fast` / `check:task` / `check:full`, and guards the diff against a lowered bar |
+| `design-solution`         | Phase 4: the release's tech lead: maps each behaviour onto real building blocks, puts the forks on an interactive plan, and orders the slices, with an S0 setup task first                                                 |
+| `experiment-idea`         | Phase 2: builds a thin, throwaway version of the idea in two approaches within the stack constraints, compares them, and records your code corrections (C1…)                                                               |
+| `implement-design`        | Phase 5: builds the release slice by slice, each on its own branch and pull request, with one test per criterion titled by its ID; goes on to verify                                                                       |
+| `load-keychain-secrets`   | Copies secrets from the macOS Keychain into a project's or sandbox's `.env` by name, git-ignoring the file first; the values never pass through the conversation                                                           |
+| `set-up-dev-machine`      | Installs the git guardrails hook (blocks force-push, `reset --hard`, `clean -f`, `branch -D`, whole-tree `checkout`/`restore`) and the npm-to-pnpm hook, and gets `gh` installed and logged in                             |
+| `simplify-code`           | Makes recently changed code easier to read without changing behaviour, one change at a time with the tests run after each; leaves `simplify-ignore` blocks alone                                                           |
+| `verify-build`            | Phase 6: traces each criterion to a test, runs every check, exercises each behaviour in the running app and reviews the diff; works the fixes until Ready                                                                  |
+| `writing-a-skill`         | Guidance for authoring new skills                                                                                                                                                                                          |
 
 The plugin also registers the `chrome-devtools` MCP server.
 
@@ -107,8 +107,9 @@ Three supporting skills plug into the phases. You can also run each of them on i
 
 ### Before you start
 
-- Install the plugin (see [Install](#install)). Consider `setting-up-git-guardrails` first, since the implementation
-  phase runs commands without asking each time.
+- Install the plugin (see [Install](#install)). Run `/set-up-dev-machine` first: its git guardrails matter because the
+  implementation phase runs commands without asking each time, and it gets `gh` logged in for the design and
+  implementation phases.
 - Have Node 24+ and pnpm 11+. For a full-stack app, have Docker running. Have `gh` installed and logged in: the design
   phase finds or creates the repo with it, and the implementation phase opens and merges a pull request per slice.
 - Pick a **slug** for the initiative: `v1` for a first version, or a feature name such as `billing` later. Every file
