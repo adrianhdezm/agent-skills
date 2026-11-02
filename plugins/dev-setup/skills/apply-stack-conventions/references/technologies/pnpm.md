@@ -1,3 +1,11 @@
+---
+kind: technology
+role: toolchain
+detect:
+  files: [pnpm-workspace.yaml]
+  manifest: [packageManager]
+aliases: [pnpm]
+---
 # pnpm
 
 The package manager: the manifest, pnpm's settings, workspaces, and how versions are held back.

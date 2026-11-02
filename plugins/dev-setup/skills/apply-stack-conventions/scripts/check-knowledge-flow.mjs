@@ -7,71 +7,51 @@
 //
 // A technology doc names no other technology that has a doc, and links to no other technology or integration doc; an
 // architecture doc names no technology and links to no technology, integration or example doc. Both may link up to an
-// architecture doc. The shared toolchain (`pnpm …`, `node …`, `tsconfig*.json`) is allowed inside code spans, as
-// notation. It prints each violation as file:line and exits non-zero when there is one.
+// architecture doc. How each technology is recognised in text is its doc's `aliases` (a word, or a literal such as
+// `@angular/`); a doc whose `family` names another technology may use that technology's vocabulary (the Cloudflare
+// products are bound to a Worker and created by Wrangler, NgRx exists only inside Angular). The shared toolchain
+// (`pnpm …`, `node …`, `tsconfig*.json`) is allowed inside code spans, as notation. Frontmatter is not prose and is
+// not checked. It prints each violation as file:line and exits non-zero when there is one.
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadGraph } from './lib/graph.mjs';
 
 const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'references'));
+const graph = loadGraph(root);
+
+/** An alias as a pattern: word boundaries around the ends that are word characters, the rest literal. */
+function pattern(alias) {
+  const literal = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`${/^\w/.test(alias) ? '\\b' : ''}${literal}${/\w$/.test(alias) ? '\\b' : ''}`);
+}
 
 /** How each technology with a doc is recognised in text, keyed by its doc's base name. */
-const names = {
-  angular: [/\bAngular\b/, /@angular\//],
-  'better-auth': [/\bBetter Auth\b/, /\bbetter-auth\b/, /\bbetterAuth\b/],
-  'cloudflare-d1': [/\bD1\b/],
-  'cloudflare-r2': [/\bR2\b/],
-  'cloudflare-workers': [/\bWorkers?\b/, /\bworkerd\b/, /\bWrangler\b/, /\bwrangler\b/, /\bCloudflare\b/],
-  'docker-compose': [/\bDocker\b/, /\bCompose\b/, /\bdocker-compose\b/, /\bdocker compose\b/],
-  drizzle: [/\bDrizzle\b/, /\bdrizzle\b/],
-  eslint: [/\bESLint\b/, /\beslint\b/],
-  express: [/\bExpress\b/, /\bexpress\(\)/, /`express`/],
-  hono: [/\bHono\b/, /\bhono\b/],
-  ngrx: [/\bNgRx\b/, /@ngrx\//],
-  nginx: [/\bNginx\b/, /\bnginx\b/],
-  node: [/\bNode\b/],
-  pnpm: [/\bpnpm\b/],
-  postgres: [/\bPostgres(?:QL)?\b/, /\bpostgres:/, /`pg`/],
-  prettier: [/\bPrettier\b/, /\bprettier\b/],
-  pino: [/\bPino\b/, /\bpino\b/],
-  'react-router': [/\bReact Router\b/, /\breact-router\b/, /\breactRouter\(/],
-  's3-storage': [/\bRustFS\b/, /\bS3\b/],
-  shadcn: [/\bshadcn\b/],
-  storybook: [/\bStorybook\b/, /@storybook\//, /\bstorybook@/],
-  tailwind: [/\bTailwind\b/, /\btailwindcss\b/],
-  typescript: [/\bTypeScript\b/],
-  vite: [/\bVite\b/, /\bvite\b/],
-  vitest: [/\bVitest\b/, /\bvitest\b/]
-};
-/**
- * Docs of one platform share its vocabulary: the Cloudflare products are bound to a Worker and created by Wrangler, and
- * NgRx exists only inside Angular.
- */
-const families = [
-  ['cloudflare-workers', 'cloudflare-d1', 'cloudflare-r2'],
-  ['angular', 'ngrx']
-];
-const shared = { 'cloudflare-workers': names['cloudflare-workers'], angular: names.angular };
+const names = Object.fromEntries(
+  Object.values(graph.technologies)
+    .filter((t) => !t.external)
+    .map((t) => [t.id, (t.aliases ?? []).map(pattern)])
+);
 /** Allowed as notation inside a code span. */
 const notation = new Set(['pnpm', 'node', 'typescript']);
 
-/** Whether `doc` may use this pattern of `tech`: its own names, or its platform's shared vocabulary. */
-function allowed(layer, doc, tech, pattern) {
-  if (layer !== 'technologies') {
-    return false;
-  }
-  if (tech === doc) {
-    return true;
-  }
-  const inFamily = families.some((f) => f.includes(doc) && f.includes(tech));
-  return inFamily && (shared[tech] ?? []).some((s) => s.source === pattern.source);
+/** Whether `doc` may name `tech`: itself, or the family it belongs to. */
+function allowed(layer, doc, tech) {
+  return layer === 'technologies' && (tech === doc || graph.technologies[doc]?.family === tech);
 }
 
-/** Lines outside code fences, with their numbers, and each line's prose (code spans removed) beside it. */
+/** Lines outside code fences and frontmatter, with their numbers, and each line's prose (code spans removed) beside it. */
 function lines(text) {
   const out = [];
   let fenced = false;
+  let frontmatter = text.startsWith('---\n');
   text.split('\n').forEach((line, i) => {
+    if (frontmatter) {
+      if (i > 0 && line === '---') {
+        frontmatter = false;
+      }
+      return;
+    }
     if (line.trimStart().startsWith('```')) {
       fenced = !fenced;
       return;
@@ -96,8 +76,11 @@ function check(layer, allowedLinks) {
         }
       }
       for (const [tech, patterns] of Object.entries(names)) {
+        if (allowed(layer, doc, tech)) {
+          continue;
+        }
         const text = notation.has(tech) ? prose : line;
-        const hit = patterns.find((p) => p.test(text) && !allowed(layer, doc, tech, p));
+        const hit = patterns.find((p) => p.test(text));
         if (hit) {
           problems.push(`${layer}/${file}:${n}: names ${tech} (${hit.source})`);
         }

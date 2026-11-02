@@ -1,3 +1,15 @@
+---
+kind: stack
+technologies: [pnpm, typescript, react-router, vite, tailwind, shadcn, hono, cloudflare-workers, eslint, prettier, vitest]
+optional:
+  database: [cloudflare-d1, drizzle]
+  authentication: [better-auth]
+  file-storage: [cloudflare-r2]
+  storybook: [storybook]
+requires:
+  authentication: [database]
+  file-storage: [database, authentication]
+---
 # React Router on Workers
 
 A server-rendered React Router app whose server is a Hono Worker on Cloudflare's edge, styled with Tailwind and

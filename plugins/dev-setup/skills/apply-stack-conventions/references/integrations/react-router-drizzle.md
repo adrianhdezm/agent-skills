@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [react-router, drizzle]
+realises: [data-access]
+---
 # React Router + Drizzle
 
 How a React Router app layers data access once it has a database: D1 on Workers or Postgres on Node, both through

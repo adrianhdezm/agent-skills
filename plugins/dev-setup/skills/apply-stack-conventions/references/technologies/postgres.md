@@ -1,3 +1,11 @@
+---
+kind: technology
+role: service
+realises: [database]
+detect:
+  dependencies: [pg]
+aliases: [Postgres, PostgresQL, 'postgres:', '`pg`']
+---
 # Postgres
 
 Postgres as the database of a long-running process: one pool, a required connection URL, its column types, and

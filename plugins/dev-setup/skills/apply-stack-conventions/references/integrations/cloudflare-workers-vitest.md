@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [cloudflare-workers, vitest]
+unless: [react-router]
+---
 # Cloudflare Workers + Vitest
 
 Vitest inside workerd through Cloudflare's plugin: tests reach the Worker through its real entry and read its bindings,

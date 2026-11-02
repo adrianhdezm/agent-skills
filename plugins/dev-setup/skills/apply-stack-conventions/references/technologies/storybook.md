@@ -1,3 +1,11 @@
+---
+kind: technology
+role: tooling
+realises: [ui-components]
+detect:
+  files: [.storybook/]
+aliases: [Storybook, @storybook/, storybook@]
+---
 # Storybook
 
 Storybook 10 as the workshop where components are built and reviewed: a story file beside every component, one story per

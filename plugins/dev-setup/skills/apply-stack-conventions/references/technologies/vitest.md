@@ -1,3 +1,10 @@
+---
+kind: technology
+role: tooling
+detect:
+  files: ['vitest.config.*']
+aliases: [Vitest, vitest]
+---
 # Vitest
 
 The test runner: one config of named projects, an environment per kind of test, and the rules every test follows.

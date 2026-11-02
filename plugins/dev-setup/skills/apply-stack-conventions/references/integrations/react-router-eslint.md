@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, eslint]
+---
 # React Router + ESLint
 
 The React and accessibility presets for a React Router app, and the overrides its routes and tests need. Both React

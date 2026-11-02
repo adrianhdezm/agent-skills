@@ -1,3 +1,10 @@
+---
+kind: integration
+connects: [angular, fundamental-ngx]
+realises: [ui-components]
+detect:
+  dependencies: [@fundamental-ngx/core]
+---
 # Angular + Fundamental NGX
 
 SAP Fiori Horizon components in the Angular web app, copied in from the Fundamental NGX shadcn registry by the shadcn

@@ -1,3 +1,10 @@
+---
+kind: technology
+role: framework
+detect:
+  dependencies: [hono]
+aliases: [Hono, hono]
+---
 # Hono
 
 Hono as the server entry: one app that whatever runs it drives through `app.fetch`, its errors answered in one place.

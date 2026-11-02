@@ -1,3 +1,7 @@
+---
+kind: example
+needs: [[react-router]]
+---
 # React Router home
 
 The first route of a React Router app: a home page whose loader reads a value the server entry put on the context,

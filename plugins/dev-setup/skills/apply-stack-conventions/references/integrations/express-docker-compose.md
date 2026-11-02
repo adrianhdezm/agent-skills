@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [express, docker-compose]
+---
 # Express + Docker Compose
 
 An Express API's image and Compose service: compiled in the build stage, run from `dist/` with production dependencies

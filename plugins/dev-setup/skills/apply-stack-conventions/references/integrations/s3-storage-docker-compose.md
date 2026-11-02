@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [s3-storage, docker-compose]
+---
 # S3 storage + Docker Compose
 
 RustFS, an S3-compatible store, as a service of the root Compose file, so file storage runs locally the way it runs in

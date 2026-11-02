@@ -1,3 +1,7 @@
+---
+kind: stack
+technologies: [pnpm, typescript, node, hono, pino, postgres, drizzle, docker-compose, eslint, prettier, vitest]
+---
 # Hono API on Node
 
 A single-package Hono + Drizzle + Postgres REST API, compiled by `tsc` and run on Node through `@hono/node-server`,

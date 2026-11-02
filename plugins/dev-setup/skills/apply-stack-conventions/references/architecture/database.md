@@ -1,3 +1,6 @@
+---
+kind: concept
+---
 # Database
 
 The database itself, whatever the engine: which kind a runtime gets, how tables are designed, how the schema changes,

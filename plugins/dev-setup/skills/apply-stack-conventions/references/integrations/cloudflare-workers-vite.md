@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [cloudflare-workers, vite]
+---
 # Cloudflare Workers + Vite
 
 Vite as the dev server and the build of a Worker, through Cloudflare's Vite plugin: the dev server runs the Worker

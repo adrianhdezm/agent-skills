@@ -1,3 +1,8 @@
+---
+kind: example
+needs: [[node]]
+unless: [hono, express, react-router, angular]
+---
 # Node module
 
 The first module of a Node package: one exported function, its test, and the entry point that runs it. The Node package

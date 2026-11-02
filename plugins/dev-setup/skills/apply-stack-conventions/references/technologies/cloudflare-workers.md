@@ -1,3 +1,10 @@
+---
+kind: technology
+role: runtime
+detect:
+  files: [wrangler.jsonc, wrangler.toml]
+aliases: [Worker, Workers, workerd, Wrangler, wrangler, Cloudflare]
+---
 # Cloudflare Workers
 
 What every Worker shares: Wrangler's config, the compatibility date, the runtime types, its scripts and its secrets.

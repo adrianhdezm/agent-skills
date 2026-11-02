@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [drizzle, cloudflare-d1]
+---
 # Drizzle + Cloudflare D1
 
 Drizzle over D1: a client per request from the binding, the `sqlite` dialect for migrations, SQLite column types in the

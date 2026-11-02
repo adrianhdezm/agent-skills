@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [hono, cloudflare-workers]
+---
 # Hono + Cloudflare Workers
 
 A Hono app as the Worker: workerd drives `app.fetch`, the bindings are typed by Wrangler, and tests reach the Worker

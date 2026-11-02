@@ -1,3 +1,8 @@
+---
+kind: example
+needs: [[express, drizzle], [hono, node, drizzle], [angular]]
+unless: [react-router]
+---
 # Entity CRUDL
 
 One resource, `entity`, listed with filter, sort and pagination, shown, created, edited and deleted: the template every

@@ -1,17 +1,19 @@
 ---
 name: apply-stack-conventions
-description: "Owns the house TypeScript stacks. Recommends the stack that fits a project, resolves which one a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it), lists the architecture, technology, integration and example docs that apply, assembles its coding-conventions.md, and hands all of it to the calling skill. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, or when a project's coding-conventions.md has to be assembled again."
+description: "Owns the house TypeScript stacks as a knowledge graph of concepts, technologies, integrations, examples and stack blueprints. Recommends the stack that fits a project, resolves which one a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it) with a script that reads the project's files or the technologies named, lists the docs that apply, assembles its coding-conventions.md, hands all of it to the calling skill, and answers which conventions, pitfalls and required values govern a file or a topic in a project. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, when a project's coding-conventions.md has to be assembled again, or when a session asks which rule applies to a file, how something is done in this stack, or why a convention holds."
 ---
 
 # Apply Stack Conventions
 
 Turns a project, or a combination of technologies, into its stack, the docs that apply and an assembled
-`coding-conventions.md`, and hands them to the skill that asked. It does not build or change the project: the caller
-reads the docs and does the work. `<skill-dir>` is this skill's base directory; every doc lives under
-`<skill-dir>/references/`, and [references/catalog.md](references/catalog.md) lists them all.
+`coding-conventions.md`, and hands them to the skill that asked; and answers, for a file or a topic in a project, which
+docs govern it. It does not build or change the project: the caller reads the docs and does the work. `<skill-dir>` is
+this skill's base directory; every doc lives under `<skill-dir>/references/`, and
+[references/catalog.md](references/catalog.md) lists them all.
 
-The two tables below are the one list of stacks. Other skills (`bootstrap-project`'s interview, `experiment-idea`,
-`plan-release`) link here rather than keep their own.
+The docs form a graph: each doc's frontmatter names what it realises, connects, needs or is built from, and the scripts
+below answer from it, so which docs apply is computed, not recalled. The two tables below are the one list of stacks.
+Other skills (`bootstrap-project`'s interview, `experiment-idea`, `plan-release`) link here rather than keep their own.
 
 ## Stacks
 
@@ -27,7 +29,8 @@ The two tables below are the one list of stacks. Other skills (`bootstrap-projec
 | Angular full stack                          | back-office apps that own their data and expose a REST API other clients can use too                                                             | Nginx, Express on Node, Postgres, Docker Compose | Postgres through Drizzle, an `entity` CRUDL end to end | `angular-fundamental-ngx` (SAP Fiori)                                              | [angular-fullstack.md](references/stacks/angular-fullstack.md)             |
 
 To recommend one, match what the project does to **Suits applications like** and give the reason in a sentence. When
-two fit, recommend the one with fewer moving parts and say what would tip it the other way.
+two fit, recommend the one with fewer moving parts and say what would tip it the other way. `authentication` needs
+`database`, and `file-storage` needs both; the script adds what a picked group requires and says so.
 
 Combinations without a blueprint are composed from the docs that cover their parts. Say plainly that one has no
 blueprint, and offer the nearest blueprint if it would do:
@@ -44,40 +47,42 @@ language is out of scope: every doc here is TypeScript.
 
 ## Workflow
 
-1. **Resolve the stack.** From the combination the caller settled, or, for an existing project, from its root
-   manifest(s), config files and its `coding-conventions.md` (its first paragraph names the stack). Match it to a row of
-   the Stacks table, and pick the optional entries (`--with`) it has or asks for. A combination no blueprint covers is
-   composed: match it to the second table, or name its parts from the "has it when it has" columns of the
-   [catalog](references/catalog.md).
-
-2. **List the docs.**
-   - **With a blueprint**, the script reads them from its **Composition**, keeping only the optional entries picked,
-     and its **Examples**.
-   - **Composed**, take the code style concept, the shared tooling (pnpm, TypeScript, ESLint, Prettier, Vitest), the
-     architecture doc of each concept the project needs (a database, endpoints, sign-in, uploads) and the docs whose
-     Realises line names it and fit the runtime, the technology doc of each technology, the integration doc of each
-     pair that connects, and the examples whose Demonstrates table names those docs. Order them code style, pnpm,
-     TypeScript, concepts, runtime and frameworks, integrations, tooling. An integration whose other half was swapped
-     for a technology the project uses instead (Express + Drizzle in a Hono API) is left out of the list, and its seam
-     applied with the project's technology in its place; name each one so under **Found**.
-   - Name each technology the combination has that no doc covers as a gap.
-
-3. **Assemble the conventions** with one command, which writes `coding-conventions.md` and prints the hand-off block.
-   `<scratchpad>` is the caller's scratch directory, or a new temporary one. The script fails on a missing section or a
-   link that would not resolve in a project; a failure is a broken doc, reported under **Found**, not something to work
-   around.
+1. **Resolve the stack** with one command, which prints the block the hand-off is built from:
 
    ```sh
-   # with a blueprint, a --with for each optional entry picked
-   node <skill-dir>/scripts/assemble-conventions.mjs <skill-dir>/references/stacks/<stack>.md [--with <entry>]... --out <scratchpad>/coding-conventions.md
-   # composed: a noun phrase for what it is, an --example for each example, then the docs from step 2 in their order
-   node <skill-dir>/scripts/assemble-conventions.mjs --compose "<what it is>" [--example <example>]... --out <scratchpad>/coding-conventions.md <doc>...
+   # an existing project: its technologies are read from its manifests and config files
+   node <skill-dir>/scripts/resolve-stack.mjs <project dir> [--with <group>]...
+   # a combination the caller settled: the technologies by their doc names, a --with for each optional entry asked for
+   node <skill-dir>/scripts/resolve-stack.mjs --technologies <name>... [--concepts <concept>...] [--with <group>]... [--kind "<what it is>"]
    ```
+
+   It matches the technologies to a blueprint when every one belongs to it and whatever it lacks is only toolchain or
+   tooling (named under `Found`), picks the groups whose technologies are present plus each `--with` and what those
+   require, and lists the blueprint's docs and examples for them. Otherwise the combination is **composed**: the
+   concepts its technologies realise (plus each `--concepts`, such as `rest-api` for an API with no data), every
+   integration whose both ends are present and no present technology rules out, and the examples whose needs are met,
+   in composition order; `Found` names the nearest blueprint. A `--technologies` name no doc covers is a `Gap`.
+
+   Name the technologies by their doc's base name (`react-router`, `cloudflare-workers`, `s3-storage`); the
+   [catalog](references/catalog.md) lists them. For an existing project, its `coding-conventions.md` names its stack in
+   its first paragraph: a difference from the `Stack` line goes under **Found**.
+
+2. **Judge the block.** The script knows the docs; you know the request. Add to `Gaps` any technology the request names,
+   or the project's manifest shows, that shapes the project (a server framework, a database, an auth library, a UI
+   kit) and the `Technologies` line lacks; an ordinary dependency is not a gap. A request for a server framework other
+   than Express or Hono, or for another language, is answered as the Stacks section says, not composed. Read the
+   blueprint and each doc the caller will need before handing off.
+
+3. **Assemble the conventions** with the `Assemble` command the block printed, `<out>` replaced by the caller's scratch
+   directory, or a new temporary one. It writes `coding-conventions.md` and prints the hand-off block. The script
+   fails on a missing section or a link that would not resolve in a project; a failure is a broken doc, reported under
+   **Found**, not something to work around.
 
    For an existing project that has a `coding-conventions.md`, diff the two: a difference means one of them moved, and
    goes under **Found** for the user to decide.
 
-4. **Hand off.** Return the block the script printed, with the two lines only you can write added, to the caller:
+4. **Hand off.** Return the block the assembly printed, with the `Gaps` and `Found` lines from step 1 and what you
+   added in step 2, to the caller:
 
    ```
    Stack: React Router on Node · with: database, authentication     (or: Composed: <what it is>)
@@ -86,16 +91,36 @@ language is out of scope: every doc here is TypeScript.
    Examples: <path>, …
    Ports: Postgres 5432 (moved with `DB_PORT`), the app's `PORT` …   (the blueprint's ports row)
    Conventions: <scratchpad>/coding-conventions.md
-   Gaps: no doc for <technology>                                     (or: none; added by you)
-   Found: <a broken doc, a swapped integration, a drift from the project's coding-conventions.md>   (or: none; added by you)
+   Gaps: no doc for <technology>                                     (or: none)
+   Found: <a broken doc, a group added because another requires it, a drift from the project's coding-conventions.md>   (or: none)
    ```
 
    Run without a calling skill, end with the same block.
 
+## Answering about a file or a topic
+
+When a session asks which rule governs a file, how something is done in this stack, or why a convention holds, do not
+load the docs and search: ask the graph.
+
+```sh
+# the docs that claim a file: their Conventions and Pitfalls (--sections Conventions,Pitfalls,Verify it is wired; or all)
+node <skill-dir>/scripts/dossier.mjs <project dir> <file>... [--sections <name>,...] [--with <group>]...
+# the bullets and rows, across the docs that apply to the project, that mention every word
+node <skill-dir>/scripts/dossier.mjs <project dir> --topic <word>... [--sections <name>,...]
+```
+
+It resolves the project's stack as step 1 does, keeps the docs that apply, and prints, for a file, each doc whose
+"Where it lives", "Layout" or Required values names it, with what that file holds and the sections asked for; for a
+topic, each matching bullet with its doc and section. Answer from what it printed, naming the doc each rule comes from,
+and quote the reason the doc gives. When no doc claims the file, say so and offer the blueprint's Layout as the nearest
+guide; when no doc mentions the topic, say so rather than inferring a rule. A rule the docs lack is a gap to report to
+the maintainer, not a rule to make up.
+
 ## Review Checklist
 
-- [ ] The stack matches a blueprint row, or the composition was built from the catalog and says so
-- [ ] Only the optional entries the project has or asks for were picked
-- [ ] Docs are in composition order; every technology without a doc is a gap
+- [ ] The stack came from `resolve-stack.mjs`, from the project's files or the technologies named, and its block was read
+- [ ] Only the optional entries the project has or asks for, and what they require, were picked
+- [ ] Docs are in composition order; every technology that shapes the project and has no doc is a gap
 - [ ] `coding-conventions.md` was assembled by the script with `--out`, and the script passed
-- [ ] The hand-off block the script printed was returned, with Gaps and Found added
+- [ ] The hand-off block was returned, with Gaps and Found carried over and added to
+- [ ] A question about a file or a topic was answered from `dossier.mjs`, each rule with its doc

@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, storybook]
+---
 # React Router + Storybook
 
 Storybook in a React Router app: the React Vite builder over the app's Vite config, without the plugins that start the

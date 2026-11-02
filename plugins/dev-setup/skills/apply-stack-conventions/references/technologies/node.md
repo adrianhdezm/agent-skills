@@ -1,3 +1,11 @@
+---
+kind: technology
+role: runtime
+detect:
+  manifest: [engines.node]
+  scripts: ['node .*\.ts']
+aliases: [Node]
+---
 # Node
 
 Node 24 as a runtime: loading the environment, configuration that fails loudly, and one file with side effects.

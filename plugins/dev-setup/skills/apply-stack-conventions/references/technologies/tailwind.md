@@ -1,3 +1,11 @@
+---
+kind: technology
+role: library
+realises: [ui-components]
+detect:
+  dependencies: [tailwindcss]
+aliases: [Tailwind, tailwindcss]
+---
 # Tailwind
 
 Tailwind 4 as the only way components are styled: utilities in the markup, and one global stylesheet holding Tailwind and

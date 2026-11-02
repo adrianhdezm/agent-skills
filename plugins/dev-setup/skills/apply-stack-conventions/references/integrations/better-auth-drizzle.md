@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [better-auth, drizzle]
+---
 # Better Auth + Drizzle
 
 Better Auth's tables in the app's Drizzle schema, reached through its Drizzle adapter with the engine's provider. The

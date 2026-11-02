@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [better-auth, react-router]
+---
 # Better Auth + React Router
 
 Better Auth inside a React Router app: built by the server entry onto `appContext`, its endpoints as one splat route,

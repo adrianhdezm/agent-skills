@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [express, pino]
+---
 # Express + Pino
 
 Pino inside an Express API: `pino-http` as the first middleware, so every request is logged with its status and timing

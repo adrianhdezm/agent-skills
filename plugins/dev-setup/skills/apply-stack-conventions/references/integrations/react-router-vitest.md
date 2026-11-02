@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, vitest]
+---
 # React Router + Vitest
 
 React Router's tests in Vitest's browser mode: route components rendered through `createRoutesStub` in real Chromium,

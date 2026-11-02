@@ -1,3 +1,11 @@
+---
+kind: technology
+role: library
+realises: [authentication]
+detect:
+  dependencies: [better-auth]
+aliases: ['Better Auth', better-auth, betterAuth]
+---
 # Better Auth
 
 Better Auth with email and password: the library that owns credentials and sessions, built where the runtime allows,

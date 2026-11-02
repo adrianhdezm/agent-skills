@@ -1,3 +1,10 @@
+---
+kind: technology
+role: tooling
+detect:
+  files: [.prettierrc]
+aliases: [Prettier, prettier]
+---
 # Prettier
 
 The formatter. Prettier owns formatting; nothing else does.

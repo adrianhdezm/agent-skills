@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [angular, tailwind]
+---
 # Angular + Tailwind
 
 Tailwind in an Angular package: wired through PostCSS, its layers imported one by one into `src/styles.css`, and every

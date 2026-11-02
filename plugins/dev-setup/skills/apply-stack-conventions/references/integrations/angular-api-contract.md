@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [angular]
+realises: [rest-api]
+---
 # Angular + the API contract
 
 How the Angular web app consumes its HTTP API: a build-time base URL, models mirrored by hand, and the REST API concept's

@@ -1,3 +1,12 @@
+---
+kind: technology
+role: service
+family: cloudflare-workers
+realises: [database]
+detect:
+  fileContains: ['wrangler.jsonc=d1_databases']
+aliases: [D1]
+---
 # Cloudflare D1
 
 D1, Cloudflare's SQLite database, as the database of a Worker: a binding in `wrangler.jsonc`, SQLite's types, batches

@@ -1,3 +1,8 @@
+---
+kind: integration
+connects: [react-router, shadcn]
+realises: [ui-components]
+---
 # React Router + shadcn/ui
 
 Tailwind 4 and shadcn/ui in a React Router app: Tailwind through its Vite plugin, primitives copied in by the shadcn CLI

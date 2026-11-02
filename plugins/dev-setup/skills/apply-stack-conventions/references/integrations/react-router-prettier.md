@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, prettier]
+---
 # React Router + Prettier
 
 The Prettier plugins a React Router app adds: imports sorted by the app's layers, and Tailwind classes sorted against the

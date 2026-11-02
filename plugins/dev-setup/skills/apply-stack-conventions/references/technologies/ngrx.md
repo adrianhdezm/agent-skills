@@ -1,3 +1,11 @@
+---
+kind: technology
+role: library
+family: angular
+detect:
+  dependencies: [@ngrx/store]
+aliases: [NgRx, @ngrx/]
+---
 # NgRx
 
 NgRx 22 with `@ngrx/router-store`, used for **route-driven state**: each page route names a state, the URL enters the

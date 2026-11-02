@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [hono, node]
+---
 # Hono + Node
 
 A Hono app served by Node through `@hono/node-server`. React Router on Node uses it with `server.ts` running

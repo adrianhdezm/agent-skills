@@ -1,3 +1,7 @@
+---
+kind: integration
+connects: [react-router, docker-compose]
+---
 # React Router + Docker Compose
 
 A server-rendered React Router app's image and Compose service: built in two stages, run from `server.ts` with
