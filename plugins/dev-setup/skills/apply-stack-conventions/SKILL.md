@@ -1,6 +1,6 @@
 ---
 name: apply-stack-conventions
-description: "Owns the house TypeScript stacks. Recommends the stack that fits a project, resolves which one a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it), lists the architecture, technology, integration and example docs that apply, assembles its coding-conventions.md, and hands all of it to the calling skill. Use when bootstrap-project, experiment-idea or design-solution needs a stack recommended or settled, when another skill needs the stack and the docs for a project, or when a project's coding-conventions.md has to be assembled again."
+description: "Owns the house TypeScript stacks. Recommends the stack that fits a project, resolves which one a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it), lists the architecture, technology, integration and example docs that apply, assembles its coding-conventions.md, and hands all of it to the calling skill. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, or when a project's coding-conventions.md has to be assembled again."
 ---
 
 # Apply Stack Conventions
@@ -11,7 +11,7 @@ reads the docs and does the work. `<skill-dir>` is this skill's base directory; 
 `<skill-dir>/references/`, and [references/catalog.md](references/catalog.md) lists them all.
 
 The two tables below are the one list of stacks. Other skills (`bootstrap-project`'s interview, `experiment-idea`,
-`design-solution`) link here rather than keep their own.
+`plan-release`) link here rather than keep their own.
 
 ## Stacks
 

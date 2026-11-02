@@ -74,6 +74,8 @@ figcaption { font-size: 13px; color: var(--muted); }
 pre { margin: 0; background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font: 13px/1.5 var(--f-mono); tab-size: 2; }
 ul.items { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 /* Mock screens: small UI sketches drawn with m-* classes. */
+.diagram { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; overflow-x: auto; max-width: 100%; }
+.diagram svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 .mock { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 16px; display: grid; gap: 10px; overflow-x: auto; max-width: 100%; }
 .m-h { font: 600 17px var(--f-display); }
 .m-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -147,6 +149,7 @@ button.ghost:hover { color: var(--accent); }
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
 <script id="plan-data" type="application/json">/*PLAN_JSON*/</script>
 <script>
 (function () {
@@ -192,6 +195,20 @@ button.ghost:hover { color: var(--accent); }
     head.appendChild(why);
   }
 
+  var drawn = 0;
+  var mermaidReady = false;
+  function draw(box, body) {
+    var m = window.mermaid;
+    if (!m) return;
+    if (!mermaidReady) {
+      var t = document.documentElement.getAttribute("data-theme");
+      var dark = t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      m.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "neutral" });
+      mermaidReady = true;
+    }
+    m.render("diagram-" + drawn++, body).then(function (r) { box.innerHTML = r.svg; }, function () { /* keep the source */ });
+  }
+
   function exhibit(x) {
     if (!x) return null;
     if (x.kind === "code") {
@@ -203,6 +220,12 @@ button.ghost:hover { color: var(--accent); }
     }
     if (x.kind === "mock") {
       return h("figure", {}, [h("div", { class: "mock", html: x.html || "" }), x.caption ? h("figcaption", { text: x.caption }) : null]);
+    }
+    if (x.kind === "diagram") {
+      // The Mermaid source shows until the script draws it, and stays if the script cannot load.
+      var box = h("div", { class: "diagram" }, [h("pre", {}, [h("code", { text: x.body || "" })])]);
+      draw(box, x.body || "");
+      return h("figure", {}, [x.title ? h("div", { class: "code-title", text: x.title }) : null, box, x.caption ? h("figcaption", { text: x.caption }) : null]);
     }
     if (x.kind === "list") {
       var ul = h("ul", { class: "items" });

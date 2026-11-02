@@ -25,7 +25,7 @@ a group is a row's `Optional (--with)` entry in the Stacks table of `SKILL.md`. 
 ` — optional (<group>)`, right after its link, is listed only when that group is picked.
 
 The stacks are listed once, in the two tables under **Stacks** in `SKILL.md`: what each suits, how to choose, and the
-combinations without a blueprint. `bootstrap-project`'s interview and `design-solution` link there, so adding or
+combinations without a blueprint. `bootstrap-project`'s interview and `plan-release` link there, so adding or
 changing a stack touches nothing outside this skill.
 
 ## Changing the conventions

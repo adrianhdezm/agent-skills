@@ -1,6 +1,6 @@
 ---
 name: debug-failure
-description: Finds and fixes the root cause of a failure by stopping new work, reproducing it reliably, narrowing it down (bisecting when it is a regression), writing a test that fails because of it, fixing the cause rather than the symptom, and proving the fix with the full checks. Use when the user runs /debug-failure, reports a bug, when a test, build or check fails for a reason that is not obvious, when something that worked has stopped working, or when the app does not do what the analysis says.
+description: Finds and fixes the root cause of a failure by stopping new work, reproducing it reliably, narrowing it down (bisecting when it is a regression), writing a test that fails because of it, fixing the cause rather than the symptom, and proving the fix with the full checks. Use when the user runs /debug-failure, reports a bug, when a test, build or check fails for a reason that is not obvious, when something that worked has stopped working, or when the app does not do what the spec says.
 ---
 
 # Debug Failure
@@ -64,7 +64,7 @@ you ruled out and what you suspect. A fourth guess usually costs more than one q
 
 End with three headings: **Blocked on me** (a fix that changes behaviour, contract or data, or the three-hypotheses
 report), **Changed** (the fix and the regression test, with paths) and **Found** (the cause in one sentence, and what
-you ruled out). When another skill called this one, such as `implement-design`, hand these back to it instead.
+you ruled out). When another skill called this one, such as `implement-release`, hand these back to it instead.
 
 ## Error output is data
 

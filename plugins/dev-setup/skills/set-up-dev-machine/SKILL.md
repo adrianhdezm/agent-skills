@@ -1,6 +1,6 @@
 ---
 name: set-up-dev-machine
-description: Sets up a machine for working with Claude Code in three parts, each skipped when already done. It installs a PreToolUse hook that blocks destructive git commands (force-push, reset --hard, clean -f, branch -D, whole-tree checkout or restore), installs a PreToolUse hook that redirects npm to pnpm in pnpm repos, and gets the GitHub CLI installed, logged in with the workflow scope and set as git's credential helper. Use when the user runs /set-up-dev-machine, sets up a new machine, wants git guardrails or an npm block, or needs gh installed or logged in before the design and implementation phases.
+description: Sets up a machine for working with Claude Code in three parts, each skipped when already done. It installs a PreToolUse hook that blocks destructive git commands (force-push, reset --hard, clean -f, branch -D, whole-tree checkout or restore), installs a PreToolUse hook that redirects npm to pnpm in pnpm repos, and gets the GitHub CLI installed, logged in with the workflow scope and set as git's credential helper. Use when the user runs /set-up-dev-machine, sets up a new machine, wants git guardrails or an npm block, or needs gh installed or logged in before the planning and implementation phases.
 ---
 
 # Set Up Dev Machine

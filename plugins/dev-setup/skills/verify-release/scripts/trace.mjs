@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Traces each acceptance criterion of an analysis (B1.1, B1.2, …) to the tests whose titles name it.
+// Traces each acceptance criterion of a spec (B1.1, B1.2, …) to the tests whose titles name it.
 //
-//   node trace.mjs <02-analysis.md> [--root <repo>] [--design <03-design.md> --slice <S2[,S3]> | --release <R1>]
+//   node trace.mjs <02-spec.md> [--root <repo>] [--plan <03-tech-plan.md> --slice <S2[,S3]> | --release <R1>]
 //
 // A test counts when the criterion ID is inside the title string of an it(), test(), describe() or context() call,
 // including .only/.skip/.each forms. An ID anywhere else in a test file, such as a comment, is listed as a mention
@@ -11,26 +11,26 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { parseAnalysis, live } from "../../analyze-problem/scripts/analysis.mjs";
-import { parseDesign } from "../../design-solution/scripts/design.mjs";
+import { parseSpec, live } from "../../specify-idea/scripts/spec.mjs";
+import { parseTechPlan } from "../../plan-release/scripts/tech-plan.mjs";
 import { TEST_FILE } from "../../define-constraints/scripts/test-files.mjs";
 
 const args = process.argv.slice(2);
-const VALUED = ["--root", "--design", "--slice", "--release"];
+const VALUED = ["--root", "--plan", "--slice", "--release"];
 const flag = (name) => {
   const i = args.indexOf(name);
   return i === -1 ? undefined : args[i + 1];
 };
-const analysisPath = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]));
+const specPath = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]));
 const root = flag("--root") ?? process.cwd();
-const designPath = flag("--design");
+const planPath = flag("--plan");
 const sliceArg = flag("--slice");
 const releaseArg = flag("--release");
 const usage = () => {
-  console.error("usage: trace.mjs <02-analysis.md> [--root <repo>] [--design <03-design.md> --slice <S2[,S3]> | --release <R1>]");
+  console.error("usage: trace.mjs <02-spec.md> [--root <repo>] [--plan <03-tech-plan.md> --slice <S2[,S3]> | --release <R1>]");
   process.exit(2);
 };
-if (!analysisPath || (sliceArg && !designPath) || (sliceArg && releaseArg)) usage();
+if (!specPath || (sliceArg && !planPath) || (sliceArg && releaseArg)) usage();
 const read = (p) => {
   try {
     return readFileSync(p, "utf8");
@@ -40,24 +40,24 @@ const read = (p) => {
   }
 };
 
-const analysis = parseAnalysis(read(analysisPath));
-const behaviours = live(analysis);
+const spec = parseSpec(read(specPath));
+const behaviours = live(spec);
 let wanted = null;
 if (sliceArg) {
-  const design = parseDesign(read(designPath));
+  const plan = parseTechPlan(read(planPath));
   const names = sliceArg.split(",").map((s) => s.trim());
-  const slices = names.map((n) => design.slices.find((s) => s.id === n));
+  const slices = names.map((n) => plan.slices.find((s) => s.id === n));
   const unknown = names.filter((n, i) => !slices[i]);
   if (unknown.length) {
-    console.error(`error: ${unknown.join(", ")} not under "## Slices" in ${designPath}`);
+    console.error(`error: ${unknown.join(", ")} not under "## Slices" in ${planPath}`);
     process.exit(2);
   }
   wanted = new Set(slices.flatMap((s) => s.covers));
 }
 if (releaseArg) {
-  const release = (analysis.releases ?? []).find((r) => r.id === releaseArg);
+  const release = (spec.releases ?? []).find((r) => r.id === releaseArg);
   if (!release) {
-    console.error(`error: ${releaseArg} is not under "## Releases" in ${analysisPath}`);
+    console.error(`error: ${releaseArg} is not under "## Releases" in ${specPath}`);
     process.exit(2);
   }
   wanted = new Set(release.covers);
@@ -65,9 +65,9 @@ if (releaseArg) {
 const scope = sliceArg ?? releaseArg;
 const criteria = new Map(); // id -> text
 for (const b of behaviours) if (!wanted || wanted.has(b.id)) for (const c of b.criteria) criteria.set(c.id, c.text);
-const known = new Set(analysis.behaviours.flatMap((b) => b.criteria.map((c) => c.id)));
+const known = new Set(spec.behaviours.flatMap((b) => b.criteria.map((c) => c.id)));
 if (criteria.size === 0) {
-  console.error(`error: no criteria ("- B1.1 Given …") found in ${analysisPath}${wanted ? ` for ${scope}` : ""}`);
+  console.error(`error: no criteria ("- B1.1 Given …") found in ${specPath}${wanted ? ` for ${scope}` : ""}`);
   process.exit(2);
 }
 
@@ -90,7 +90,7 @@ const lineAt = (text, index) => text.slice(0, index).split("\n").length;
 
 const hits = new Map(); // id -> [{ file, line, title }]
 const mentions = new Map(); // id -> Set(file:line)
-const strangers = new Map(); // ids in titles that the analysis does not have, or has dropped
+const strangers = new Map(); // ids in titles that the spec does not have, or has dropped
 for (const f of files) {
   const text = readFileSync(f, "utf8");
   const rel = relative(root, f);
@@ -132,5 +132,5 @@ if (untitled.length) {
   console.log("Mentioned, but in no test title (does not count):");
   for (const [id, where] of untitled) console.log(`- ${id}: ${[...where].join(", ")}`);
 }
-if (strangers.size) console.log(`IDs in test titles that the analysis does not have or has dropped: ${[...strangers].map(([id, at]) => `${id} (${at})`).join(", ")}`);
+if (strangers.size) console.log(`IDs in test titles that the spec does not have or has dropped: ${[...strangers].map(([id, at]) => `${id} (${at})`).join(", ")}`);
 process.exit(missing.length ? 1 : 0);

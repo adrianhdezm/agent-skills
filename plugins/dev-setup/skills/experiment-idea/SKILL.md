@@ -1,12 +1,12 @@
 ---
 name: experiment-idea
-description: Validates the brainstormed idea before any requirements are written, by building a thin end-to-end version of the product concept in two or more design approaches that the stack constraints allow (such as two shapes of a web app on Cloudflare), throwaway and outside the project, with every external service behind an interface and a mock strategy so it runs without accounts, keys or network. It answers the riskiest assumptions as yes/no questions, compares the approaches, lets the user read and correct the code and records each correction (C1…), and writes docs/<slug>/01-experiment.md with the answers, the chosen approach and the corrections. Use when the user runs /experiment-idea, or wants to prototype, validate or compare approaches for an idea after /brainstorm-idea and before /analyze-problem.
+description: Validates the brainstormed idea before any requirements are written, by building a thin end-to-end version of the product concept in two or more architectural approaches that the stack constraints allow (such as two shapes of a web app on Cloudflare), throwaway and outside the project, with every external service behind an interface and a mock strategy so it runs without accounts, keys or network. It answers the riskiest assumptions as yes/no questions, compares the approaches, lets the user read and correct the code and records each correction (C1…), and writes docs/<slug>/01-experiment.md with the answers, the chosen approach and the corrections. Use when the user runs /experiment-idea, or wants to prototype, validate or compare approaches for an idea after /brainstorm-idea and before /specify-idea.
 disable-model-invocation: true
 ---
 
 # Experiment Idea
 
-Phase 2 of 6: brainstorm → **experiment** → analyze → design → implement → verify.
+Phase 2 of 6: brainstorm → **experiment** → specify → plan → implement → verify.
 
 The brainstorm picked a direction, described the product as the user pictures it and named the stack it must live
 with. This phase builds that product thinly from end to end, in two ways the stack allows, so the user can use it,
@@ -15,8 +15,8 @@ path works and everything around it is faked: no edge cases, no polish, no tests
 
 The prototypes are evidence, not a first version. They never enter the project repo, and no code is copied from them.
 What carries forward is `01-experiment.md`: the answers, the approach the user picked and every correction they made.
-The analysis turns behaviour corrections into requirements, and the design follows the chosen approach and the design
-and convention corrections.
+The spec turns behaviour corrections into requirements, and the tech plan follows the chosen approach and the
+architecture and convention corrections.
 
 **Done means:** each approach runs the thin path from one command in the sandbox, each question the user agreed to has
 an answer backed by what a prototype showed, the user read the code and every change they made or asked for is a
@@ -25,8 +25,8 @@ correction with its reason, the user picked an approach, and `docs/<slug>/01-exp
 ## When not to use
 
 - No `docs/<slug>/01-brainstorm.md` with a chosen direction: run `/brainstorm-idea` first.
-- A change to a product that already runs, with nothing code could answer: skip to `/analyze-problem`.
-- The user wants the real thing built: that is `/analyze-problem` onwards.
+- A change to a product that already runs, with nothing code could answer: skip to `/specify-idea`.
+- The user wants the real thing built: that is `/specify-idea` onwards.
 
 ## Workflow
 
@@ -87,7 +87,7 @@ correction with its reason, the user picked an approach, and `docs/<slug>/01-exp
      approach's folder with the lightest combination that has that shape, and leave out what the approach does not use
      (a database, auth). When they name none, use TypeScript that Node 24 runs directly (`node main.ts`), and a single
      HTML page served by `node:http` when there is something to click. Add a dependency only when the approach or a
-     question is about it. A scaffold here does not choose the stack for the project: the design does.
+     question is about it. A scaffold here does not choose the stack for the project: the tech plan does.
    - **The same thin path, seed data and mocks in each approach**, so a difference between them is the approach, not
      the data.
    - Put every external service behind a strategy (below). Fake the rest of the world with in-memory data seeded from
@@ -114,8 +114,8 @@ correction with its reason, the user picked an approach, and `docs/<slug>/01-exp
    Then, with `git diff` against the snapshot, record each change as a correction:
    - **C1, C2, …** in the order found, with the approach, the `path`, what changed and why. Ask for the reason when
      the change does not show it, and quote their words. Several edits with one reason are one correction.
-   - Its kind: **behaviour** (what a person can do or see changes; the analysis takes it), **design** (how the
-     product is built; the design follows it) or **convention** (how code is written; the design adds it to the
+   - Its kind: **behaviour** (what a person can do or see changes; the spec takes it), **architecture** (how the
+     product is built; the tech plan follows it) or **convention** (how code is written; the tech plan adds it to the
      project's conventions).
 
    Commit the corrected state as `corrected`, so a second round diffs only new edits. If the user does not want to
@@ -167,7 +167,7 @@ export const placeSearch: PlaceSearch =
 - **Real only when the question is about the service.** "Does the API return X?" needs the real call. Then the real
   strategy is the experiment, and the keys come from the user's environment, never from a file in the prototype.
 - **A mock is an assumption.** Each mock pretends the real service behaves a certain way: the shape of its answer, its
-  speed, its limits, its price. Write each pretence down. It goes into the experiment file, so the analysis treats it
+  speed, its limits, its price. Write each pretence down. It goes into the experiment file, so the spec treats it
   as untested.
 
 ## Template
@@ -219,7 +219,7 @@ decided it>
 
 ## Corrections
 
-- **C1** · design · A `src/routes/claims.ts`: <what changed>. "<the user's reason, quoted>"
+- **C1** · architecture · A `src/routes/claims.ts`: <what changed>. "<the user's reason, quoted>"
 - **C2** · behaviour · B `app/claim.tsx`: <what changed>. "<reason>"
 - **C3** · convention · both: <what changed>. "<reason>"
 
@@ -227,13 +227,13 @@ decided it>
 
 - **<service>**: <what the mock pretends: shape, speed, limits, cost> · Switch: `<ENV>=real`
 
-## What changes for the analysis
+## What changes for the spec
 
-- <a refuted or partly true assumption, or a behaviour correction, and what the analysis should do about it>
+- <a refuted or partly true assumption, or a behaviour correction, and what the spec should do about it>
 
-## What the design must keep
+## What the plan must keep
 
-- <the chosen approach's shape, and each design and convention correction by its C number>
+- <the chosen approach's shape, and each architecture and convention correction by its C number>
 
 ## Not answered
 
@@ -243,7 +243,7 @@ decided it>
 ## End of the run
 
 End with three headings: **Blocked on me**, **Changed** and **Found**. Under **Found**, put each answer that was not
-"yes" and each correction that surprised you. Then name the next step: `/analyze-problem <slug>`, or
+"yes" and each correction that surprised you. Then name the next step: `/specify-idea <slug>`, or
 `/brainstorm-idea <slug>` if the riskiest question came back "no" in every approach.
 
 ## Red flags

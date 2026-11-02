@@ -1,6 +1,6 @@
 # Interview
 
-Settle the combination before writing a file. Ask only what the request, the analysis or the calling skill has not
+Settle the combination before writing a file. Ask only what the request, the spec or the calling skill has not
 already answered, put every open question in one message, and give each its default. Then state the combination in
 one line and run to the end.
 
@@ -45,8 +45,8 @@ no doc covers) is a combination without a blueprint: say so plainly and offer th
 
 ## Recommending a stack
 
-When another skill (`design-solution`) or the user asks which stack fits, recommend one the way the Stacks section of
-`apply-stack-conventions` says: by what the analysis says people do, matched to its **Suits applications like**
+When another skill (`plan-release`) or the user asks which stack fits, recommend one the way the Stacks section of
+`apply-stack-conventions` says: by what the spec says people do, matched to its **Suits applications like**
 column, with the reason in a sentence.
 
 ## The answer

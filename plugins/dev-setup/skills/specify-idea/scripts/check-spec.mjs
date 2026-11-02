@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Checks docs/<slug>/02-analysis.md before the later phases depend on it.
+// Checks docs/<slug>/02-spec.md before the later phases depend on it.
 //
-//   node check-analysis.mjs <02-analysis.md> [--against <ref>]
+//   node check-spec.mjs <02-spec.md> [--against <ref>]
 //
 // Errors: no "Status: Approved <date>" line; an ID line in a form the scripts cannot read; a duplicate or missing B
 // number; a behaviour with no criterion; a criterion filed under the wrong behaviour, or without Given, When and
-// Then; a release with no behaviours, a gap in the R numbers, or a live behaviour in no release or in two. Against the
+// Then; a release with no behaviours, a gap in the R numbers, or a live behaviour in no release or in two; no Mermaid
+// classDiagram under "## Domain"; no stateDiagram-v2 under "## Lifecycles", one that is not under a "### <Thing>"
+// heading, or a transition that cites a behaviour the spec does not have or has dropped. Against the
 // committed version of the file (HEAD by default), an ID that disappeared instead of being marked
 // _(dropped)_ is an error, and a changed title or criterion is a warning: a change of meaning needs a new number.
 // Exit 0: clean · 1: errors · 2: could not run.
@@ -13,14 +15,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { parseAnalysis } from "./analysis.mjs";
+import { parseSpec, classesOf, transitionsOf } from "./spec.mjs";
 
 const args = process.argv.slice(2);
 const ai = args.indexOf("--against");
 const against = ai === -1 ? "HEAD" : args[ai + 1];
 const path = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--against");
 if (!path) {
-  console.error("usage: check-analysis.mjs <02-analysis.md> [--against <ref>]");
+  console.error("usage: check-spec.mjs <02-spec.md> [--against <ref>]");
   process.exit(2);
 }
 let text;
@@ -34,7 +36,7 @@ try {
 const errors = [];
 const warnings = [];
 const at = (line, msg) => `line ${line}: ${msg}`;
-const a = parseAnalysis(text);
+const a = parseSpec(text);
 
 if (!a.status) errors.push('status: no "Status: Approved <YYYY-MM-DD>" line under the title');
 else if (!/^Approved \d{4}-\d{2}-\d{2}\b/.test(a.status)) errors.push(`status: "Status: ${a.status}" is not "Approved <YYYY-MM-DD>"`);
@@ -70,7 +72,7 @@ for (let n = 1; n <= (numbers.at(-1) ?? 0); n++) {
 
 // Releases: every live behaviour ships in exactly one, and they are numbered R1, R2, … in the order they ship.
 if (a.releases === null) {
-  warnings.push('releases: no "## Releases" section; the design treats every behaviour as one release');
+  warnings.push('releases: no "## Releases" section; the plan treats every behaviour as one release');
 } else {
   if (a.releases.length === 0) errors.push('releases: the "## Releases" section has no "- **R1: <name>**: B1, B2 · <goal>" line');
   const inRelease = new Map();
@@ -89,6 +91,40 @@ if (a.releases === null) {
   for (const b of a.behaviours) if (!b.dropped && !inRelease.has(b.id)) errors.push(at(b.line, `${b.id} is in no release`));
 }
 
+// Diagrams: the domain as a class diagram, and each thing whose state changes as a statechart whose transitions cite
+// the behaviours that make them.
+const KNOWN_DIAGRAMS = ["classDiagram", "stateDiagram-v2", "stateDiagram", "sequenceDiagram", "flowchart", "graph"];
+for (const d of a.diagrams) {
+  if (!KNOWN_DIAGRAMS.includes(d.kind)) errors.push(at(d.line, `mermaid block starts with "${d.kind || "(nothing)"}", not one of ${KNOWN_DIAGRAMS.join(", ")}`));
+}
+const domain = a.diagrams.filter((d) => /^Domain\b/.test(d.section) && d.kind === "classDiagram");
+const classes = new Set(domain.flatMap((d) => [...classesOf(d.body)].map((c) => c.toLowerCase())));
+if (domain.length === 0) errors.push('domain: no ```mermaid classDiagram under "## Domain"; draw the things the system knows and how they relate');
+else if (classes.size === 0) errors.push(at(domain[0].line, "domain: the classDiagram declares no classes"));
+const lifecycles = a.diagrams.filter((d) => /^Lifecycles\b/.test(d.section) && /^stateDiagram/.test(d.kind));
+if (lifecycles.length === 0) errors.push('lifecycles: no ```mermaid stateDiagram-v2 under "## Lifecycles"; draw one for each thing whose state changes');
+const liveIds = new Set(a.behaviours.filter((b) => !b.dropped).map((b) => b.id));
+const droppedIds = new Set(a.behaviours.filter((b) => b.dropped).map((b) => b.id));
+for (const d of lifecycles) {
+  if (!d.heading) {
+    errors.push(at(d.line, 'lifecycles: a statechart sits under the "### <Thing>" heading it draws'));
+    continue;
+  }
+  if (classes.size && !classes.has(d.heading.replace(/\s+/g, "").toLowerCase())) {
+    warnings.push(at(d.line, `lifecycles: "${d.heading}" is not a class in the Domain diagram`));
+  }
+  const moves = transitionsOf(d.body);
+  if (moves.length === 0) errors.push(at(d.line, `lifecycles: ${d.heading} has no "a --> b : <event> (B<n>)" transition`));
+  for (const t of moves) {
+    const where = at(d.line + 1 + t.offset, `${d.heading}: ${t.from} --> ${t.to}`);
+    if (t.cites.length === 0 && t.to !== "[*]") warnings.push(`${where} cites no behaviour; label it "<event> (B<n>)"`);
+    for (const id of t.cites) {
+      if (droppedIds.has(id)) errors.push(`${where} cites ${id}, which is dropped`);
+      else if (!liveIds.has(id)) errors.push(`${where} cites ${id}, which is not a behaviour`);
+    }
+  }
+}
+
 // Stable IDs, against the committed version of this file.
 let previous = null;
 try {
@@ -100,7 +136,7 @@ try {
   /* not committed yet, or not a git repository: nothing to compare */
 }
 if (previous !== null) {
-  const old = parseAnalysis(previous);
+  const old = parseSpec(previous);
   const now = new Map(a.behaviours.map((b) => [b.id, b]));
   for (const ob of old.behaviours) {
     const nb = now.get(ob.id);
@@ -127,6 +163,6 @@ const criteria = a.behaviours.filter((b) => !b.dropped).reduce((n, b) => n + b.c
 for (const w of warnings) console.log(`warning: ${w}`);
 for (const e of errors) console.log(`error: ${e}`);
 console.log(
-  `\n${count} behaviours · ${criteria} criteria · ${a.releases?.length ?? 0} releases · ${previous === null ? "no committed version to compare" : `IDs compared with ${against}`} · ${errors.length} error(s), ${warnings.length} warning(s)`
+  `\n${count} behaviours · ${criteria} criteria · ${a.releases?.length ?? 0} releases · ${domain.length} class and ${lifecycles.length} state diagram(s) · ${previous === null ? "no committed version to compare" : `IDs compared with ${against}`} · ${errors.length} error(s), ${warnings.length} warning(s)`
 );
 process.exit(errors.length ? 1 : 0);

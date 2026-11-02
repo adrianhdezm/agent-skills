@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Brainstorm Idea
 
-Phase 1 of 6: **brainstorm** → experiment → analyze → design → implement → verify.
+Phase 1 of 6: **brainstorm** → experiment → specify → plan → implement → verify.
 
 This phase widens before it narrows. Collect what the user has in mind, show them options they had not thought of, name what is most likely to kill the idea, and stop when they have picked a direction. Two things it keeps close to the user's own picture, because the experiment builds from them: the **product concept** (what using it looks like, as they expect to have it) and the **stack constraints** (where it must run and what it must use or avoid). Leave requirements, data models and the choice of frameworks to the later phases.
 
@@ -14,7 +14,7 @@ This phase widens before it narrows. Collect what the user has in mind, show the
 
 ## When not to use
 
-- The user already knows exactly what to build and why: start at `/analyze-problem`.
+- The user already knows exactly what to build and why: start at `/specify-idea`.
 - A bug fix or a small change to an existing feature.
 
 ## Where the docs live
@@ -22,14 +22,14 @@ This phase widens before it narrows. Collect what the user has in mind, show the
 Every phase writes into one folder per initiative, where `<slug>` names the initiative in kebab case (`v1`, `potluck`, `billing`). Each phase reads only the files of the phases before it, plus the repo, so work can stop and resume in a new session. Which folder depends on how the brainstorm starts:
 
 - **In the project's repo:** the current directory is the repo the idea belongs to. Write into its `docs/<slug>/`.
-- **With no repo yet:** there is none, or the current directory belongs to something else. Write into the idea folder, `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/`. Do not create a repo or run `git init`: an idea can be dropped before it needs one, and the design phase finds or creates the repo and moves the folder into it.
+- **With no repo yet:** there is none, or the current directory belongs to something else. Write into the idea folder, `${CLAUDE_PLUGIN_DATA}/ideas/<slug>/`. Do not create a repo or run `git init`: an idea can be dropped before it needs one, and the planning phase finds or creates the repo and moves the folder into it.
 
 If you cannot tell which case it is, ask, with the idea folder as the default. In this file and the next phases, `docs/<slug>/` means whichever of the two holds the initiative.
 
 - If `01-brainstorm.md` exists in that folder, read it and continue from it instead of starting over. If the idea folder holds only `MOVED.md`, the initiative already lives in the repo it names: continue there.
 - Tell the user the folder's full path. Anything they want the later phases to see (notes, briefs, screenshots, exports) goes in its `references/` folder.
 - If earlier initiatives exist under the repo's `docs/`, read what they handed on: the **Next initiative** section of each
-  `05-verification.md`, the **Later** list of each `02-analysis.md` and the **Not doing** list of each
+  `05-verification.md`, the **Later** list of each `02-spec.md` and the **Not doing** list of each
   `01-brainstorm.md`. Offer the items that touch this idea as references, and quote them in the file. Do not reopen a
   Not doing item without saying so.
 
@@ -61,7 +61,7 @@ If you cannot tell which case it is, ask, with the idea folder as the default. I
    Be honest, not supportive. Say when a direction is weak and why. Ask the user to react, mix or add their own. Iterate while it is producing new ideas. Stop when it produces only variants.
 
 4. **Converge.** Ask the user to pick a direction or a combination. Restate the product concept for that direction and let them correct it. Then write down two lists with them:
-   - **Not doing**: the good ideas you are saying no to, each with the reason. Focus is saying no to good ideas, and this list stops the analysis phase from reopening them.
+   - **Not doing**: the good ideas you are saying no to, each with the reason. Focus is saying no to good ideas, and this list stops the spec phase from reopening them.
    - **Assumptions to test**: what the direction bets is true, each with how to find out (an experiment in code, a conversation, a number to look up). Put the riskiest first. Include what the direction bets about the stack ("Durable Objects can hold a potluck's live state"): the experiment tests those too.
 
 5. **Write `docs/<slug>/01-brainstorm.md`** from the template below. Leave out a section that has nothing in it.
@@ -122,9 +122,9 @@ and the two or three screens, commands or moments that matter. Quote them where 
 
 - [ ] <assumption>: <how to find out>
 
-## Open for analysis
+## Open for the spec
 
-- <questions the analysis phase must answer>
+- <questions the spec phase must answer>
 ```
 
 ## End of the run

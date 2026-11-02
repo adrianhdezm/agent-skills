@@ -22,7 +22,7 @@ and the project's checks pass.
 ## Scope
 
 By default, simplify only what changed: the current slice, or the diff against the base (in an initiative, the
-`Base:` commit in `03-design.md`). Code outside that
+`Base:` commit in `03-tech-plan.md`). Code outside that
 scope is out of bounds unless the user widens it. Note what you see there under **Noticed** instead of fixing it.
 
 Never touch a block between `simplify-ignore-start` and `simplify-ignore-end` comments. Someone marked it on purpose.
@@ -71,7 +71,7 @@ initiative, record what you changed under the slice's notes in `04-progress.md`.
 
 End with three headings: **Blocked on me** (anything that needs the user to widen the scope), **Changed** (each
 simplification kept, in a line, and each one reverted) and **Found** (the Noticed list). When another skill called
-this one, such as `implement-design`, hand these back to it instead.
+this one, such as `implement-release`, hand these back to it instead.
 
 ## Red flags
 

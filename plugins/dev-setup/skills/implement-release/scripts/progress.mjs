@@ -3,18 +3,18 @@
 //
 //   node progress.mjs <docs/<slug>> [--slice <S2 | fixes>]
 //
-// Prints the Status line of each phase file, each release of the analysis with its slices, then each slice of the
-// design with its state in 04-progress.md, then what to build next: the open "Fixes from verification" section
-// first, then the first slice not done; when every designed slice is done, the release to verify and the one to
-// design next.
+// Prints the Status line of each phase file, each release of the spec with its slices, then each slice of the
+// tech plan with its state in 04-progress.md, then what to build next: the open "Fixes from verification" section
+// first, then the first slice not done; when every planned slice is done, the release to verify and the one to
+// plan next.
 // Errors: a section marked done with an unticked item, a section whose state is not "done" or "in progress", or a
-// section in the progress file that is not a slice of the design. With --slice, also exits 1 when that section has
+// section in the progress file that is not a slice of the tech plan. With --slice, also exits 1 when that section has
 // an unticked item, so a slice cannot be closed with work left on it. Exit 0: clean · 1: errors · 2: could not run.
 
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { parseAnalysis, releaseOf } from "../../analyze-problem/scripts/analysis.mjs";
-import { parseDesign } from "../../design-solution/scripts/design.mjs";
+import { parseSpec, releaseOf } from "../../specify-idea/scripts/spec.mjs";
+import { parseTechPlan } from "../../plan-release/scripts/tech-plan.mjs";
 
 const args = process.argv.slice(2);
 const si = args.indexOf("--slice");
@@ -29,20 +29,20 @@ if (!existsSync(dir)) {
   process.exit(2);
 }
 
-const PHASES = ["01-brainstorm.md", "01-experiment.md", "02-analysis.md", "03-design.md", "04-progress.md", "05-verification.md"];
+const PHASES = ["01-brainstorm.md", "01-experiment.md", "02-spec.md", "03-tech-plan.md", "04-progress.md", "05-verification.md"];
 console.log("Phase files");
 for (const f of PHASES) {
   const p = join(dir, f);
   if (!existsSync(p)) {
-    console.log(`  ${f.padEnd(20)} not written`);
+    console.log(`  ${f.padEnd(22)} not written`);
     continue;
   }
   const status = readFileSync(p, "utf8").split("\n").find((l) => /^Status:/.test(l));
-  console.log(`  ${f.padEnd(20)} ${status ?? "(no Status line)"}`);
+  console.log(`  ${f.padEnd(22)} ${status ?? "(no Status line)"}`);
 }
 
-const designPath = join(dir, "03-design.md");
-const design = existsSync(designPath) ? parseDesign(readFileSync(designPath, "utf8")) : { slices: [] };
+const planPath = join(dir, "03-tech-plan.md");
+const plan = existsSync(planPath) ? parseTechPlan(readFileSync(planPath, "utf8")) : { slices: [] };
 const progressPath = join(dir, "04-progress.md");
 const sections = new Map(); // id -> { title, state, items: [{ done, text }] }
 const errors = [];
@@ -71,8 +71,8 @@ if (existsSync(progressPath)) {
   }
 }
 
-const order = design.slices.map((s) => s.id);
-for (const id of sections.keys()) if (id !== "fixes" && order.length && !order.includes(id)) errors.push(`${id} is in the progress file but not in the design`);
+const order = plan.slices.map((s) => s.id);
+for (const id of sections.keys()) if (id !== "fixes" && order.length && !order.includes(id)) errors.push(`${id} is in the progress file but not in the tech plan`);
 console.log("\nSlices");
 const rows = [...order, ...[...sections.keys()].filter((id) => !order.includes(id))];
 for (const id of rows) {
@@ -87,18 +87,18 @@ for (const id of rows) {
 }
 
 // Releases: which slices ship each one. S0 sets the project up for the first.
-const analysisPath = join(dir, "02-analysis.md");
-const analysis = existsSync(analysisPath) ? parseAnalysis(readFileSync(analysisPath, "utf8")) : { releases: null };
-const releaseFor = releaseOf(analysis);
-const releases = (analysis.releases ?? []).map((r, i) => ({
+const specPath = join(dir, "02-spec.md");
+const spec = existsSync(specPath) ? parseSpec(readFileSync(specPath, "utf8")) : { releases: null };
+const releaseFor = releaseOf(spec);
+const releases = (spec.releases ?? []).map((r, i) => ({
   ...r,
-  slices: design.slices.filter((s) => (s.id === "S0" ? i === 0 : releaseFor.get(s.covers[0]) === r.id)).map((s) => s.id)
+  slices: plan.slices.filter((s) => (s.id === "S0" ? i === 0 : releaseFor.get(s.covers[0]) === r.id)).map((s) => s.id)
 }));
 if (releases.length) {
   console.log("\nReleases");
   for (const r of releases) {
     const done = r.slices.filter((id) => sections.get(id)?.state === "done").length;
-    console.log(`  ${r.id.padEnd(4)} ${r.name.padEnd(28)} ${r.slices.length ? `${r.slices.join(", ")} · ${done}/${r.slices.length} done` : "not designed"}`);
+    console.log(`  ${r.id.padEnd(4)} ${r.name.padEnd(28)} ${r.slices.length ? `${r.slices.join(", ")} · ${done}/${r.slices.length} done` : "not planned"}`);
   }
 }
 
@@ -107,12 +107,12 @@ const next =
   fixes && (fixes.state !== "done" || fixes.items.some((i) => !i.done))
     ? "fixes"
     : order.find((id) => sections.get(id)?.state !== "done") ?? null;
-let allDone = "every slice is done; run /verify-build";
-const designed = releases.filter((r) => r.slices.length);
-if (designed.length) {
+let allDone = "every slice is done; run /verify-release";
+const planned = releases.filter((r) => r.slices.length);
+if (planned.length) {
   const later = releases.find((r) => !r.slices.length);
   const slug = basename(resolve(dir));
-  allDone = `every slice of ${designed.at(-1).id} is done; run /verify-build ${slug} ${designed.at(-1).id}${later ? `, then /design-solution ${slug} ${later.id}` : ""}`;
+  allDone = `every slice of ${planned.at(-1).id} is done; run /verify-release ${slug} ${planned.at(-1).id}${later ? `, then /plan-release ${slug} ${later.id}` : ""}`;
 }
 console.log(`\nNext: ${next === "fixes" ? "Fixes from verification" : next ?? allDone}`);
 
