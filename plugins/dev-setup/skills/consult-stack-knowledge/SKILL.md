@@ -1,11 +1,11 @@
 ---
 name: consult-stack-knowledge
-description: "Consults the house knowledge base of TypeScript stacks: a graph of concept, technology, integration, example and stack docs. Recommends the stack that fits a project; resolves which stack a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it) from the project's files or the technologies named; lists the docs that apply and assembles coding-conventions.md for the calling skill; and answers which conventions, pitfalls and required values govern a file or a topic in a project. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, when a project's coding-conventions.md has to be assembled again, or when a session asks which rule applies to a file, how something is done in this stack, or why a convention holds."
+description: "Consults the house knowledge base of TypeScript stacks: a graph of concept, technology, integration and stack docs. Recommends the stack that fits a project; resolves which stack a project is or will be (a blueprint with its optional parts, or a combination composed from the docs that cover it) from the project's files or the technologies named; lists the docs that apply and assembles coding-conventions.md for the calling skill; and answers which conventions, pitfalls and required values govern a file or a topic in a project. Use when bootstrap-project, experiment-idea or plan-release needs a stack recommended or settled, when another skill needs the stack and the docs for a project, when a project's coding-conventions.md has to be assembled again, or when a session asks which rule applies to a file, how something is done in this stack, or why a convention holds."
 ---
 
 # Consult Stack Knowledge
 
-The house stacks as a knowledge base: concept, technology, integration, example and stack docs under
+The house stacks as a knowledge base: concept, technology, integration and stack docs under
 `<skill-dir>/references/` (`<skill-dir>` is this skill's base directory), joined into a graph by each doc's frontmatter,
 and the scripts that ask it. For a project, or a combination of technologies, it answers which stack that is, which
 docs apply and what `coding-conventions.md` they assemble into, and hands that to the skill that asked; for a file or a
@@ -59,10 +59,10 @@ language is out of scope: every doc here is TypeScript.
 
    It matches the technologies to a blueprint when every one belongs to it and whatever it lacks is only toolchain or
    tooling (named under `Found`), picks the groups whose technologies are present plus each `--with` and what those
-   require, and lists the blueprint's docs and examples for them. Otherwise the combination is **composed**: the
-   concepts its technologies realise (plus each `--concepts`, such as `rest-api` for an API with no data), every
-   integration whose both ends are present and no present technology rules out, and the examples whose needs are met,
-   in composition order; `Found` names the nearest blueprint. A `--technologies` name no doc covers is a `Gap`.
+   require, and lists the blueprint's docs and the parts of its Starter (what a fresh scaffold ships) for them.
+   Otherwise the combination is **composed**: the concepts its technologies realise (plus each `--concepts`, such as
+   `rest-api` for an API with no data) and every integration whose both ends are present and no present technology
+   rules out, in composition order, with no Starter; `Found` names the nearest blueprint. A `--technologies` name no doc covers is a `Gap`.
 
    Name the technologies by their doc's base name (`react-router`, `cloudflare-workers`, `s3-storage`); the
    [catalog](references/catalog.md) lists them. For an existing project, its `coding-conventions.md` names its stack in
@@ -89,7 +89,7 @@ language is out of scope: every doc here is TypeScript.
    Stack: React Router on Node · with: database, authentication     (or: Composed: <what it is>)
    Blueprint: <skill-dir>/references/stacks/react-router-docker.md  (or: none)
    Docs: <path>, <path>, …                                           (absolute, in composition order)
-   Examples: <path>, …
+   Starter: the blueprint's Starter: Home; Sign in, with `authentication`   (or: none (no blueprint))
    Ports: Postgres 5432 (moved with `DB_PORT`), the app's `PORT` …   (the blueprint's ports row)
    Conventions: <scratchpad>/coding-conventions.md
    Gaps: no doc for <technology>                                     (or: none)

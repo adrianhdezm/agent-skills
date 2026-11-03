@@ -3,17 +3,18 @@
 // combination no blueprint covers, from a title and the docs the project was built from.
 //
 //   node assemble-conventions.mjs <stack file> [--with <optional entry>]... [--out <file>] [--list]
-//   node assemble-conventions.mjs --compose "<project kind>" [--example <example>]... [--out <file>] [--list] <doc>...
+//   node assemble-conventions.mjs --compose "<project kind>" [--out <file>] [--list] <doc>...
 //
 // The blueprint's "## Composition" section lists the architecture, technology and integration docs as a bulleted list
 // of links, in the order their conventions appear. An entry ending in " — optional" is included only when its file's
 // base name is passed with --with (`--with angular-fundamental-ngx`); one ending in " — optional (<group>)" when its
-// group is, so `--with authentication` brings in every entry of that group. Its "## Examples" section lists the
-// examples a fresh scaffold starts with, an example marked " — optional (<group>)" only when its group is picked, and the "ports" row of its "## Required values" the ports it binds.
+// group is, so `--with authentication` brings in every entry of that group. Its "## Starter" section is what a fresh
+// scaffold ships, a `### ` part whose heading says "with `<group>`" only when that group is picked, and the "ports" row
+// of its "## Required values" the ports it binds.
 // The conventions hold the stack's own "## Conventions" section first (none in --compose mode, where the project kind is
 // a noun phrase such as "Hono API on Node"), then each doc's "## Conventions" section under the doc's title. Without
 // --out they go to stdout. With --out they are written to that file, and stdout gets the hand-off block the skill
-// returns: Stack, Blueprint, Docs and Examples (absolute paths, in composition order), Ports and Conventions; the caller
+// returns: Stack, Blueprint, Docs (absolute paths, in composition order), Starter, Ports and Conventions; the caller
 // adds Gaps and Found. --list prints the same block without assembling anything.
 // It exits non-zero when a section is missing, when --with names no optional entry, or when the conventions would carry
 // a relative link to a file (they live in the project, not beside the skill) or an anchor that does not resolve.
@@ -23,12 +24,11 @@ import { basename, dirname, resolve } from 'node:path';
 const args = process.argv.slice(2);
 const usage = [
   'usage: assemble-conventions.mjs <stack file> [--with <optional entry>]... [--out <file>] [--list]',
-  '       assemble-conventions.mjs --compose "<project kind>" [--example <example>]... [--out <file>] [--list] <doc>...'
+  '       assemble-conventions.mjs --compose "<project kind>" [--out <file>] [--list] <doc>...'
 ].join('\n');
 const composing = args[0] === '--compose';
 const opted = new Set();
 const composedDocs = [];
-const composedExamples = [];
 let listing = false;
 let outFile;
 let usable = composing ? args.length >= 3 : args.length >= 1 && !args[0].startsWith('--');
@@ -41,9 +41,6 @@ for (let i = composing ? 2 : 1; usable && i < args.length; i++) {
     i++;
   } else if (args[i] === '--with' && !composing && value !== undefined) {
     opted.add(value);
-    i++;
-  } else if (args[i] === '--example' && composing && value !== undefined) {
-    composedExamples.push(resolve(value));
     i++;
   } else if (composing && !args[i].startsWith('--')) {
     composedDocs.push(resolve(args[i]));
@@ -105,7 +102,7 @@ function slug(heading) {
     .replace(/ /g, '-');
 }
 
-/** The blueprint's title and conventions, the docs its composition lists that this project includes, and its examples. */
+/** The blueprint's title and conventions, the docs its composition lists that this project includes, and its Starter parts. */
 function fromStack(stackPath) {
   const stackText = readFileSync(stackPath, 'utf8');
   const stackTitle = title(stackText, stackPath);
@@ -120,10 +117,13 @@ function fromStack(stackPath) {
       problems.push(`--with ${name}: not an optional entry of ${stackPath}`);
     }
   }
-  const examplesSection = /^## Examples$/m.test(stackText) ? section(stackText, 'Examples', stackPath) : '';
-  const examples = [...examplesSection.matchAll(/^- \[[^\]]+\]\(([^)#\s]+\.md)\)(?:[^\n]*? — optional \(([a-z0-9-]+)\))?/gm)].filter(
-    (m) => m[2] === undefined || opted.has(m[2])
-  );
+  const starter = withFences(section(stackText, 'Starter', stackPath))
+    .filter((l) => !l.fenced && l.line.startsWith('### '))
+    .map((l) => l.line.slice(4).trim())
+    .filter((part) => {
+      const group = /\bwith `([a-z0-9-]+)`/i.exec(part)?.[1];
+      return !group || opted.has(group);
+    });
   const ports = /^\| ports +\| (.+?) *\|$/m.exec(section(stackText, 'Required values', stackPath));
   return {
     kind: stackTitle,
@@ -133,7 +133,7 @@ function fromStack(stackPath) {
     source: "skill's blueprint for that stack",
     head: [{ title: stackTitle, body: section(stackText, 'Conventions', stackPath) }],
     docs: entries.filter((e) => !e.optional || opted.has(e.name)).map((e) => resolve(dirname(stackPath), e.link)),
-    examples: examples.map((m) => resolve(dirname(stackPath), m[1]))
+    starter: `the blueprint's Starter${starter.length > 0 ? `: ${starter.join('; ')}` : ''}`
   };
 }
 
@@ -142,7 +142,7 @@ function fail() {
   process.exit(1);
 }
 
-const { kind, stack, blueprint, ports, source, head, docs, examples } = composing
+const { kind, stack, blueprint, ports, source, head, docs, starter } = composing
   ? {
       kind: args[1],
       stack: `Composed: ${args[1]}`,
@@ -151,7 +151,7 @@ const { kind, stack, blueprint, ports, source, head, docs, examples } = composin
       source: 'docs it was built from',
       head: [],
       docs: composedDocs,
-      examples: composedExamples
+      starter: 'none (no blueprint)'
     }
   : fromStack(args[0]);
 
@@ -161,7 +161,7 @@ function handOff(conventions) {
     `Stack: ${stack}`,
     `Blueprint: ${blueprint}`,
     `Docs: ${docs.join(', ')}`,
-    `Examples: ${examples.join(', ') || 'none'}`,
+    `Starter: ${starter}`,
     `Ports: ${ports}`,
     ...(conventions ? [`Conventions: ${conventions}`] : [])
   ].join('\n');

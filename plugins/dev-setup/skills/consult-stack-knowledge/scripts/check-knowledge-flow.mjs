@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Checks that knowledge flows one way: architecture ← technologies ← integrations ← examples ← stacks.
+// Checks that knowledge flows one way: architecture ← technologies ← integrations ← stacks.
 //
 //   node check-knowledge-flow.mjs [<references dir>]
 //
 // The references dir defaults to this skill's.
 //
 // A technology doc names no other technology that has a doc, and links to no other technology or integration doc; an
-// architecture doc names no technology and links to no technology, integration or example doc. Both may link up to an
+// architecture doc names no technology and links to no technology or integration doc. Both may link up to an
 // architecture doc. How each technology is recognised in text is its doc's `aliases` (a word, or a literal such as
 // `@angular/`); a doc whose `family` names another technology may use that technology's vocabulary (the Cloudflare
 // products are bound to a Worker and created by Wrangler, NgRx exists only inside Angular). The shared toolchain

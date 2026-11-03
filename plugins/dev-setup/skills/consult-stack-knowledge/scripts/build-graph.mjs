@@ -6,8 +6,8 @@
 // Without --check it writes graph.json and then runs the checks; with --check it only checks, and also fails when the
 // committed graph.json is out of date. The checks: every doc has a row in catalog.md and every catalog row a doc;
 // every edge names a doc that exists; a doc's Realises line lists exactly the concepts its frontmatter does; each
-// blueprint's Composition and Examples are exactly what its technologies and optional groups bring, with every
-// optional mark on the right group; and the Stacks table of SKILL.md names each blueprint and its groups. It prints
+// blueprint's Composition is exactly what its technologies and optional groups bring, with every optional mark on the
+// right group; each blueprint has a Starter whose parts name only its own groups; and the Stacks table of SKILL.md names each blueprint and its groups. It prints
 // each violation and exits non-zero when there is one.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -22,7 +22,7 @@ const problems = [...graph.problems];
 
 // --- every edge resolves -------------------------------------------------------------------------------------------
 
-const has = (kind, id) => ({ concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, example: graph.examples, stack: graph.stacks })[kind][id] !== undefined;
+const has = (kind, id) => ({ concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks })[kind][id] !== undefined;
 const check = (file, kind, ids, what) => {
   for (const id of ids) {
     if (!has(kind, id)) {
@@ -44,13 +44,6 @@ for (const i of Object.values(graph.integrations)) {
   }
   if (i.connects.some((t) => graph.technologies[t].external) && !i.detect) {
     problems.push(`${i.file}: connects an external technology, so it needs its own detect`);
-  }
-}
-for (const e of Object.values(graph.examples)) {
-  check(e.file, 'technology', e.needs.flat(), 'needs');
-  check(e.file, 'technology', e.unless, 'unless');
-  if (e.needs.length === 0) {
-    problems.push(`${e.file}: needs nothing, so no stack would list it`);
   }
 }
 for (const s of Object.values(graph.stacks)) {
@@ -80,8 +73,8 @@ for (const doc of [...Object.values(graph.technologies).filter((t) => !t.externa
 // --- the catalog lists every doc, and only docs ---------------------------------------------------------------------
 
 const catalog = linkedIds(readFileSync(join(root, 'catalog.md'), 'utf8'));
-for (const kind of ['concept', 'technology', 'integration', 'example']) {
-  const layer = { concept: 'architecture', technology: 'technologies', integration: 'integrations', example: 'examples' }[kind];
+for (const kind of ['concept', 'technology', 'integration']) {
+  const layer = { concept: 'architecture', technology: 'technologies', integration: 'integrations' }[kind];
   const listed = catalog.filter((l) => l.layer === layer).map((l) => l.id);
   for (const id of graph.order[kind]) {
     if (!graph[`${kind === 'technology' ? 'technologies' : `${kind}s`}`][id].external && !listed.includes(id)) {
@@ -134,26 +127,13 @@ for (const stack of Object.values(graph.stacks)) {
       }
     }
   }
-  // Examples: listed when their needs are met; marked with the group that meets them.
-  const listedExamples = new Map(stack.examples.map((e) => [e.id, e]));
-  for (const id of full.examples) {
-    const entry = listedExamples.get(id);
-    if (!entry) {
-      problems.push(`${stack.file}: Examples lacks ${id}, whose needs its technologies meet`);
-      continue;
-    }
-    const inBase = base.examples.includes(id);
-    if (!inBase && !entry.optional) {
-      problems.push(`${stack.file}: example ${id} needs an optional group but is not marked optional`);
-    } else if (inBase && entry.optional) {
-      problems.push(`${stack.file}: example ${id} is marked optional (${entry.group}) but the stack brings it without the group`);
-    } else if (!inBase && !stackClosure(graph, stack, expandGroups(stack, [entry.group]).groups).examples.includes(id)) {
-      problems.push(`${stack.file}: example ${id} is marked optional (${entry.group}) but that group does not bring it`);
-    }
+  // Starter: what a fresh scaffold ships, each part that needs a group naming one of the stack's.
+  if (!stack.starter) {
+    problems.push(`${stack.file}: no "## Starter" section`);
   }
-  for (const id of listedExamples.keys()) {
-    if (!full.examples.includes(id)) {
-      problems.push(`${stack.file}: Examples lists ${id}, whose needs its technologies never meet`);
+  for (const part of stack.starter ?? []) {
+    if (part.group && !groups.includes(part.group)) {
+      problems.push(`${stack.file}: Starter part "${part.title}" names ${part.group}, not a group of this stack`);
     }
   }
 }
@@ -191,7 +171,6 @@ const serialised = `${JSON.stringify(
     concepts: graph.concepts,
     technologies: graph.technologies,
     integrations: graph.integrations,
-    examples: graph.examples,
     stacks: graph.stacks,
     order: graph.order
   },
@@ -218,5 +197,5 @@ if (problems.length > 0) {
   console.error(`${problems.length} problems`);
   process.exit(1);
 }
-const counts = `${Object.keys(graph.concepts).length} concepts, ${graph.order.technology.length} technologies, ${Object.keys(graph.integrations).length} integrations, ${Object.keys(graph.examples).length} examples, ${Object.keys(graph.stacks).length} stacks`;
+const counts = `${Object.keys(graph.concepts).length} concepts, ${graph.order.technology.length} technologies, ${Object.keys(graph.integrations).length} integrations, ${Object.keys(graph.stacks).length} stacks`;
 console.log(`${checkOnly ? 'graph.json is current' : 'graph.json written'}: ${counts}`);

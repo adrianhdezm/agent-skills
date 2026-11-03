@@ -1,6 +1,6 @@
 # Catalog
 
-Every concept, technology, integration and example, with what it covers and how a project shows it has one. Read it to
+Every concept, technology and integration, with what it covers and how a project shows it has one. Read it to
 find the doc a task needs, or to name the parts of a project no stack covers.
 
 ## Contents
@@ -8,7 +8,6 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 - [Architecture](#architecture)
 - [Technologies](#technologies)
 - [Integrations](#integrations)
-- [Examples](#examples)
 
 ## Architecture
 
@@ -25,8 +24,8 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 
 Each has **Principles** (each with its reason), **Required values** (where the concept fixes exact values),
 **Conventions** and **Verify it is wired**. A concept states only what holds whatever the technology; it
-names no stack. The docs that carry it out say so in a **Realises** line under their title, and an example's
-Demonstrates table names the concepts it shows, so which docs realise a concept is found by searching for its name.
+names no stack. The docs that carry it out say so in a **Realises** line under their title, so which docs realise a
+concept is found by searching for its name.
 
 ## Technologies
 
@@ -108,12 +107,3 @@ Each has **Use it like this** (the principles, each with its reason), **Required
 Each has **The seam** (what calls what, as a diagram), **Where it lives** (the files to open), **Required values**,
 **Pitfalls**, **Reference code**, **Conventions** and **Verify it is wired** (what a check confirms), each only where it
 has something.
-
-## Examples
-
-| Example                                  | What it must show                                                             | Used by                                        |
-| ---------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
-
-Each has **Demonstrates** (each part and the docs it applies), **Data** or **The resource** (the values it depends on),
-**Behaviour** (what it does, and the contracts tests rely on: routes, names, answers), **Tests** (the behaviours each
-tier covers, and the files), **Variants** (short deltas) and **Done when**, each only where it has something.

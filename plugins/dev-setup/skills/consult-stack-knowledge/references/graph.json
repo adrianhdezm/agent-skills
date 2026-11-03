@@ -1560,7 +1560,6 @@
       "unless": []
     }
   },
-  "examples": {},
   "stacks": {
     "angular-app": {
       "id": "angular-app",
@@ -1746,7 +1745,21 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "The resource"
+        },
+        {
+          "title": "Web"
+        },
+        {
+          "title": "Web tests"
+        },
+        {
+          "title": "With `angular-fundamental-ngx`",
+          "group": "angular-fundamental-ngx"
+        }
+      ],
       "owns": [
         {
           "holds": "one page component per route, each reading its slice and loading from its watch",
@@ -2077,7 +2090,30 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "The resource"
+        },
+        {
+          "title": "API"
+        },
+        {
+          "title": "API tests"
+        },
+        {
+          "title": "Web"
+        },
+        {
+          "title": "Web tests"
+        },
+        {
+          "title": "End to end"
+        },
+        {
+          "title": "With `angular-fundamental-ngx`",
+          "group": "angular-fundamental-ngx"
+        }
+      ],
       "owns": [
         {
           "holds": "the Express 5 + Drizzle + Postgres API, with zod and Pino",
@@ -2302,7 +2338,17 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "The resource"
+        },
+        {
+          "title": "API"
+        },
+        {
+          "title": "API tests"
+        }
+      ],
       "owns": [
         {
           "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
@@ -2464,7 +2510,7 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [],
       "owns": [
         {
           "holds": "the Hono app, the default export; routes grow there or in modules it imports",
@@ -2651,7 +2697,17 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "The resource"
+        },
+        {
+          "title": "API"
+        },
+        {
+          "title": "API tests"
+        }
+      ],
       "owns": [
         {
           "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
@@ -2779,7 +2835,7 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [],
       "owns": [
         {
           "holds": "the entry point, the one file with side effects (Node says why)",
@@ -3095,7 +3151,19 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "Home"
+        },
+        {
+          "title": "Sign in, with `authentication`",
+          "group": "authentication"
+        },
+        {
+          "title": "File upload, with `file-storage`",
+          "group": "file-storage"
+        }
+      ],
       "owns": [
         {
           "holds": "the Worker: builds the context per request and hands it to React Router",
@@ -3449,7 +3517,19 @@
           "optional": false
         }
       ],
-      "examples": [],
+      "starter": [
+        {
+          "title": "Home"
+        },
+        {
+          "title": "Sign in, with `authentication`",
+          "group": "authentication"
+        },
+        {
+          "title": "File upload, with `file-storage`",
+          "group": "file-storage"
+        }
+      ],
       "owns": [
         {
           "holds": "runs `workers/app.ts`: Vite middleware in development, the build in production",
@@ -3573,7 +3653,6 @@
       "s3-storage-docker-compose",
       "drizzle-s3-storage"
     ],
-    "example": [],
     "stack": [
       "angular-app",
       "angular-fullstack",

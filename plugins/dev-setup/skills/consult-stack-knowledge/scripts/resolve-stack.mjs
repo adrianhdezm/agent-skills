@@ -9,16 +9,16 @@
 // them to a blueprint: every technology must belong to the stack, and a required technology that is missing is only
 // tolerated when it is toolchain or tooling (reported under Found). The groups picked are the ones whose technologies
 // are present, plus each --with, plus the groups those require. Without a blueprint the combination is composed: the
-// concepts the technologies realise (plus each --concepts), every integration whose both ends are present, and the
-// examples whose needs are met, in composition order. A name that is no technology is a gap.
+// concepts the technologies realise (plus each --concepts) and every integration whose both ends are present, in
+// composition order; it has no Starter. A name that is no technology is a gap.
 //
 // It prints a block the skill's hand-off is built from: Stack, Blueprint, Technologies (with evidence from a
-// project), Concepts, Docs, Examples, Gaps, Found, and the Assemble command to run next (`<out>` is where the
+// project), Concepts, Docs, Starter (the blueprint's Starter parts for the groups picked), Gaps, Found, and the Assemble command to run next (`<out>` is where the
 // conventions go). It writes nothing. A combination no doc covers at all exits non-zero.
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closure, detectTechnologies, expandGroups, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, scanProject, section } from './lib/graph.mjs';
+import { closure, detectTechnologies, expandGroups, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, scanProject, section, starterParts } from './lib/graph.mjs';
 
 const usage = [
   'usage: resolve-stack.mjs <project dir> [--with <group>]... [--kind "<what it is>"]',
@@ -119,7 +119,6 @@ if (match) {
   }
   const groups = expanded.groups;
   const docs = stack.composition.filter((e) => !e.optional || groups.includes(e.group));
-  const examples = stack.examples.filter((e) => !e.optional || groups.includes(e.group));
   const ports = /^\| ports +\| (.+?) *\|$/m.exec(section(parseFrontmatter(readFileSync(stack.path, 'utf8')).body, 'Required values') ?? '');
   const outName = '<out>';
   lines.push(
@@ -128,7 +127,7 @@ if (match) {
     `Technologies: ${closure(graph, technologies).technologies.map(describe).join(', ')}`,
     `Concepts: ${docs.filter((e) => e.kind === 'concept').map((e) => e.id).join(', ')}`,
     `Docs: ${absolute(docs).join(', ')}`,
-    `Examples: ${absolute(examples).join(', ') || 'none'}`,
+    `Starter: ${starterLine(starterParts(stack, groups))}`,
     `Ports: ${ports ? ports[1] : 'none'}`,
     `Gaps: ${gaps.join('; ') || 'none'}`,
     `Found: ${found.join('; ') || 'none'}`,
@@ -147,21 +146,25 @@ if (match) {
   if (nearest) {
     found.push(`no blueprint; nearest is ${nearest.stack.title} (${nearest.extra.length > 0 ? `without ${nearest.extra.join(', ')}` : ''}${nearest.extra.length > 0 && nearest.lacking.length > 0 ? '; ' : ''}${nearest.lacking.length > 0 ? `lacking ${nearest.lacking.join(', ')}` : ''})`);
   }
-  const examples = cl.examples.map((id) => ({ kind: 'example', id }));
   lines.push(
     `Stack: Composed: ${what}`,
     'Blueprint: none',
     `Technologies: ${cl.technologies.map(describe).join(', ')}`,
     `Concepts: ${cl.concepts.join(', ')}`,
     `Docs: ${absolute(docs).join(', ')}`,
-    `Examples: ${absolute(examples).join(', ') || 'none'}`,
+    'Starter: none (no blueprint)',
     "Ports: the docs' own; check each",
     `Gaps: ${gaps.join('; ') || 'none'}`,
     `Found: ${found.join('; ') || 'none'}`,
-    `Assemble: node ${join(skillDir, 'scripts', 'assemble-conventions.mjs')} --compose "${what}"${absolute(examples).map((e) => ` --example ${e}`).join('')} --out <out>/coding-conventions.md ${absolute(docs).join(' ')}`
+    `Assemble: node ${join(skillDir, 'scripts', 'assemble-conventions.mjs')} --compose "${what}" --out <out>/coding-conventions.md ${absolute(docs).join(' ')}`
   );
 }
 process.stdout.write(`${lines.join('\n')}\n`);
+
+/** The Starter line: the blueprint's "## Starter", and its parts when it has several. */
+function starterLine(parts) {
+  return `the blueprint's Starter${parts.length > 0 ? `: ${parts.join('; ')}` : ''}`;
+}
 
 /** The blueprint sharing the most technologies with a composed combination. */
 function nearestBlueprint(technologies) {
