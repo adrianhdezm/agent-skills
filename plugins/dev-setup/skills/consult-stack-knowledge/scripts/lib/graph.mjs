@@ -66,7 +66,7 @@ function parseFlow(text) {
     while (i < text.length && !',]'.includes(text[i])) {
       out += text[i++];
     }
-    return scalar(out.trim());
+    return scalar(plain(out.trim()));
   }
   function skip() {
     while (i < text.length && text[i] === ' ') {
@@ -79,6 +79,14 @@ function parseFlow(text) {
     throw new Error(`unexpected "${text.slice(i)}" in ${text}`);
   }
   return result;
+}
+
+/** YAML's indicator characters cannot start an unquoted value: GitHub, and any YAML parser, rejects the frontmatter. */
+function plain(raw) {
+  if (/^[@`!&*%|>{}[\]#]/.test(raw)) {
+    throw new Error(`"${raw}" must be quoted ('${raw}'): YAML cannot start an unquoted value with "${raw[0]}"`);
+  }
+  return raw;
 }
 
 function scalar(raw) {
@@ -111,17 +119,24 @@ export function parseFrontmatter(text, file = '') {
       throw new Error(`${file}: cannot read frontmatter line "${line}"`);
     }
     const [, indent, key, raw] = match;
+    const read = (value) => {
+      try {
+        return value.startsWith('[') ? parseFlow(value) : /^'.*'$/.test(value) ? value.slice(1, -1) : scalar(plain(value));
+      } catch (error) {
+        throw new Error(`${file}: ${error.message}`);
+      }
+    };
     if (indent === '') {
       if (raw === undefined) {
         current = data[key] = {};
       } else {
         current = data;
-        data[key] = raw.startsWith('[') ? parseFlow(raw) : scalar(raw.replace(/^'(.*)'$/, '$1'));
+        data[key] = read(raw);
       }
     } else if (current === data || raw === undefined) {
       throw new Error(`${file}: unexpected nesting at "${line}"`);
     } else {
-      current[key] = raw.startsWith('[') ? parseFlow(raw) : scalar(raw.replace(/^'(.*)'$/, '$1'));
+      current[key] = read(raw);
     }
   }
   return { data, body: text.slice(end + 5) };
@@ -204,7 +219,14 @@ export function loadGraph(root) {
       const id = basename(file, '.md');
       const path = join(root, dir, file);
       const text = readFileSync(path, 'utf8');
-      const { data, body } = parseFrontmatter(text, `${dir}/${file}`);
+      let parsed;
+      try {
+        parsed = parseFrontmatter(text, `${dir}/${file}`);
+      } catch (error) {
+        problems.push(error.message);
+        continue;
+      }
+      const { data, body } = parsed;
       if (data.kind !== kind) {
         problems.push(`${dir}/${file}: frontmatter kind is "${data.kind ?? 'missing'}", expected "${kind}"`);
       }
