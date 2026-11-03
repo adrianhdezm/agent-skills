@@ -120,7 +120,8 @@ function fromStack(stackPath) {
       problems.push(`--with ${name}: not an optional entry of ${stackPath}`);
     }
   }
-  const examples = [...section(stackText, 'Examples', stackPath).matchAll(/^- \[[^\]]+\]\(([^)#\s]+\.md)\)(?:[^\n]*? — optional \(([a-z0-9-]+)\))?/gm)].filter(
+  const examplesSection = /^## Examples$/m.test(stackText) ? section(stackText, 'Examples', stackPath) : '';
+  const examples = [...examplesSection.matchAll(/^- \[[^\]]+\]\(([^)#\s]+\.md)\)(?:[^\n]*? — optional \(([a-z0-9-]+)\))?/gm)].filter(
     (m) => m[2] === undefined || opted.has(m[2])
   );
   const ports = /^\| ports +\| (.+?) *\|$/m.exec(section(stackText, 'Required values', stackPath));

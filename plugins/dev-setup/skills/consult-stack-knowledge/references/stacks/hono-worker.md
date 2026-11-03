@@ -27,10 +27,6 @@ Worker.
 - [Vitest](../technologies/vitest.md)
 - [Cloudflare Workers + Vitest](../integrations/cloudflare-workers-vitest.md)
 
-## Examples
-
-- [Hono hello](../examples/hono-hello.md): the first route and its workerd test
-
 ## Shape
 
 ```
@@ -251,6 +247,22 @@ export default defineConfig({
 
 - **Run `pnpm cf-typegen`** once the configs are written, before the first check.
 
+## Starter
+
+What a fresh scaffold ships so every check has a route to run against: one `GET /` answered by the Worker's real entry,
+and a test that reaches it the way workerd does. When the user has named routes of their own they take its place, in
+the same shape.
+
+| What     | Value                                                                       |
+| -------- | --------------------------------------------------------------------------- |
+| app      | `src/app.ts`, the default export: `Hono<{ Bindings: Env }>`, no binding yet |
+| route    | `GET /`                                                                     |
+| response | 200, text `Hello Cloudflare Workers!`                                       |
+
+| Tier          | File                | Covers                                                            |
+| ------------- | ------------------- | ----------------------------------------------------------------- |
+| unit, workerd | `tests/app.test.ts` | `GET /` through `exports.default.fetch` answers 200 with the text |
+
 ## Conventions
 
 ### Layout
@@ -272,5 +284,5 @@ replaced by `noEmit` plus `tsBuildInfoFile`, `include` pointed at `src/`, and `j
 
 ## Smoke test
 
-`pnpm build`, then `pnpm exec vite preview --port <free port>`, serves the build in workerd; with the example, `GET /`
-answers `Hello Cloudflare Workers!`.
+`pnpm build`, then `pnpm exec vite preview --port <free port>`, serves the build in workerd; with the starter, `GET /`
+answers `Hello Cloudflare Workers!`. The five checks pass.

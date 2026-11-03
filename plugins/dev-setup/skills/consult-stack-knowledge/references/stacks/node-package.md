@@ -21,10 +21,6 @@ bundled or emitted; the entry point is `src/main.ts`. It has the strictest lint 
 - [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 
-## Examples
-
-- [Node module](../examples/node-module.md): the first module, its test and `main.ts`
-
 ## Shape
 
 ```
@@ -184,6 +180,21 @@ export default defineConfig(
 );
 ```
 
+## Starter
+
+What a fresh scaffold ships so every check has a module to run against: one exported function, its test, and the entry
+point that runs it. When the user has named a module of their own it takes this one's place, in the same shape.
+
+| What   | Value                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| module | `src/greeting.ts`, exporting `greet(name)` with a doc comment saying what it returns                                        |
+| result | `hello, ${name}`                                                                                                            |
+| entry  | `src/main.ts` prints `greet(process.argv[2] ?? 'world')`: a command-line argument, so a default is input, not configuration |
+
+| Tier | File                     | Covers                           |
+| ---- | ------------------------ | -------------------------------- |
+| unit | `tests/greeting.test.ts` | `greet` addresses the given name |
+
 ## Conventions
 
 ### Layout
@@ -222,4 +233,4 @@ package with a base file, and the scripts into root `pnpm -r` rollups.
 
 ## Smoke test
 
-`pnpm start` runs the entry point: with the example, it prints `hello, world`.
+`pnpm start` runs the entry point and, with the starter, prints `hello, world`; the five checks pass with zero warnings.

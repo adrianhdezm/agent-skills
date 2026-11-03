@@ -1605,38 +1605,6 @@
       "kind": "example",
       "unless": []
     },
-    "hono-hello": {
-      "id": "hono-hello",
-      "title": "Hono hello",
-      "file": "examples/hono-hello.md",
-      "needs": [
-        [
-          "hono",
-          "cloudflare-workers"
-        ]
-      ],
-      "unless": [
-        "react-router"
-      ],
-      "kind": "example"
-    },
-    "node-module": {
-      "id": "node-module",
-      "title": "Node module",
-      "file": "examples/node-module.md",
-      "needs": [
-        [
-          "node"
-        ]
-      ],
-      "unless": [
-        "hono",
-        "express",
-        "react-router",
-        "angular"
-      ],
-      "kind": "example"
-    },
     "react-router-home": {
       "id": "react-router-home",
       "title": "React Router home",
@@ -2590,14 +2558,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "hono-hello",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the Hono app, the default export; routes grow there or in modules it imports",
@@ -2919,14 +2880,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "node-module",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the entry point, the one file with side effects (Node says why)",
@@ -3763,8 +3717,6 @@
       "drizzle-s3-storage"
     ],
     "example": [
-      "node-module",
-      "hono-hello",
       "react-router-home",
       "sign-in",
       "file-upload",
