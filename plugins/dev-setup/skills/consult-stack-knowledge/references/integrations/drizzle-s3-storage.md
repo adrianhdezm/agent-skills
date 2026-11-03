@@ -27,13 +27,15 @@ list:     the data access list, with eq(files.ownerId, ownerId) added to the typ
 
 ## Where it lives
 
-| File                                      | Holds                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------ |
-| `app/db/schemas/files.schema.ts`          | the `files` table with its indexed `ownerId`, and its list input schemas |
-| `app/services/files.service.ts`           | `FilesService`                                                           |
-| `tests/integration/files.service.test.ts` | the service on a Testcontainers Postgres and an in-memory store          |
+| File                                      | Holds                                                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `app/db/schemas/files.schema.ts`          | the `files` table with its indexed `ownerId`, and its list input schemas                                 |
+| `app/services/files.service.ts`           | `FilesService`                                                                                           |
+| `tests/integration/files.service.test.ts` | the service on a real database (the engine's integration says how it is started) and an in-memory store |
 
 ## Reference code
+
+Both files are laid out for React Router; in Drizzle's `src/` layout the imports come from `models/` and `helpers/`.
 
 `app/services/files.service.ts`:
 
@@ -44,8 +46,6 @@ import { and, count, eq } from 'drizzle-orm';
 import type { DbClient } from '~/db/client';
 import { NotFoundError, type PaginatedResult, filterToSql, sortToSql, toPaginatedResult } from '~/db/data-access';
 import { type FileRow, type ListFileInput, fileDefaultSort, files } from '~/db/schemas/files.schema';
-
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 /** The one owner of the `files` table and the object store: every database call is paired with an object-store call. */
 export class FilesService {
@@ -128,7 +128,8 @@ export class FilesService {
 }
 ```
 
-`app/db/schemas/files.schema.ts`:
+`app/db/schemas/files.schema.ts`, on Postgres; on D1 the columns take Drizzle + D1's types. `users` is the auth
+tables' (Better Auth + Drizzle); without sign-in the `ownerId` column and its reference are dropped:
 
 ```ts
 import { index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
@@ -227,7 +228,8 @@ function createFakeStore() {
 
 - **`FilesService` is the only code that imports the S3 client or the `files` table**, built by the server entry.
 - **Every read and delete is scoped to the owner**; another user's file is not found.
-- **The service's integration test runs on a real Postgres and an in-memory store**, and covers the rollback branch.
+- **The service's integration test runs on a real database** (the engine's integration says how it is started) **and
+  an in-memory store**, and covers the rollback branch.
 
 ## Verify it is wired
 

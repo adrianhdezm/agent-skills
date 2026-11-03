@@ -19,9 +19,8 @@ docker-compose.yml: migrate (same image, node dist/migrate.js) ─► depends_on
                     api (DATABASE_URL at host db, PORT, ports '${PORT:-3000}:3000') ─► depends_on migrate completed
 ```
 
-- **The runtime stage runs the compiled server**: `dist/` and production dependencies only; the compiler, the dev loop
-  and the log pretty printer stay in the build stage.
-- **Logs stay JSON in the container**: the pretty printer is a dev pipe, never part of the image's command.
+- **The runtime stage runs the compiled server**: `dist/` and production dependencies only; dev tools and the compiler
+  stay in the build stage.
 
 ## Required values
 

@@ -31,10 +31,11 @@ rustfs:
     - ./<owner>/storage/data:/data # Persist objects (host-bound)
 ```
 
-| What    | Value                                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------ |
-| `.env`  | `RUSTFS_PORT=9000`, `S3_ENDPOINT=http://localhost:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` |
-| ignores | `<owner>/storage/data/` in `.gitignore`, `.dockerignore` and `.prettierignore`                         |
+| What        | Value                                                                                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`      | `RUSTFS_PORT=9000`, `S3_ENDPOINT=http://localhost:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`                                                     |
+| ignores     | `<owner>/storage/data/` in `.gitignore`, `.dockerignore` and `.prettierignore`                                                                             |
+| app service | sets `S3_ENDPOINT: http://rustfs:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` and `S3_BUCKET` from `.env`, and `depends_on: rustfs: condition: service_started` |
 
 ## Pitfalls
 
@@ -43,7 +44,6 @@ rustfs:
   started, since it has no healthcheck: check `docker compose ps` or its logs.
 - **Inside Compose, an app reaches RustFS at its service name**, not `localhost`: the app service sets its own
   `S3_ENDPOINT`.
-- **The bucket does not exist on a fresh service**: create it with the SDK once the service is up.
 
 ## Conventions
 

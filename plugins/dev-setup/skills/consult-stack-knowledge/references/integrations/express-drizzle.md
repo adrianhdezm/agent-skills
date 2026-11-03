@@ -6,7 +6,8 @@ realises: [data-access, rest-api]
 # Express + Drizzle
 
 An Express API over the Drizzle DAO layer: the composition root builds the DAOs once, controllers reach them through the
-app's context, decode the list query, and turn DAO results into HTTP answers. The Angular full stack's `api/` uses it.
+app's context, decode the list query, and turn DAO results into HTTP answers. REST API on Node and the Angular full
+stack's `api/` use it.
 
 **Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md)
 
@@ -14,13 +15,13 @@ app's context, decode the list query, and turn DAO results into HTTP answers. Th
 
 ```
 server.ts ─► createDbClient() ─► new <Resource>Dao(db) ─► AppContext { db, <resource>Dao, … } ─► createApp(context)
-request ─► controller ─► req.app.locals.context.<resource>Dao ─► Drizzle ─► Postgres
+request ─► controller ─► req.app.locals.context.<resource>Dao ─► Drizzle ─► the database
                 │                     │
      decodes the list query     NotFoundError / null ─► createError(404)
 ```
 
-- **`server.ts` builds the database client and every DAO**, puts them on the `AppContext`, and closes the pool after the
-  HTTP server on `SIGINT` / `SIGTERM`. It is the only place that opens connections.
+- **`server.ts` builds the database client and every DAO**, puts them on the `AppContext`, and closes the database
+  client after the HTTP server on `SIGINT` / `SIGTERM`. It is the only place that opens connections.
 - **Controllers call DAOs through `req.app.locals.context`** and never import the ORM or a DAO class.
 - **A DAO's `NotFoundError` becomes a 404 in the handler**, as does a `null` from `get`. DAOs throw no HTTP errors, so
   they stay callable from non-HTTP code.
@@ -34,25 +35,26 @@ request ─► controller ─► req.app.locals.context.<resource>Dao ─► Dri
 
 | File                                 | Holds                                                                      |
 | ------------------------------------ | -------------------------------------------------------------------------- |
-| `src/server.ts`                      | the pool, the Drizzle client, every DAO, the `AppContext`, shutdown        |
+| `src/server.ts`                      | the database client, every DAO, the `AppContext`, shutdown                 |
 | `src/models/app-context.model.ts`    | `AppContext { db: DbClient; <resource>Dao: <Resource>Dao }`                |
 | `src/express.d.ts`                   | `Express.Locals { context: AppContext }`                                   |
 | `src/controllers/*.controller.ts`    | list decoding, `safeParse` against the resource's schemas, the 404 mapping |
 | `src/helpers/query-parser.helper.ts` | `normalizeQuery`, the one HTTP-aware helper of the data layer              |
 | `tests/utils/http-mocks.ts`          | `createStubContext()`: a `vi.fn()` per DAO method                          |
-| `tests/api/`                         | the real app on the real DAOs and a Testcontainers Postgres                |
+| `tests/api/`                         | the real app on the real DAOs and the engine's throwaway database          |
 
 ## Reference code
 
-`src/db/client.ts` is Drizzle + Postgres's and the error handler Express + Pino's.
+`src/db/client.ts` is Drizzle + Postgres's; `src/app.ts`, the middlewares and `tests/utils/test-server.ts` are the
+Express doc's reference code.
 
-`src/server.ts`: the composition root: settings read and checked, the client and DAOs built once, the listener, and shutdown closing the server and then the pool.
+`src/server.ts`: the composition root: settings read and checked, the client and DAOs built once, the listener, and
+shutdown closing the server and then the database client. The lines that log are the stack's logger's.
 
 ```ts
 import { createApp } from './app.js';
 import { EntityDao } from './daos/entity.dao.js';
 import { createDbClient } from './db/client.js';
-import { logger } from './logger.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -67,16 +69,16 @@ const { pool, db } = createDbClient(databaseUrl);
 const app = createApp({ db, entityDao: new EntityDao(db) });
 
 const server = app.listen(port, () => {
-  logger.info({ port }, 'API listening');
+  // the stack's logger reports the port
 });
 
 function shutdown(signal: string): void {
-  logger.info({ signal }, 'Shutting down');
+  // the stack's logger reports the signal
   server.close(() => {
     pool.end().then(
       () => process.exit(0),
-      (err: unknown) => {
-        logger.error({ err }, 'Closing the pool failed');
+      () => {
+        // the stack's logger reports the error
         process.exit(1);
       }
     );
@@ -91,41 +93,7 @@ process.on('SIGTERM', () => {
 });
 ```
 
-`src/app.ts`: the pure factory.
-
-```ts
-import cors from 'cors';
-import express, { type Express } from 'express';
-import { pinoHttp } from 'pino-http';
-import { getEntity, createEntity, deleteEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
-import { getHealth } from './controllers/health.controller.js';
-import { getHome } from './controllers/home.controller.js';
-import { errorHandler } from './middlewares/error.middleware.js';
-import { notFoundHandler } from './middlewares/not-found.middleware.js';
-import { logger } from './logger.js';
-import type { AppContext } from './models/app-context.model.js';
-
-export function createApp(context: AppContext): Express {
-  const app = express();
-  app.locals.context = context;
-
-  app.use(pinoHttp({ logger }));
-  app.use(cors());
-  app.use(express.json());
-
-  app.get('/', getHome);
-  app.get('/health', getHealth);
-  app.get('/entities', listEntities);
-  app.post('/entities', createEntity);
-  app.get('/entities/:id', getEntity);
-  app.patch('/entities/:id', updateEntity);
-  app.delete('/entities/:id', deleteEntity);
-
-  app.use(notFoundHandler);
-  app.use(errorHandler);
-  return app;
-}
-```
+`createApp(context)` stores the context once on `app.locals.context`.
 
 `src/models/app-context.model.ts`:
 
@@ -319,17 +287,6 @@ export async function getHealth(req: Request, res: Response, next: NextFunction)
 }
 ```
 
-`src/middlewares/not-found.middleware.ts`:
-
-```ts
-import type { RequestHandler } from 'express';
-import createError from 'http-errors';
-
-export const notFoundHandler: RequestHandler = (req, _res, next) => {
-  next(createError(404, `Not Found: ${req.method} ${req.path}`, { expose: true }));
-};
-```
-
 `tests/utils/http-mocks.ts`: the stub context, request, response and next for unit tests.
 
 ```ts
@@ -405,45 +362,11 @@ export function httpError(status: number, message?: string): unknown {
 }
 ```
 
-`tests/utils/test-server.ts`: the real app on an ephemeral port for API tests.
-
-```ts
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import type { Express } from 'express';
-
-export interface TestServer {
-  readonly baseUrl: string;
-  readonly close: () => Promise<void>;
-}
-
-export async function serve(app: Express): Promise<TestServer> {
-  const server = await new Promise<Server>((resolve) => {
-    const listening = app.listen(0, '127.0.0.1', () => {
-      resolve(listening);
-    });
-  });
-  const { port } = server.address() as AddressInfo;
-  return {
-    baseUrl: `http://127.0.0.1:${String(port)}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      })
-  };
-}
-```
-
 ## Conventions
 
-- **The composition root builds the DAOs once**: `server.ts` creates the pool and one `<Resource>Dao` per table, puts
-  them on `AppContext`, and closes the pool on shutdown. Adding a resource adds its DAO there and to `AppContext`.
+- **The composition root builds the DAOs once**: `server.ts` creates the database client and one `<Resource>Dao` per
+  table, puts them on `AppContext`, and closes the client on shutdown. Adding a resource adds its DAO there and to
+  `AppContext`.
 - **Controllers reach data only through the context's DAOs**; they import no table or DAO class, and only the health
   probe imports from the ORM, for its `SELECT 1`.
 - **A DAO's `NotFoundError` becomes a 404** in the handler, as does a `null` from `get`.
@@ -455,7 +378,7 @@ export async function serve(app: Express): Promise<TestServer> {
 
 ## Verify it is wired
 
-- Only `server.ts` constructs a pool or a DAO; no controller imports from `db/` or `daos/`, and only the health probe
-  imports from `drizzle-orm` (its `sql`).
+- Only `server.ts` constructs a database client or a DAO; no controller imports from `db/` or `daos/`, and only the
+  health probe imports from `drizzle-orm` (its `sql`).
 - Every DAO method that can miss a row is mapped to a 404 by its handler.
 - Every list controller rejects unknown query params and validates with its resource's list input schema.

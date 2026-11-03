@@ -18,13 +18,13 @@ tests: readMigrationFiles() at config time ─► a binding ─► applied in wo
 
 ## Required values
 
-| What                | Value                                                                                                                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| client              | `drizzle(c.env.APP_DB, { schema })` from `drizzle-orm/d1`, built inside the request handler                                                                                     |
-| `drizzle.config.ts` | `dialect: 'sqlite'`; `dbCredentials` from `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` in `.env`, listed in `.env.example`                          |
-| scripts             | `db:generate` and `db:migrate` (remote), each drizzle-kit's bin under `node --env-file=.env --import=tsx`                                                                       |
-| schema              | `sqliteTable`; ids `text('id').primaryKey().$defaultFn(() => crypto.randomUUID())`; times `integer(…, { mode: 'timestamp_ms' })` defaulting to the current time in milliseconds |
-| tests               | the Cloudflare Vitest plugin with `d1Databases: ['APP_DB']`; the migrations read with `readMigrationFiles()` and passed as a JSON binding, applied by the setup file            |
+| What                | Value                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| client              | `drizzle(c.env.APP_DB, { schema })` from `drizzle-orm/d1`, built inside the request handler                                                                                                                                     |
+| `drizzle.config.ts` | `dialect: 'sqlite'`; `dbCredentials` from `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` in `.env`, listed in `.env.example`                                                                          |
+| scripts             | `db:generate` and `db:migrate` (remote), each drizzle-kit's bin under `node --env-file=.env --import=tsx`                                                                                                                       |
+| schema              | `sqliteTable`; ids `text('id').primaryKey().$defaultFn(() => crypto.randomUUID())`; times `integer(…, { mode: 'timestamp_ms' })` defaulting to the current time in milliseconds                                                 |
+| tests               | the `integration` project runs in workerd through Cloudflare Workers + Vitest's plugin, with `d1Databases: ['APP_DB']`; the migrations read with `readMigrationFiles()` and passed as a JSON binding, applied by the setup file |
 
 ## Reference code
 
@@ -36,6 +36,7 @@ The data layer is [Drizzle](../technologies/drizzle.md)'s reference code, and
 | `drizzle-orm/pg-core`, `pgTable`, `AnyPgColumn`     | `drizzle-orm/sqlite-core`, `sqliteTable`, `AnySQLiteColumn`                              |
 | `uuid('id').primaryKey().defaultRandom()`           | `text('id').primaryKey().$defaultFn(() => crypto.randomUUID())`                          |
 | `timestamp(…, { withTimezone: true }).defaultNow()` | `integer(…, { mode: 'timestamp_ms' }).$defaultFn(() => new Date())`                      |
+| `boolean(…)`                                        | `integer(…, { mode: 'boolean' })`                                                        |
 | `ilike` / `notIlike`                                | `likeEscaped` / `not(likeEscaped(…))` below: SQLite's `LIKE` already ignores ASCII case  |
 | refine callbacks, `(schema) => schema.min(1)`       | plain schemas, `z.string().min(1)`: drizzle-zod types a SQLite `text` callback as Buffer |
 | a list's items, then its count, as two queries      | one `db.batch([items, count])`                                                           |
@@ -52,7 +53,7 @@ import type { schema } from './schema';
 export type DbClient = DrizzleD1Database<typeof schema>;
 ```
 
-The entity table:
+The entity table, shown with Drizzle's `src/` layout; in React Router both imports come from `~/db/data-access`:
 
 ```ts
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
@@ -161,15 +162,11 @@ beforeAll(async () => {
 ## Pitfalls
 
 - **`db.transaction()` throws on D1**: use `db.batch([...])`, which is atomic.
-- **`Promise.all` over queries** gains nothing and can interleave: `await` them in sequence.
 - **workerd cannot read the project's files**: migrations reach the tests as a binding, read at config time.
 - **SQLite's `LIKE` has no default escape character**: the backslashes `escapeLike` adds are matched literally unless
   the query says `escape '\'`, so a `contains: '50%'` filter finds nothing. Use `likeEscaped`.
 - **drizzle-zod types a refine callback on a SQLite `text` column as `ZodType<Buffer>`** (no `min`, no `max`): refine
   with a plain `z.string()…` schema instead.
-- **`wrangler d1 create` needs a Cloudflare account**: offline, write the `d1_databases` binding by hand with a
-  placeholder `database_id`; local development and the tests use the local D1, and the real id replaces it before the
-  first deploy.
 
 ## Conventions
 
@@ -179,5 +176,5 @@ beforeAll(async () => {
 
 ## Verify it is wired
 
-- No `db.transaction(` and no `Promise.all` over queries in the data layer.
+- No `db.transaction(` in the data layer.
 - The integration tests apply `db/migrations/` before the first test.

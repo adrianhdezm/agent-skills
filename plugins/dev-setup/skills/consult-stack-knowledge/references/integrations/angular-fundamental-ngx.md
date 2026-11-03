@@ -3,7 +3,7 @@ kind: integration
 connects: [angular, fundamental-ngx]
 realises: [ui-components]
 detect:
-  dependencies: [@fundamental-ngx/core]
+  fileContains: ['src/index.html=data-sap-theme']
 ---
 # Angular + Fundamental NGX
 
@@ -25,14 +25,14 @@ pages / app components ─► import from '@/app/components/ui/<name>/<name>'
 
 ## Where it lives
 
-| File                                      | Holds                                                         |
-| ----------------------------------------- | ------------------------------------------------------------- |
-| `components.json`                         | the registry's style, the stylesheet, the `@/app/…` aliases   |
-| `tsconfig.json`                           | `paths: { "@/*": ["./src/*"] }`                               |
-| `src/app/components/ui/<name>/`           | registry code, one folder per component, never edited by hand |
-| `src/app/lib/utils.ts`                    | the registry's `cn`                                           |
-| `src/index.html`                          | the theme attributes on `<html>`                              |
-| `vitest.config.mts`, `.storybook/main.ts` | `tsconfigPaths`, so tests and stories resolve `@/`            |
+| File                                      | Holds                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `components.json`                         | the registry's style, the stylesheet, the `@/app/…` aliases                           |
+| `tsconfig.json`                           | `paths: { "@/*": ["./src/*"] }`                                                       |
+| `src/app/components/ui/<name>/`           | registry code, one folder per component, never edited by hand                         |
+| `src/app/lib/utils.ts`                    | the registry's `cn`                                                                   |
+| `src/index.html`                          | the theme attributes on `<html>`                                                      |
+| `vitest.config.mts`, `.storybook/main.ts` | `resolve.tsconfigPaths`, as the Vite doc says, so every Vite-based tool resolves `@/` |
 
 ## Required values
 
@@ -40,7 +40,7 @@ pages / app components ─► import from '@/app/components/ui/<name>/<name>'
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `tsconfig.json`         | `"paths": { "@/*": ["./src/*"] }`: the components import each other as `@/app/components/ui/…`; `erasableSyntaxOnly` and `noUncheckedIndexedAccess` `false`, for the registry's code                                                                               |
 | `components.json`       | `style: "new-york"`, `rsc: false`, `tsx: true`, `tailwind: { config: "", css: "src/styles.css", baseColor: "neutral", cssVariables: true }`, aliases `components: "@/app/components"`, `ui: "@/app/components/ui"`, `utils: "@/app/lib/utils"`, `lib: "@/app/lib"` |
-| Vite (tests, Storybook) | `resolve: { tsconfigPaths: true }` in `vitest.config.mts`; `viteFinal` doing the same in `.storybook/main.ts`                                                                                                                                                      |
+| Vite-based tools        | `resolve: { tsconfigPaths: true }` in each tool's Vite config, so `@/` resolves                                                                                                                                                                                    |
 | lint and format ignores | `src/app/components/ui/*/**`, `src/app/lib/**` in ESLint; `src/app/components/ui/*/`, `src/app/lib`, `src/styles` in Prettier                                                                                                                                      |
 | dependencies            | `@angular/cdk`, `clsx`, `tailwind-merge`, `class-variance-authority`: the registry items' imports; confirm the CLI added them                                                                                                                                      |
 | styles                  | the CLI writes the theme to `src/styles/` (`fundamental.css`, `tokens.css`, `extensions.css`, `fonts.css`, `themes/`); `src/styles.css` imports `./styles/fundamental.css` after the three Tailwind layer imports                                                  |
@@ -69,8 +69,6 @@ required` adds a marker. Vitest's exact name match needs `{ exact: false }` for 
   than one page.
 - **`fd-dialog` declared in a template without a `DialogRef` does not close on Escape**: the app component handles Escape
   itself.
-- **The first browser test run after adding the registry** can fail one file while Vite pre-bundles `@angular/cdk/*`
-  ("Vite unexpectedly reloaded a test"); run it again.
 
 ## Conventions
 
@@ -85,6 +83,6 @@ required` adds a marker. Vitest's exact name match needs `{ exact: false }` for 
 
 - `src/app/lib/utils.ts` and the registry folders sit under `src/app/`; there is no `src/components`, `src/lib`, `@` or
   `~` folder.
-- ESLint's and Prettier's ignores list the registry folders; no hand-written `ui-dialog`, `ui-select` or `ui-pagination`
-  remains beside them.
+- ESLint's and Prettier's ignores list the registry folders; no hand-written primitive with the same name as a registry
+  component remains beside them.
 - `index.html` carries `data-sap-theme="sap_horizon"`.

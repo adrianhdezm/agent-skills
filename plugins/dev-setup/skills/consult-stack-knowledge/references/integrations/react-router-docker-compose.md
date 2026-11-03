@@ -23,19 +23,19 @@ docker-compose.yml: migrate (same image, node migrate.ts; once a database is add
 
 ## Required values
 
-| What            | Value                                                                                                                                                                                                                                                                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| build stage     | the Docker Compose doc's, building with `pnpm build`                                                                                                                                                                                                                                                                                      |
-| runtime stage   | `pnpm install --prod --frozen-lockfile`; copy `build/` and `server.ts`; `ENV NODE_ENV=production`; `USER node`; `EXPOSE 3000`; `CMD ["node", "server.ts"]`                                                                                                                                                                                |
-| service `app`   | `build: .`; `environment`: the database URL at its service name, `APP_NAME: ${APP_NAME}`, `PORT: '3000'`; ports `'${PORT:-3000}:3000'`; `depends_on` the database being healthy, or, once Drizzle is added, `migrate` with `condition: service_completed_successfully`                                                                    |
-| with a database | `migrate.ts` beside `server.ts`: Drizzle + Postgres's `src/migrate.ts` with the folder `./db/migrations`, in `tsconfig.node.json`; the runtime stage also copies `migrate.ts` and `db/migrations/`; a `migrate` service on the same `build`, `command: ['node', 'migrate.ts']`, the database URL, `depends_on` the database being healthy |
-| `.dockerignore` | `**/node_modules`, `build`, `.react-router`, `.git`, `.env`, the data folders                                                                                                                                                                                                                                                             |
+| What            | Value                                                                                                                                                                                                                                                                                         |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| build stage     | the Docker Compose doc's, building with `pnpm build`                                                                                                                                                                                                                                          |
+| runtime stage   | `pnpm install --prod --frozen-lockfile`; copy `build/` and `server.ts`; `ENV NODE_ENV=production`; `USER node`; `EXPOSE 3000`; `CMD ["node", "server.ts"]`                                                                                                                                    |
+| service `app`   | `build: .`; `environment`: the database URL at its service name, `APP_NAME: ${APP_NAME}`, `PORT: '3000'`; ports `'${PORT:-3000}:3000'`; `depends_on` the database being healthy, or, once Drizzle is added, `migrate` with `condition: service_completed_successfully`                        |
+| with a database | a `migrate` service on the same `build`, `command: ['node', 'migrate.ts']`, `depends_on` the database being healthy; `migrate.ts` is the data layer's migration entry (Drizzle + Postgres), run as TypeScript from `tsconfig.node.json`, and the runtime stage copies it and `db/migrations/` |
+| `.dockerignore` | `**/node_modules`, `build`, `.react-router`, `.git`, `.env`, the data folders                                                                                                                                                                                                                 |
 
 ## Pitfalls
 
 - **`NODE_ENV=development` in the image** sends the server down its dev branch, which imports Vite: the container fails
   without dev dependencies.
-- **Sign-in with no `migrate` service** fails every request that reads a session ("relation does not exist") until
+- **A database with no `migrate` service** fails the first request that reads a table ("relation does not exist") until
   someone runs `db:migrate` from the host.
 - **A new environment variable missing from the service** works on the host, where `.env` is loaded, and is `undefined`
   in the container.
@@ -67,8 +67,9 @@ EXPOSE 3000
 CMD ["node", "server.ts"]
 ```
 
-The `migrate` and `app` services with every optional entry, beside the `db` and `rustfs` services; `app` reports
-healthy once it serves its home page, so `up --wait` returns only when the app answers:
+The `migrate` and `app` services; the lines an optional entry adds to `app` are its own integration's (the auth
+secret, the store's endpoint), and its database URL is Postgres + Docker Compose's. `app` reports healthy once it
+serves its home page, so `up --wait` returns only when the app answers:
 
 ```yaml
   migrate:
@@ -85,22 +86,14 @@ healthy once it serves its home page, so `up --wait` returns only when the app a
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
+      # DATABASE_URL at host db (Postgres + Docker Compose); an optional entry's variables as its integration says
       APP_NAME: ${APP_NAME}
       PORT: '3000'
-      AUTH_SECRET: ${AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-      S3_ENDPOINT: http://rustfs:9000
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_BUCKET: ${S3_BUCKET:-app-files}
     ports:
       - '${PORT:-3000}:3000'
     depends_on:
       migrate:
         condition: service_completed_successfully
-      rustfs:
-        condition: service_started
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ >/dev/null || exit 1']
       interval: 5s

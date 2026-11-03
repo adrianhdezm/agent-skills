@@ -32,6 +32,7 @@ shadcn/ui. No database is wired: D1, R2 and KV arrive later as bindings.
 - [Vite](../technologies/vite.md)
 - [React Router + Vite](../integrations/react-router-vite.md)
 - [Tailwind](../technologies/tailwind.md)
+- [React Router + Tailwind](../integrations/react-router-tailwind.md)
 - [shadcn](../technologies/shadcn.md)
 - [React Router + shadcn/ui](../integrations/react-router-shadcn.md)
 - [Hono](../technologies/hono.md)
@@ -54,6 +55,7 @@ shadcn/ui. No database is wired: D1, R2 and KV arrive later as bindings.
 - [React Router + Prettier](../integrations/react-router-prettier.md)
 - [Vitest](../technologies/vitest.md)
 - [React Router + Vitest](../integrations/react-router-vitest.md)
+- [Cloudflare Workers + Vitest](../integrations/cloudflare-workers-vitest.md)
 
 ## Examples
 

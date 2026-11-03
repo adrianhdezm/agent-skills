@@ -24,8 +24,9 @@ folder, and the overrides its reducers and specs need. Both Angular stacks use i
 - **The strict typed presets fight Angular's idioms**: about 17 errors on ordinary code, such as
   `restrict-template-expressions` on bound numbers, `no-confusing-void-expression` on event handlers and
   `no-extraneous-class` on the root component. Angular packages take `recommendedTypeChecked`.
-- **A typed preset not limited to `**/_.ts`** also runs on the virtual `.html`files`processInlineTemplates` creates
-and crashes (`await-thenable`under the template parser): put it, and the shared typed rules, in a`files: ['\*\*/_.ts']` block.
+- **A typed preset not limited to `**/*.ts`** also runs on the virtual `.html` files `processInlineTemplates` creates
+  and crashes (`await-thenable` under the template parser): put it, and the shared typed rules, in a
+  `files: ['**/*.ts']` block.
 - **`Validators.required` trips `@typescript-eslint/unbound-method`**, a known false positive: disable it on that line
   with a comment.
 

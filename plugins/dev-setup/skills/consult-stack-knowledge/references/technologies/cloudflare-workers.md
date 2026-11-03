@@ -44,7 +44,7 @@ What every Worker shares: Wrangler's config, the compatibility date, the runtime
 | `cf:deploy`  | `pnpm run build && wrangler deploy`                                    |
 
 `allowBuilds` adds `workerd: true` (it downloads its binary in an install script). `.gitignore` adds `.wrangler/` and
-`.env`; linters and formatters ignore `worker-configuration.d.ts`, which is generated.
+`.env`; linters and formatters ignore `.wrangler/` and `worker-configuration.d.ts`, which is generated.
 
 ## Pitfalls
 

@@ -633,6 +633,11 @@
       "realises": [
         "rest-api"
       ],
+      "detect": {
+        "fileContains": [
+          "src/environments/environment.ts=apiBaseUrl"
+        ]
+      },
       "kind": "integration",
       "owns": [
         {
@@ -640,15 +645,11 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the only importer of `environment`; `selectApiBaseUrl`",
-          "source": "Where it lives"
-        },
-        {
           "holds": "the API's types, by name and shape",
           "source": "Where it lives"
         },
         {
-          "holds": "the only `HttpClient` user; full URLs from `selectApiBaseUrl`",
+          "holds": "the only `HttpClient` user; full URLs from the configured base URL",
           "source": "Where it lives"
         },
         {
@@ -687,8 +688,8 @@
         "ui-components"
       ],
       "detect": {
-        "dependencies": [
-          "@fundamental-ngx/core"
+        "fileContains": [
+          "src/index.html=data-sap-theme"
         ]
       },
       "kind": "integration",
@@ -714,11 +715,11 @@
           "source": "Where it lives"
         },
         {
-          "holds": "`tsconfigPaths`, so tests and stories resolve `@/`",
+          "holds": "`resolve.tsconfigPaths`, as the Vite doc says, so every Vite-based tool resolves `@/`",
           "source": "Where it lives"
         },
         {
-          "holds": "`tsconfigPaths`, so tests and stories resolve `@/`",
+          "holds": "`resolve.tsconfigPaths`, as the Vite doc says, so every Vite-based tool resolves `@/`",
           "source": "Where it lives"
         },
         {
@@ -861,7 +862,7 @@
       "realises": [],
       "owns": [
         {
-          "holds": "`createAuth(db, …)`: the `betterAuth` options and adapter; `AppAuth`",
+          "holds": "`createAuth(db, …)` and `AppAuth`, Better Auth + Drizzle's code",
           "source": "Where it lives"
         },
         {
@@ -889,7 +890,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "`safeRedirectTo`",
+          "holds": "`safeRedirectTo`, beside the UI integration's `cn`",
           "source": "Where it lives"
         }
       ],
@@ -916,21 +917,19 @@
         "cloudflare-workers",
         "vitest"
       ],
-      "unless": [
-        "react-router"
-      ],
       "kind": "integration",
       "realises": [],
       "owns": [
         {
-          "holds": "`cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`",
+          "holds": "`cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`; under a framework, in the `integration` project only",
           "source": "Required values"
         },
         {
           "holds": "extends the Worker project, adds `tests`, `types: [\"./worker-configuration.d.ts\", \"@cloudflare/vitest-plugin/types\"]`",
           "source": "Required values"
         }
-      ]
+      ],
+      "unless": []
     },
     "drizzle-d1": {
       "id": "drizzle-d1",
@@ -990,7 +989,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the service on a Testcontainers Postgres and an in-memory store",
+          "holds": "the service on a real database (the engine's integration says how it is started) and an in-memory store",
           "source": "Where it lives"
         }
       ],
@@ -1024,7 +1023,7 @@
       "kind": "integration",
       "owns": [
         {
-          "holds": "the pool, the Drizzle client, every DAO, the `AppContext`, shutdown",
+          "holds": "the database client, every DAO, the `AppContext`, shutdown",
           "source": "Where it lives"
         },
         {
@@ -1048,7 +1047,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the real app on the real DAOs and a Testcontainers Postgres",
+          "holds": "the real app on the real DAOs and the engine's throwaway database",
           "source": "Where it lives"
         }
       ],
@@ -1085,10 +1084,6 @@
         {
           "holds": "the generated `Env` the app's `Bindings` use",
           "source": "Where it lives"
-        },
-        {
-          "holds": "`exports.default.fetch(new Request(…))` from `cloudflare:workers`",
-          "source": "Where it lives"
         }
       ],
       "unless": []
@@ -1111,7 +1106,7 @@
       "kind": "integration",
       "owns": [
         {
-          "holds": "the pool, the Drizzle client, every DAO, `createApp(context)`, `serve`, shutdown",
+          "holds": "the database client, every DAO, `createApp(context)`, `serve`, shutdown",
           "source": "Where it lives"
         },
         {
@@ -1127,10 +1122,6 @@
           "source": "Where it lives"
         },
         {
-          "holds": "`errorHandler` and `notFoundHandler`, the one place an error becomes a response",
-          "source": "Where it lives"
-        },
-        {
           "holds": "`createStubContext()`: a `vi.fn()` per DAO method",
           "source": "Where it lives"
         },
@@ -1139,7 +1130,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the real app on the real DAOs and a Testcontainers Postgres",
+          "holds": "the real app on the real DAOs and the engine's throwaway database (Drizzle + Postgres)",
           "source": "Where it lives"
         }
       ]
@@ -1160,11 +1151,11 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the `ssr` environment's `input: './workers/app.ts'`",
+          "holds": "in an API: `serve()`, and closing the server, then what the context opened, on a signal; the rest is Hono + Drizzle's",
           "source": "Where it lives"
         },
         {
-          "holds": "in an API: the composition root, `serve()`, and closing the server, then the pool, on a signal",
+          "holds": "in an API: `serveApp(app)`, the real app on an ephemeral port",
           "source": "Where it lives"
         }
       ],
@@ -1183,10 +1174,6 @@
       "owns": [
         {
           "holds": "`requestLog`",
-          "source": "Where it lives"
-        },
-        {
-          "holds": "`errorHandler`, logging as above",
           "source": "Where it lives"
         },
         {
@@ -1213,10 +1200,6 @@
         },
         {
           "holds": "`appContext = createContext<…>()`, the one type every loader and action reads",
-          "source": "Where it lives"
-        },
-        {
-          "holds": "references `@react-router/dev/vite/env`, so `virtual:react-router/server-build` types",
           "source": "Where it lives"
         },
         {
@@ -1332,7 +1315,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "the contract: `Dao`, `RelationQuery`, `PaginatedResult`, `IdInput`, and the list-input builders and translator",
+          "holds": "the contract: `Dao`, `PaginatedResult`, `IdInput`, and the list-input builders and translator",
           "source": "Where it lives"
         },
         {
@@ -1357,6 +1340,14 @@
         },
         {
           "holds": "DAOs, queries and services against a real database",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the seeding helpers the integration tests share",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "the file that registers the hooks",
           "source": "Where it lives"
         }
       ],
@@ -1410,19 +1401,11 @@
           "source": "Where it lives"
         },
         {
-          "holds": "Tailwind, `tw-animate-css`, the dark variant, the tokens",
-          "source": "Where it lives"
-        },
-        {
-          "holds": "`cn`, re-exported from the `cn` package",
+          "holds": "`cn`, re-exported from the `cn` package; with sign-in, `safeRedirectTo` beside it",
           "source": "Where it lives"
         },
         {
           "holds": "the shadcn primitives, the project's code once added",
-          "source": "Where it lives"
-        },
-        {
-          "holds": "`prettier-plugin-tailwindcss` with `tailwindStylesheet`",
           "source": "Where it lives"
         },
         {
@@ -1431,10 +1414,6 @@
         },
         {
           "holds": "`\"compilerOptions\": { \"paths\": { \"~/*\": [\"./app/*\"] } }`, for the CLI",
-          "source": "Required values"
-        },
-        {
-          "holds": "copied from `<skill-dir>/references/assets/react-router-app.css`: Tailwind, `tw-animate-css`, the dark variant, shadcn's tokens for light and dark, plus `surface`, `code` and `selection` tokens and two wide breakpoints",
           "source": "Required values"
         },
         {
@@ -1461,6 +1440,46 @@
         },
         {
           "holds": "`/// <reference types=\"vite/client\" />`, then imports `../app/app.css` (the node project has no Vite types otherwise)",
+          "source": "Required values"
+        }
+      ],
+      "unless": []
+    },
+    "react-router-tailwind": {
+      "id": "react-router-tailwind",
+      "title": "React Router + Tailwind",
+      "file": "integrations/react-router-tailwind.md",
+      "connects": [
+        "react-router",
+        "tailwind"
+      ],
+      "realises": [
+        "ui-components"
+      ],
+      "kind": "integration",
+      "owns": [
+        {
+          "holds": "`tailwindcss()` from `@tailwindcss/vite`, before `reactRouter()`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "Tailwind, `tw-animate-css`, the dark variant, the tokens",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`import './app.css'`",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "`import '../app/app.css'`, the unit project's setup file",
+          "source": "Where it lives"
+        },
+        {
+          "holds": "copied from `<skill-dir>/references/assets/react-router-app.css`: Tailwind, `tw-animate-css`, the dark variant, the theme's tokens for light and dark, plus `surface`, `code` and `selection` tokens and two wide breakpoints",
+          "source": "Required values"
+        },
+        {
+          "holds": "`import '../app/app.css'`, listed in the unit project's `setupFiles` where the blueprint's test config has one, so browser tests render with the styles",
           "source": "Required values"
         }
       ],
@@ -1501,10 +1520,6 @@
       "owns": [
         {
           "holds": "one inline project `unit`: `plugins: [react()]`, `resolve.tsconfigPaths: true`, `include: ['tests/unit/**/*.test.{ts,tsx}']`, Chromium browser mode",
-          "source": "Required values"
-        },
-        {
-          "holds": "extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`",
           "source": "Required values"
         }
       ],
@@ -2914,6 +2929,12 @@
           "optional": false
         },
         {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-tailwind",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "shadcn",
@@ -3049,6 +3070,12 @@
           "layer": "integrations",
           "kind": "integration",
           "id": "react-router-vitest",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "cloudflare-workers-vitest",
           "optional": false
         }
       ],
@@ -3243,6 +3270,12 @@
           "layer": "technologies",
           "kind": "technology",
           "id": "tailwind",
+          "optional": false
+        },
+        {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "react-router-tailwind",
           "optional": false
         },
         {
@@ -3519,6 +3552,7 @@
       "hono-react-router",
       "hono-cloudflare-workers",
       "hono-node",
+      "react-router-tailwind",
       "react-router-shadcn",
       "react-router-drizzle",
       "express-drizzle",

@@ -22,16 +22,15 @@ app/env.d.ts ─► @react-router/dev/vite/env ─► the virtual module's types
 | ---------------- | ---------------------------------------------------------------------------------- |
 | `vite.config.ts` | `reactRouter()` from `@react-router/dev/vite`, last; `resolve.tsconfigPaths: true` |
 | `app/env.d.ts`   | `/// <reference types="@react-router/dev/vite/env" />`                             |
-| runtime tsconfig | `"vite/client"` in `types`, beside the runtime's                                   |
 
 ## Required values
 
-| What            | Value                                                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| devDependencies | `vite`                                                                                                                        |
-| plugins         | the runtime's plugin first where there is one, then the styling plugin, then `reactRouter()`                                  |
-| aliases         | `resolve.tsconfigPaths: true`, so `~/` comes from the runtime project's `paths`                                               |
-| commands        | `react-router dev` and `react-router build` drive Vite; `vite preview` serves a build where the runtime's integration says so |
+| What          | Value                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| plugins       | the runtime's plugin first where there is one, then the styling plugin, then `reactRouter()`                                  |
+| aliases       | `resolve.tsconfigPaths: true`, so `~/` comes from the runtime project's `paths`                                               |
+| commands      | `react-router dev` and `react-router build` drive Vite; `vite preview` serves a build where the runtime's integration says so |
+| custom server | `environments.ssr.build.rollupOptions.input: './workers/app.ts'`, so the server build is the Hono app `server.ts` imports     |
 
 ## Pitfalls
 

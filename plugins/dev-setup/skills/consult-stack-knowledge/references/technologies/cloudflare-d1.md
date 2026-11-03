@@ -42,6 +42,9 @@ for atomic work, and migrations applied by Wrangler locally and remotely.
 - **A migration applied locally is not applied remotely**, and the reverse: apply to both.
 - **Touching the binding at module scope** finds no `env`: do it inside the handler.
 - **Rewriting `wrangler.jsonc` by hand** drops the generated id: merge.
+- **`wrangler d1 create` needs a Cloudflare account**: offline, write the `d1_databases` binding by hand with a
+  placeholder `database_id`; local development and the tests use the local D1, and the real id replaces it before the
+  first deploy.
 
 ## Conventions
 

@@ -8,7 +8,8 @@ unless: [react-router]
 
 A Hono API over the Drizzle DAO layer: the server entry builds the DAOs once and hands them to `createApp(context)`,
 handlers reach them as `c.var.context`, decode the list query, and turn DAO results into HTTP answers through
-`HTTPException`. Hono API on Node uses it.
+`HTTPException`. Hono API on Node uses it. Under React Router, where Hono only hands requests on, the data layer is
+React Router + Drizzle's and this seam is not used.
 
 **Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md)
 
@@ -16,13 +17,13 @@ handlers reach them as `c.var.context`, decode the list query, and turn DAO resu
 
 ```
 server.ts ─► createDbClient() ─► new <Resource>Dao(db) ─► AppContext { db, <resource>Dao, … } ─► createApp(context)
-request ─► middleware sets c.var.context ─► handler ─► c.var.context.<resource>Dao ─► Drizzle ─► Postgres
+request ─► middleware sets c.var.context ─► handler ─► c.var.context.<resource>Dao ─► Drizzle ─► the database
                 │                         │
      decodes the list query     NotFoundError / null ─► HTTPException(404) ─► app.onError
 ```
 
 - **`server.ts` builds the database client and every DAO** and passes them to `createApp`; it is the only place that
-  opens connections, and it closes the pool after the server on `SIGINT` / `SIGTERM`.
+  opens connections, and it closes the database client after the server on `SIGINT` / `SIGTERM`.
 - **Handlers are `(c: Context<AppEnv>) => Promise<Response>`** and reach data through `c.var.context`; they import no
   DAO class and no table.
 - **A DAO's `NotFoundError` becomes a 404 `HTTPException`** in the handler, as does a `null` from `get`; DAOs throw no
@@ -30,22 +31,68 @@ request ─► middleware sets c.var.context ─► handler ─► c.var.context
 - **The list query is decoded in the handler** from `c.req.queries()`, exactly as the REST API concept's wire format
   says; the DAO takes the structured `{ filter, sort, page, pageSize }`.
 - **The health probe runs `SELECT 1`** through ``c.var.context.db.execute(sql`SELECT 1`)``, the one handler that imports
-  from `drizzle-orm`, and throws a 503 `HTTPException`with the original error as its`cause`.
+  from `drizzle-orm`, and throws a 503 `HTTPException` with the original error as its `cause`.
 
 ## Where it lives
 
-| File                                  | Holds                                                                            |
-| ------------------------------------- | -------------------------------------------------------------------------------- |
-| `src/server.ts`                       | the pool, the Drizzle client, every DAO, `createApp(context)`, `serve`, shutdown |
-| `src/app.ts`                          | `createApp(context)`: the context middleware, the shared middleware, every route |
-| `src/models/app-context.model.ts`     | `AppContext` and `AppEnv` (`Variables: { context: AppContext }`)                 |
-| `src/controllers/*.controller.ts`     | list decoding, `safeParse` against the resource's schemas, the 404 mapping       |
-| `src/middlewares/error.middleware.ts` | `errorHandler` and `notFoundHandler`, the one place an error becomes a response  |
-| `tests/utils/http-mocks.ts`           | `createStubContext()`: a `vi.fn()` per DAO method                                |
-| `tests/unit/controllers/`             | `createApp(stub.context).request(…)`, so a handler test also covers its route    |
-| `tests/api/`                          | the real app on the real DAOs and a Testcontainers Postgres                      |
+| File                              | Holds                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `src/server.ts`                   | the database client, every DAO, `createApp(context)`, `serve`, shutdown                |
+| `src/app.ts`                      | `createApp(context)`: the context middleware, the shared middleware, every route       |
+| `src/models/app-context.model.ts` | `AppContext` and `AppEnv` (`Variables: { context: AppContext }`)                       |
+| `src/controllers/*.controller.ts` | list decoding, `safeParse` against the resource's schemas, the 404 mapping             |
+| `tests/utils/http-mocks.ts`       | `createStubContext()`: a `vi.fn()` per DAO method                                      |
+| `tests/unit/controllers/`         | `createApp(stub.context).request(…)`, so a handler test also covers its route          |
+| `tests/api/`                      | the real app on the real DAOs and the engine's throwaway database (Drizzle + Postgres) |
 
 ## Reference code
+
+`src/app.ts`, the middlewares and `tests/utils/test-server.ts` are the Hono doc's and Hono + Node's reference code.
+
+`src/server.ts`: the composition root: reads its two settings and fails loudly, builds the context, serves, and on
+`SIGINT` or `SIGTERM` closes the server and then the database client. The lines that log are the stack's logger's.
+
+```ts
+import { serve } from '@hono/node-server';
+import { createApp } from './app.js';
+import { createDbClient } from './db/client.js';
+import { EntityDao } from './daos/entity.dao.js';
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required');
+}
+const port = Number(process.env.PORT);
+if (!Number.isInteger(port) || port <= 0) {
+  throw new Error('PORT is required');
+}
+
+const { pool, db } = createDbClient(databaseUrl);
+const app = createApp({ db, entityDao: new EntityDao(db) });
+const server = serve({ fetch: app.fetch, port }, () => {
+  // the stack's logger reports the port
+});
+
+function shutdown(signal: string): void {
+  // the stack's logger reports the signal
+  server.close(() => {
+    pool.end().then(
+      () => process.exit(0),
+      () => {
+        // the stack's logger reports the error
+        process.exit(1);
+      }
+    );
+  });
+}
+
+process.on('SIGINT', () => {
+  shutdown('SIGINT');
+});
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM');
+});
+```
 
 `src/models/app-context.model.ts`:
 
@@ -65,81 +112,13 @@ export interface AppEnv {
 }
 ```
 
-`src/app.ts`:
+The context middleware in `src/app.ts`, the one line of the factory that is this seam:
 
 ```ts
-import { Hono } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
-import { cors } from 'hono/cors';
-import { HTTPException } from 'hono/http-exception';
-import { createEntity, deleteEntity, getEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
-import { getHealth } from './controllers/health.controller.js';
-import { getHome } from './controllers/home.controller.js';
-import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
-import { requestLog } from './middlewares/request-log.middleware.js';
-import type { AppContext, AppEnv } from './models/app-context.model.js';
-
-const MAX_BODY_BYTES = 100 * 1024;
-
-/** The Hono app around a context: middleware, every route, then the not-found and error handlers. It reads no environment. */
-export function createApp(context: AppContext): Hono<AppEnv> {
-  const app = new Hono<AppEnv>();
   app.use(async (c, next) => {
     c.set('context', context);
     await next();
   });
-  app.use(requestLog);
-  app.use(cors());
-  app.use(
-    bodyLimit({
-      maxSize: MAX_BODY_BYTES,
-      onError: () => {
-        throw new HTTPException(413, { message: 'Payload Too Large' });
-      }
-    })
-  );
-
-  app.get('/', getHome);
-  app.get('/health', getHealth);
-  app.get('/entities', listEntities);
-  app.post('/entities', createEntity);
-  app.get('/entities/:id', getEntity);
-  app.patch('/entities/:id', updateEntity);
-  app.delete('/entities/:id', deleteEntity);
-
-  app.notFound(notFoundHandler);
-  app.onError(errorHandler);
-  return app;
-}
-```
-
-`src/middlewares/error.middleware.ts`:
-
-```ts
-import type { ErrorHandler, NotFoundHandler } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { logger } from '../logger.js';
-import type { AppEnv } from '../models/app-context.model.js';
-
-/**
- * The one place an error becomes a response: `{ status: 'error', message }`. An HTTPException is thrown on purpose, so its
- * message is exposed (Hono has no `expose` flag); anything else is hidden and logged.
- */
-export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
-  if (error instanceof HTTPException) {
-    const status = error.status;
-    const log = status >= 500 ? logger.error.bind(logger) : logger.warn.bind(logger);
-    log({ err: error, status, method: c.req.method, path: c.req.path }, error.message);
-    return c.json({ status: 'error', message: error.message }, status);
-  }
-  logger.error({ err: error, method: c.req.method, path: c.req.path }, 'Unhandled error');
-  return c.json({ status: 'error', message: 'Internal Server Error' }, 500);
-};
-
-/** Forwards an unmatched route to the error handler in the standard shape. */
-export const notFoundHandler: NotFoundHandler<AppEnv> = (c) => {
-  throw new HTTPException(404, { message: `Not Found: ${c.req.method} ${c.req.path}` });
-};
 ```
 
 `tests/utils/http-mocks.ts`:
@@ -196,9 +175,9 @@ export async function listEntities(c: Context<AppEnv>): Promise<Response> {
     }
   }
   const sort =
-    typeof query.sortField === 'string'
-      ? { field: query.sortField, direction: query.sortDirection === 'DESC' ? 'DESC' : 'ASC' }
-      : undefined;
+    query.sortField === undefined && query.sortDirection === undefined
+      ? undefined
+      : { field: query.sortField, direction: query.sortDirection ?? 'ASC' };
   const parsed = listEntityInputSchema.safeParse({
     filter,
     sort,
@@ -303,41 +282,6 @@ export async function getHealth(c: Context<AppEnv>): Promise<Response> {
 }
 ```
 
-`tests/utils/test-server.ts`: the real app on an ephemeral port for API tests.
-
-```ts
-import type { AddressInfo } from 'node:net';
-import { serve } from '@hono/node-server';
-import type { Hono } from 'hono';
-import type { AppEnv } from '../../src/models/app-context.model.js';
-
-export interface TestServer {
-  readonly baseUrl: string;
-  readonly close: () => Promise<void>;
-}
-
-/** Serves the app on an ephemeral port. */
-export function serveApp(app: Hono<AppEnv>): Promise<TestServer> {
-  return new Promise((resolve) => {
-    const server = serve({ fetch: app.fetch, port: 0 }, (info: AddressInfo) => {
-      resolve({
-        baseUrl: `http://localhost:${String(info.port)}`,
-        close: () =>
-          new Promise<void>((done, fail) => {
-            server.close((error) => {
-              if (error) {
-                fail(error);
-              } else {
-                done();
-              }
-            });
-          })
-      });
-    });
-  });
-}
-```
-
 ## Conventions
 
 - **The server entry builds the DAOs once** and hands them to `createApp(context)`; adding a resource adds its DAO
@@ -345,14 +289,12 @@ export function serveApp(app: Hono<AppEnv>): Promise<TestServer> {
 - **Handlers reach data only through `c.var.context`**; they import no table or DAO class, and only the health probe
   imports from `drizzle-orm`.
 - **A DAO's `NotFoundError` becomes a 404 `HTTPException`** in the handler, as does a `null` from `get`.
-- **Every error answers through `app.onError`** in the REST API concept's error body; an `HTTPException` is thrown on
-  purpose and shown, anything else is a logged 500.
 - **Request bodies are validated against the resource's strict `drizzle-zod` schemas** with `safeParse`; an update
   merges the path id into the body before validating.
 - **Handler tests go through `createApp(stub.context).request(…)`**, so they cover the route table as well.
 
 ## Verify it is wired
 
-- Only `server.ts` constructs a pool or a DAO; no handler but the health probe imports from `drizzle-orm`.
+- Only `server.ts` constructs a database client or a DAO; no handler but the health probe imports from `drizzle-orm`.
 - Every DAO method that can miss a row is mapped to a 404 by its handler.
 - `POST` with a malformed body answers 400, with an unknown field 400, over the limit 413, all as `{ status: 'error', message }`.

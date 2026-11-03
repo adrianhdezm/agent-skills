@@ -39,8 +39,7 @@ vite preview ─► the build, in workerd, locally
 
 ## Conventions
 
-- **`pnpm dev` runs the Worker in workerd**; `pnpm preview` runs the production build in workerd; `pnpm cf:deploy` ships
-  it.
+- **`pnpm dev` runs the Worker in workerd; `pnpm preview` runs the production build in workerd.**
 - **Vite builds the Worker; Wrangler only deploys it.**
 
 ## Verify it is wired

@@ -33,6 +33,7 @@ it is layered when it arrives.
 - [Vite](../technologies/vite.md)
 - [React Router + Vite](../integrations/react-router-vite.md)
 - [Tailwind](../technologies/tailwind.md)
+- [React Router + Tailwind](../integrations/react-router-tailwind.md)
 - [shadcn](../technologies/shadcn.md)
 - [React Router + shadcn/ui](../integrations/react-router-shadcn.md)
 - [Hono](../technologies/hono.md)
@@ -104,7 +105,7 @@ my-app/
 | `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                                                                                                        |
 | dependencies         | the React Router set and the shadcn/ui packages from their docs; `hono`, `@hono/node-server`                                                                                                                                                                                                                                                     |
 | devDependencies      | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `@types/node@24`, and the pinned `typescript`                                                                                |
-| configs              | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; `tsconfig.node.json` also holds `server.ts`, under Node's rules (`module: "NodeNext"`, `allowImportingTsExtensions`), and Vite takes the SSR input from the Hono + Node integration                                                             |
+| configs              | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; `tsconfig.node.json` also holds `server.ts`, under Node's rules (`module: "NodeNext"`, `allowImportingTsExtensions`), and Vite takes the SSR input from the React Router + Vite integration                                                             |
 | `.env.example`       | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `NODE_ENV=development`, `APP_NAME=<App name>`; with authentication `AUTH_SECRET=` (empty) and `BETTER_AUTH_URL=http://localhost:3000`; with file storage `RUSTFS_PORT=9000`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (empty), `S3_BUCKET=app-files` |
 | `docker-compose.yml` | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the React Router + Docker Compose `app` service                                                                                                                                                                                                                     |
 | `Dockerfile`         | React Router + Docker Compose's two stages                                                                                                                                                                                                                                                                                                       |

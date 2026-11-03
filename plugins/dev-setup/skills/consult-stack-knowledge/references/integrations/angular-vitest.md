@@ -43,7 +43,6 @@ Analog compiles only tsconfig.spec.json's program
   fail with `Failed to resolve import "@oxc-project/runtime/helpers/decorate"`, browser tests with `NG0950` / `NG0951`,
   and Analog's warning "… contains Angular decorators but is not in the TypeScript program" points at the include list,
   which is not the cause. Leave `noEmit` out of every Angular tsconfig; the `typecheck` script passes `--noEmit`.
-- **A test config named `vite.config.*`** is read by Storybook too: name it `vitest.config.mts`.
 - **The first browser run can report "Vite unexpectedly reloaded a test"** while Vite pre-bundles; run it again.
 
 ## Conventions

@@ -5,8 +5,8 @@ connects: [drizzle, postgres]
 # Drizzle + Postgres
 
 Drizzle over Postgres: the `node-postgres` client on the shared pool, the `postgresql` dialect for migrations, Postgres
-column types in the schema files, and Testcontainers for the data layer's tests. React Router on Node and the Angular
-full stack use it.
+column types in the schema files, and Testcontainers for the data layer's tests. React Router on Node, REST API on
+Node, Hono API on Node and the Angular full stack use it.
 
 ## The seam
 
@@ -26,20 +26,20 @@ tests: Testcontainers postgres:17-alpine ─► Drizzle migrator ─► DAO suit
 | `drizzle.config.ts` | `dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset), `migrations.schema: 'public'`                                                                                               |
 | scripts             | the Drizzle doc's, reading `DATABASE_URL`                                                                                                                                                                         |
 | schema              | `pgTable`; `uuid('id').primaryKey().defaultRandom()`; `timestamp(…, { withTimezone: true }).defaultNow()`; `text`                                                                                                 |
-| Vitest projects     | `unit` (no database), `db` and `api` (Testcontainers; `hookTimeout: 120_000`, `testTimeout: 30_000` for the first image pull); `test` runs `--project unit`, `test:integration` runs `--project db --project api` |
+| test timeouts       | the projects that start a container set `hookTimeout: 120_000` and `testTimeout: 30_000`, for the first image pull                                                                                                 |
 | `allowBuilds`       | `cpu-features`, `protobufjs`, `ssh2` set to `false`: optional native dependencies of Testcontainers that the local Docker socket never needs                                                                      |
 
 ## Reference code
 
 The one pool, its idle-error listener, and the Drizzle client on it; the caller keeps `pool` to close it on shutdown
-(`app/db/client.ts` in React Router, with `~/` imports).
+(`app/db/client.ts` in React Router, with `~/` imports). A stack with a logger logs the idle error through it instead
+of `console.error`. A server that exits on `SIGTERM` without a shutdown handler leaves the pool to the database.
 
 `src/db/client.ts`:
 
 ```ts
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { logger } from '../logger.js';
 import { schema } from './schema.js';
 
 export type DbClient = NodePgDatabase<typeof schema>;
@@ -48,7 +48,7 @@ export type DbClient = NodePgDatabase<typeof schema>;
 export function createDbClient(connectionString: string): { pool: Pool; db: DbClient } {
   const pool = new Pool({ connectionString });
   pool.on('error', (error) => {
-    logger.error({ err: error }, 'Idle database client error');
+    console.error('Idle database client error', error);
   });
   return { pool, db: drizzle(pool, { schema }) };
 }
@@ -362,6 +362,8 @@ export async function startTestDb(): Promise<TestDb> {
 - **drizzle-kit runs under `node --env-file`** with the `postgresql` dialect.
 - **Each DAO suite gets its own Testcontainers Postgres**, migrated by the Drizzle migrator; the end-to-end suite its
   own database in the Compose service.
+- **Three renders the translator's tests meet**: `PgDialect.sqlToQuery` returns `{ sql, params, typings }`, each nested
+  `and` / `or` is parenthesised on its own, and an empty `not` renders as `false`.
 
 ## Verify it is wired
 
