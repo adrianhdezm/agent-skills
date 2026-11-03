@@ -33,8 +33,8 @@ from the moment a project adds sign-in.
 - **The secret is generated, never committed, and stable.** It lives in the git-ignored env file or the platform's
   secret store, and is the same across environments: a new secret ends every session.
 - **Tests cover what an attacker would try**: a rejected credential shows its error without saying which field was
-  wrong, the redirect target survives a failed attempt and is sanitised, and an anonymous request to a protected route
-  is sent to login.
+  wrong and without the password in the page, the redirect target survives a failed attempt and is sanitised, and an
+  anonymous request to a protected route is sent to login.
 
 ## Required values
 
