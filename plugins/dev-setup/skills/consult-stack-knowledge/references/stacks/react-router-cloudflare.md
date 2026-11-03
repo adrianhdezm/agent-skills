@@ -58,12 +58,6 @@ shadcn/ui. No database is wired: D1, R2 and KV arrive later as bindings.
 - [React Router + Vitest](../integrations/react-router-vitest.md)
 - [Cloudflare Workers + Vitest](../integrations/cloudflare-workers-vitest.md)
 
-## Examples
-
-- [React Router home](../examples/react-router-home.md): the home route reading `APP_NAME` from the bindings
-- [Sign in](../examples/sign-in.md) — optional (authentication): sign up, log in, a protected account page, log out
-- [File upload](../examples/file-upload.md) — optional (file-storage): upload, list, download and delete, per user; needs authentication too
-
 ## Shape
 
 ```
@@ -341,6 +335,75 @@ import '../app/app.css';
 - **Run `pnpm cf-typegen`** once the configs are written, before the app code.
 - **Add the shadcn primitives after the app files.**
 
+## Starter
+
+What a fresh scaffold ships, built by applying the docs above: the home route always, and each optional part's
+starter when its group is picked. The user's own routes grow beside them in the same shape.
+
+### Home
+
+| What             | Value                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| route            | `/`, `app/routes/home.tsx`, declared in `app/routes.ts`                                      |
+| loader           | returns `` `Welcome to ${APP_NAME}` ``, reading `APP_NAME` through `context.get(appContext)` |
+| `APP_NAME`       | the app name in Title Case, from `vars.APP_NAME` in `wrangler.jsonc`                         |
+| `appContext`     | `{ cloudflare: { env: Env; ctx: Context['executionCtx'] } }`                                 |
+| page             | the message as the heading, a short paragraph, an outline `Button`                           |
+| primitives       | `button`, added with the shadcn CLI                                                          |
+| unknown path     | 404 through the root `ErrorBoundary`                                                         |
+| with `storybook` | a story beside each primitive (`app/components/ui/button.stories.tsx` and the rest)          |
+
+| Tier          | File                              | Covers                                                 |
+| ------------- | --------------------------------- | ------------------------------------------------------ |
+| unit, browser | `tests/unit/lib/utils.test.ts`    | `cn` merges classes, imported through `~/`             |
+| unit, browser | `tests/unit/routes/home.test.tsx` | the heading shows the message a stubbed loader returns |
+
+### Sign in, with `authentication`
+
+Sign up, log in, a protected page that knows who is signed in, and log out. Signing up redirects to `/login` (no
+automatic sign-in); an anonymous request for `/account` goes to `/login?redirectTo=%2Faccount`.
+
+| What           | Value                                                                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| routes         | `api/auth/*` (splat, `routes/auth.tsx`), `/signup`, `/login`, `/logout` (action only), and `/account` under the protected layout                      |
+| signup fields  | `name` (required), `email` (an email), `password` (at least 8 characters)                                                                             |
+| login fields   | `email`, `password`; `redirectTo` from the query string                                                                                               |
+| account page   | the heading "Account" and "Signed in as `<email>`", with a "Sign out" button posting to `/logout`                                                     |
+| auth tables    | `users`, `sessions`, `accounts`, `verifications` (Better Auth's `user`, `session`, `account`, `verification`), with uuid ids, in the `init` migration |
+| safe redirect  | `safeRedirectTo` in `app/lib/utils.ts`                                                                                                                |
+| primitives     | `input`, `label`, `card` beside `button`                                                                                                              |
+| wrong password | the login page again with "Invalid email or password"                                                                                                 |
+
+| Tier          | File                                   | Covers                                                                                                   |
+| ------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| unit, browser | `tests/unit/lib/utils.test.ts`         | `safeRedirectTo` keeps `/account`, turns `//evil.com`, `https://evil.com` and nothing into `/`           |
+| unit, browser | `tests/unit/routes/login.test.tsx`     | the form's labelled fields; an action error shows on the form; `redirectTo` is kept on the form's action |
+| unit, browser | `tests/unit/routes/protected.test.tsx` | an anonymous request for a route under the layout is redirected to `/login?redirectTo=…`                 |
+| unit, browser | `tests/unit/routes/account.test.tsx`   | the email a stubbed loader returns, and the Sign out button                                              |
+
+### File upload, with `file-storage`
+
+Upload, list, download and delete files, each visible only to the user who uploaded it.
+
+| What       | Value                                                                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| store      | the R2 bucket binding (Cloudflare R2)                                                                                                                                                            |
+| `files`    | the `files` table in the app's Drizzle schema, with its generated migration: `id`, unique `key`, `filename`, `contentType`, `size`, `ownerId` (indexed, the user's id), `createdAt`, `updatedAt` |
+| service    | `app/services/files.service.ts`, built by the server entry onto `appContext`                                                                                                                     |
+| key        | `<ownerId>/<uuid>`                                                                                                                                                                               |
+| size limit | 10 MB per file; a larger upload answers 413                                                                                                                                                      |
+| routes     | `/files` (list and upload form), `/files/:id` (details, delete), `/files/:id/download`, all under the protected layout, in `routes/files.tsx`, `routes/file.tsx`, `routes/file-download.tsx`     |
+| upload     | `multipart/form-data`, field `file`; redirects to the file's page                                                                                                                                |
+| list       | the signed-in user's files, newest first, as the data access paginated result                                                                                                                    |
+| delete     | redirects to `/files`                                                                                                                                                                            |
+
+The integration tests run in workerd against the local D1 database and R2 bucket.
+
+| Tier          | File                                      | Covers                                                                                                              |
+| ------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| integration   | `tests/integration/files.service.test.ts` | upload writes both sides; a failing insert leaves no object; delete removes both; another owner's file is not found |
+| unit, browser | `tests/unit/routes/files.test.tsx`        | the list a stubbed loader returns, the labelled upload field, the empty state                                       |
+
 ## Conventions
 
 ### Layout
@@ -365,6 +428,13 @@ import '../app/app.css';
 
 ## Smoke test
 
-`pnpm build`, then `pnpm exec vite preview --port <free port>`, runs the build in workerd: `/` renders the welcome
-heading (proving the loader read `APP_NAME` from the bindings), the stylesheet it links answers 200, and an unknown
-path answers 404.
+- **The build**: `pnpm build`, then `pnpm exec vite preview --port <free port>`, runs it in workerd: `/` renders the
+  welcome heading (proving the loader read `APP_NAME` from the bindings), the stylesheet it links answers 200, and an
+  unknown path answers 404.
+- **With authentication**, against the built app on an empty, migrated database: `/account` redirects anonymously,
+  sign-up then log-in sets a cookie and lands on `/account` with the email shown, a wrong password stays on the login
+  page with the error and no password in the HTML, `//evil.com` as `redirectTo` lands on `/`, and log-out ends the
+  session.
+- **With file storage**, signed in: an upload lands on its page and in the list, the download returns the same bytes
+  and content type, a second user gets 404 for it, and delete removes it from the list and the store.
+- **With Storybook**: `pnpm build-storybook` lists the primitives' stories in `storybook-static/index.json`.

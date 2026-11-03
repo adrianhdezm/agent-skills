@@ -1583,55 +1583,6 @@
         "react-router"
       ],
       "kind": "example"
-    },
-    "file-upload": {
-      "id": "file-upload",
-      "title": "File upload",
-      "file": "examples/file-upload.md",
-      "needs": [
-        [
-          "react-router",
-          "cloudflare-r2",
-          "drizzle",
-          "better-auth"
-        ],
-        [
-          "react-router",
-          "s3-storage",
-          "drizzle",
-          "better-auth"
-        ]
-      ],
-      "kind": "example",
-      "unless": []
-    },
-    "react-router-home": {
-      "id": "react-router-home",
-      "title": "React Router home",
-      "file": "examples/react-router-home.md",
-      "needs": [
-        [
-          "react-router",
-          "hono",
-          "shadcn"
-        ]
-      ],
-      "kind": "example",
-      "unless": []
-    },
-    "sign-in": {
-      "id": "sign-in",
-      "title": "Sign in",
-      "file": "examples/sign-in.md",
-      "needs": [
-        [
-          "react-router",
-          "better-auth",
-          "drizzle"
-        ]
-      ],
-      "kind": "example",
-      "unless": []
     }
   },
   "stacks": {
@@ -3196,28 +3147,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "react-router-home",
-          "optional": false
-        },
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "sign-in",
-          "optional": true,
-          "group": "authentication"
-        },
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "file-upload",
-          "optional": true,
-          "group": "file-storage"
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the Worker: builds the context per request and hands it to React Router",
@@ -3571,28 +3501,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "react-router-home",
-          "optional": false
-        },
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "sign-in",
-          "optional": true,
-          "group": "authentication"
-        },
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "file-upload",
-          "optional": true,
-          "group": "file-storage"
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "runs `workers/app.ts`: Vite middleware in development, the build in production",
@@ -3717,9 +3626,6 @@
       "drizzle-s3-storage"
     ],
     "example": [
-      "react-router-home",
-      "sign-in",
-      "file-upload",
       "entity-crudl"
     ],
     "stack": [
