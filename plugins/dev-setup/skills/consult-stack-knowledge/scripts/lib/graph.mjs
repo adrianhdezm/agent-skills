@@ -202,6 +202,9 @@ export function loadGraph(root) {
   const byKind = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, example: graph.examples, stack: graph.stacks };
   const problems = [];
   for (const [dir, kind] of Object.entries(LAYERS)) {
+    if (!existsSync(join(root, dir))) {
+      continue;
+    }
     for (const file of readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).sort()) {
       const id = basename(file, '.md');
       const path = join(root, dir, file);

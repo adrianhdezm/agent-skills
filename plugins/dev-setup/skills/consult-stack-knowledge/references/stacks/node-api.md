@@ -35,10 +35,6 @@ its own, for an API that several clients use.
 - [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 
-## Examples
-
-- [Entity CRUDL](../examples/entity-crudl.md): its resource and its API part
-
 ## Shape
 
 ```
@@ -240,6 +236,67 @@ export default defineConfig({
 - **Generate the `init` migration before the first `compose:up`**: the image carries `db/migrations/`, and the
   `migrate` service applies it before the API starts. It produces exactly one migration, committed with the scaffold.
 
+## Starter
+
+What a fresh scaffold ships: one resource, `entity`, listed with filter, sort and pagination, shown, created, edited and
+deleted, the template every later resource copies. Build it by applying the docs above, and take from here what they
+leave open: names, values, behaviours and tests. When the user names the first resource, it takes this one's name and
+keeps its fields, routes and tests.
+
+### The resource
+
+| Field         | Type                     | Rules                    | Filter           | Sort |
+| ------------- | ------------------------ | ------------------------ | ---------------- | ---- |
+| `id`          | UUID, generated          |                          | id operators     |      |
+| `name`        | text                     | required, 1 to 200 chars | string operators | yes  |
+| `description` | text or `null`           | up to 2000 chars         | string operators |      |
+| `createdAt`   | timestamp, set on insert |                          | date operators   | yes  |
+| `updatedAt`   | timestamp                |                          | date operators   | yes  |
+
+The default sort is `createdAt DESC`. An update needs at least one field besides `id`. These are Drizzle + Postgres's
+reference code.
+
+### API
+
+| Piece       | What it is                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| context     | `AppContext { db: DbClient; entityDao: EntityDao }`                                                                                                                         |
+| controllers | `home` (`getHome`: `{ service: 'api', status: 'running' }`), `health` (`getHealth`), `entity` (`listEntities`, `getEntity`, `createEntity`, `updateEntity`, `deleteEntity`) |
+| mounts      | `GET /`, `GET /health`, `GET` and `POST /entities`, `GET`, `PATCH` and `DELETE /entities/:id`                                                                               |
+| database    | the `entity` table arrives in the scaffold's `init` migration                                                                                                               |
+
+The routes, their answers and their errors:
+
+| Route                  | Success                                                | Errors                                                                      |
+| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `GET /`                | 200 `{ service, status }`                              | —                                                                           |
+| `GET /health`          | 200 `{ status: 'ok', db: 'up', latencyMs, timestamp }` | 503 `Database connection failed`                                            |
+| `GET /entities`        | 200 `PaginatedResult<Entity>`                          | 400 `Unknown query params: …`, `filter must be valid JSON`, `Invalid query` |
+| `POST /entities`       | 201 the created row                                    | 400 `Invalid body`; 400 malformed JSON, 413 over 100 kB                     |
+| `GET /entities/:id`    | 200 the row                                            | 400 `Invalid id`; 404 `Entity not found: <id>`                              |
+| `PATCH /entities/:id`  | 200 the updated row                                    | 400 `Invalid id` / `Invalid body` (including no updatable field); 404       |
+| `DELETE /entities/:id` | 204, no body                                           | 400 `Invalid id`; 404                                                       |
+| anything else          | —                                                      | 404 `Not Found: <METHOD> <path>`                                            |
+
+### API tests
+
+The tests are written from these tables; the utilities and the code under test are reference code.
+
+**Test utilities** (`tests/utils/`): `http-mocks.ts`, `test-server.ts` and `pg-container.ts` are the integration's and
+Drizzle + Postgres's reference code; `entity-seed.ts` (`day(n)`, a fixed UTC day in 2026; `seedEntities(db, rows)`
+inserting directly so tests control timestamps; `seedCanonical(db)`: `alpha` to `echo` on consecutive days, `charlie`
+with a `null` description).
+
+| Tier | Files                                                                   | Covers                                                                                                                                                             |
+| ---- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| unit | `unit/helpers/dao.helper.test.ts`                                       | every operator and kind through the SQL `PgDialect` renders, escaped LIKE patterns, empty `in`, nested `and`/`or`/`not`, the sort tie-breaker, `toPaginatedResult` |
+| unit | `unit/helpers/list-input.helper.test.ts`, `query-parser.helper.test.ts` | the builders' accepts and rejects against an ad-hoc config and their limits; first-value-wins, empty values dropped                                                |
+| unit | `unit/db/schemas/entity.schema.test.ts`                                 | the entity's own wiring: its columns, date coercion, its sort allowlist                                                                                            |
+| unit | `unit/controllers/*.test.ts`                                            | list decoding and every 400, 404 mapping, 201/204, an unexpected error forwarded; health `ok` and 503 with `cause`                                                 |
+| unit | `unit/middlewares/error.middleware.test.ts`                             | exposed 4xx at `warn`, hidden 500 at `error`, an unexposed http error hidden, headers already sent                                                                 |
+| DAO  | `db/entity.dao.test.ts`                                                 | every method's happy path and edges; `list` pagination, sort, each filter kind, combinations, hostile input as data                                                |
+| API  | `api/entity.api.test.ts`                                                | a real query string from seeded rows with the right totals, the CRUD round trip, malformed JSON 400, over 100 kB 413, unmatched path 404                           |
+
 ## Conventions
 
 ### Layout
@@ -268,8 +325,8 @@ export default defineConfig({
 
 ### HTTP contract
 
-Routes follow the REST API concept; the `entity` resource's routes, answers and errors are the Entity CRUDL example's,
-the template every later resource copies.
+Routes follow the REST API concept; the `entity` resource's routes, answers and errors are the Starter's, the template
+every later resource copies.
 
 ### Testing tiers
 

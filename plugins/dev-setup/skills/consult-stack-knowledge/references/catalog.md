@@ -113,7 +113,6 @@ has something.
 
 | Example                                  | What it must show                                                             | Used by                                        |
 | ---------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
-| [Entity CRUDL](examples/entity-crudl.md) | one resource end to end: table, DAO, API, contract, slices, pages, tests, e2e | both Angular stacks and both REST APIs on Node |
 
 Each has **Demonstrates** (each part and the docs it applies), **Data** or **The resource** (the values it depends on),
 **Behaviour** (what it does, and the contracts tests rely on: routes, names, answers), **Tests** (the behaviours each
