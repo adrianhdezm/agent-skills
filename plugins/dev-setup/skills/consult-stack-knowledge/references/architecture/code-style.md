@@ -26,6 +26,8 @@ own rules; this is the habit behind them.
   check, or the code is restructured so it needs no proof; tests may assert.
 - **Closed sets are literal values**, not a separate runtime construct, so they cost nothing and read as data.
 - **An intentionally unused name is marked as such**, so the reader and the tools know it was left on purpose.
+- **Independent async work runs concurrently**, because awaiting it one piece at a time adds up every latency for no
+  gain; a loop awaits in sequence only where order matters.
 
 ## Conventions
 
@@ -39,6 +41,7 @@ own rules; this is the habit behind them.
 - **Narrow with checks instead of casting**; tests may assert.
 - **Closed sets are literal values**, never a separate runtime construct.
 - **An intentionally unused name starts with `_`.**
+- **`Promise.all` for independent async work**; `for … of` with `await` only where order matters.
 
 ## Verify it is wired
 

@@ -38,6 +38,7 @@ my-project/
 ├── tsconfig.node.json     # tests/ and eslint.config.js
 ├── src/
 │   ├── main.ts            # the entry point, the one file with side effects
+│   ├── errors/            # error classes with a name the caller can check
 │   └── <module>.ts
 └── tests/
     └── <module>.test.ts   # one per module in src/, same name
@@ -45,15 +46,15 @@ my-project/
 
 ## Required values
 
-| What              | Value                                                                                                                                                                                                                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports             | none: nothing listens                                                                                                                                                                                                                                                                 |
-| scripts           | `start` `node --env-file=.env src/main.ts`; `dev` `node --import=tsx --watch --env-file=.env src/main.ts`; `typecheck` `tsc -b`; `lint` `eslint . --max-warnings 0`; `test` `vitest run`; `format`, `format:check`                                                                    |
-| `allowBuilds`     | `esbuild`                                                                                                                                                                                                                                                                             |
-| devDependencies   | `@types/node@24`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, `tsx`, `vitest@5`, and the pinned `typescript`                                                                                                                                   |
-| configs           | the tsconfigs and `eslint.config.js` under Reference code; past the shared rules, ESLint adds `consistent-type-assertions: never` and `max-classes-per-file: 1`, and `consistent-type-imports` takes `{ prefer: 'type-imports' }` alone (Node + TypeScript says why)                  |
-| `.prettierignore` | `node_modules`, `dist`, `pnpm-lock.yaml`                                                                                                                                                                                                                                              |
-| `.gitignore`      | one comment per group: dependencies (`node_modules`); output (`out`, `dist`, `*.tgz`); coverage (`coverage`, `*.lcov`); logs (`logs`, `*.log`); dotenv (`.env`, `.env.*.local`, `.env.local`); caches (`.eslintcache`, `.cache`, `*.tsbuildinfo`); IDEs and OS (`.idea`, `.DS_Store`) |
+| What              | Value                                                                                                                                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ports             | none: nothing listens                                                                                                                                                                                                                                                                                                                      |
+| scripts           | `start` `node --env-file=.env src/main.ts` (a package is run where it is checked out, so `start` loads `.env` too: there is no platform to hand it an environment); `dev` `node --import=tsx --watch --env-file=.env src/main.ts`; `typecheck` `tsc -b`; `lint` `eslint . --max-warnings 0`; `test` `vitest run`; `format`, `format:check` |
+| `allowBuilds`     | `esbuild`                                                                                                                                                                                                                                                                                                                                  |
+| devDependencies   | `@types/node@24`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, `tsx`, `vitest@5`, and the pinned `typescript`                                                                                                                                                                                        |
+| configs           | the tsconfigs and `eslint.config.js` under Reference code; past the shared rules, ESLint adds `consistent-type-assertions: never` and `max-classes-per-file: 1`, and `consistent-type-imports` takes `{ prefer: 'type-imports' }` alone (Node + TypeScript says why)                                                                       |
+| `.prettierignore` | `node_modules`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                                           |
+| `.gitignore`      | one comment per group: dependencies (`node_modules`); output (`out`, `dist`, `*.tgz`); coverage (`coverage`, `*.lcov`); logs (`logs`, `*.log`); dotenv (`.env`, `.env.*.local`, `.env.local`); caches (`.eslintcache`, `.cache`, `*.tsbuildinfo`); IDEs and OS (`.idea`, `.DS_Store`)                                                      |
 
 ## Reference code
 
@@ -121,7 +122,7 @@ import prettier from 'eslint-config-prettier/flat';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', '**/dist/**']),
+  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo']),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
@@ -182,28 +183,20 @@ export default defineConfig(
 );
 ```
 
-## Scaffold
-
-- **An empty `.env`** is created with the manifest: the scripts' `--env-file` needs it to exist.
-- **Into an existing project**: move sources under `src/` and tests under `tests/`, or adjust the two `include` arrays.
-- **Growing into a workspace**: the pieces to move are exactly the ones inlined here: versions into the catalog, the
-  ESLint rules into a `tooling/eslint-config` package exporting `config({ tsconfigRootDir })`, the compiler options into
-  a `tooling/tsconfig` package with a base file, and the scripts into root `pnpm -r` rollups.
-
 ## Conventions
 
 ### Layout
 
-- **`src/main.ts` is the only file that does something when imported**: it reads the environment, builds what it needs
-  and runs. Every other file under `src/` exports functions or classes.
-- **A test file per source file**, same base name, in `tests/`, importing from `../src/….ts`. `main.ts` has none: its
-  behaviour lives, and is tested, in the modules it calls.
-- **Errors are classes** with a name the caller can check, under `src/errors/`.
+| Path                     | Holds                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| `src/main.ts`            | the entry point, the one file with side effects (Node says why)                            |
+| `src/<module>.ts`        | exports only                                                                               |
+| `src/errors/`            | error classes with a name the caller can check                                             |
+| `tests/<module>.test.ts` | one per module in `src/`, same base name, importing from `../src/….ts`; `main.ts` has none |
 
 ### Values and control flow
 
 - **`undefined`, not `null`, for absence**, except where an external format (JSON, a provider API) says otherwise.
-- **`Promise.all` for independent async work**; `for … of` with `await` only where order matters.
 
 ### Lint
 
@@ -215,6 +208,16 @@ export default defineConfig(
 
 `pnpm start` runs the program, `pnpm dev` reruns it on change; `pnpm typecheck`, `pnpm lint`, `pnpm test` and
 `pnpm format:check` are the four required checks.
+
+### Into an existing project
+
+Move sources under `src/` and tests under `tests/`, or adjust the two `include` arrays.
+
+### Growing into a workspace
+
+The pieces to move are exactly the ones inlined here: versions into the catalog, the ESLint rules into a
+`tooling/eslint-config` package exporting `config({ tsconfigRootDir })`, the compiler options into a `tooling/tsconfig`
+package with a base file, and the scripts into root `pnpm -r` rollups.
 
 ## Smoke test
 

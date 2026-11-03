@@ -43,6 +43,7 @@ The test runner: one config of named projects, an environment per kind of test, 
   `resolve.external`, or start a second runtime.
 - **Browser mode caches inside a `node_modules/` beside the config**: ignore `node_modules/` at any depth, not
   `/node_modules/`.
+- **Browser mode opens its API server on port 63315**, beside the dev server's: count it among the ports to check.
 
 ## Conventions
 

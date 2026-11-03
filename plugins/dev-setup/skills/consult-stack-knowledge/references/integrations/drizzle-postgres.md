@@ -79,6 +79,47 @@ try {
 }
 ```
 
+`tests/utils/entity-seed.ts`, the seed helper every DAO suite and API suite uses:
+
+```ts
+import type { DbClient } from '../../src/db/client.js';
+import { entity } from '../../src/db/schemas/entity.schema.js';
+
+/** A fixed UTC day in 2026, so tests control timestamps. */
+export function day(n: number): Date {
+  return new Date(Date.UTC(2026, 0, n, 12, 0, 0));
+}
+
+export interface SeedEntity {
+  readonly name: string;
+  readonly description?: string | null;
+  readonly createdAt?: Date;
+  readonly updatedAt?: Date;
+}
+
+/** Insert rows directly, bypassing the DAO, so timestamps are the test's own. */
+export async function seedEntities(db: DbClient, rows: readonly SeedEntity[]) {
+  if (rows.length === 0) {
+    return [];
+  }
+  return db
+    .insert(entity)
+    .values(rows.map((row) => ({ ...row, updatedAt: row.updatedAt ?? row.createdAt })))
+    .returning();
+}
+
+/** `alpha` to `echo` on consecutive days; `charlie` has a null description. */
+export async function seedCanonical(db: DbClient) {
+  return seedEntities(db, [
+    { name: 'alpha', description: 'first letter', createdAt: day(1) },
+    { name: 'bravo', description: 'second letter', createdAt: day(2) },
+    { name: 'charlie', description: null, createdAt: day(3) },
+    { name: 'delta', description: 'fourth letter', createdAt: day(4) },
+    { name: 'echo', description: 'fifth letter', createdAt: day(5) }
+  ]);
+}
+```
+
 The engine-specific files of the Drizzle doc's DAO layer: the translator, the resource schema and DAO, and the
 Testcontainers database the DAO suites run on. `entity.schema.ts` and `entity.dao.ts` name a resource: copy them for
 each new one.

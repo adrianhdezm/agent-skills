@@ -69,20 +69,20 @@ my-api/
 
 `<App name>` is the repo name in Title Case; the database name defaults to `app`.
 
-| What                   | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports                  | 5432 (Postgres, moved with `DB_PORT`), the API's `PORT` (default 3000)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `pnpm-workspace.yaml`  | `allowBuilds` with `esbuild: true` and `cpu-features`, `protobufjs`, `ssh2` all `false`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| scripts                | `dev` `node --env-file=.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname`; `build` `tsc -p tsconfig.app.json`; `start` `node dist/server.js`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `.`; `db:generate`, `db:migrate` as the Drizzle doc says; `compose:up` `docker compose up --build -d --wait`, `compose:down` |
-| dependencies           | `hono`, `@hono/node-server`, `zod`, and the Pino, Drizzle and Postgres docs' runtime packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| devDependencies        | the Pino, Drizzle and Drizzle + Postgres dev packages; `tsx`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the pinned `typescript`                                                                                                                                                                                                                                                                                                                                                                              |
-| configs                | the tsconfigs, `eslint.config.js` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres. ESLint turns `@typescript-eslint/require-await` off for `*.controller.ts`, because every handler is `async` for one shape; Vitest sets `env: { LOG_LEVEL: 'silent' }` at the root                                                                                                                                                                                                                                                                                      |
-| `.env.example`         | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `docker-compose.yml`   | one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and Node + Docker Compose's `migrate` and `api` services, in that order                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `.gitignore`           | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `.prettierignore`      | `node_modules`, `dist`, `db/migrations`, `db/data`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `Dockerfile`, services | Node + Docker Compose's compiled API image and its `migrate` and `api` services, as given                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `.dockerignore`        | `**/node_modules`, `dist`, `.git`, `.env`, `db/data`, `coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| What                   | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ports                  | 5432 (Postgres, moved with `DB_PORT`), the API's `PORT` (default 3000)                                                                                                                                                                                                                                                                                                                                                                                              |
+| `pnpm-workspace.yaml`  | `allowBuilds` with `esbuild: true` and `cpu-features`, `protobufjs`, `ssh2` all `false`                                                                                                                                                                                                                                                                                                                                                                             |
+| scripts                | `dev` `node --env-file=.env --import=tsx --watch src/server.ts` piped as Pino says; `build` `tsc -p tsconfig.app.json`; `start` `node dist/server.js`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check`; `db:generate`, `db:migrate` as the Drizzle doc says; `compose:up`, `compose:down` |
+| dependencies           | `hono`, `@hono/node-server`, `zod`, and the Pino, Drizzle and Postgres docs' runtime packages                                                                                                                                                                                                                                                                                                                                                                       |
+| devDependencies        | the Pino, Drizzle and Drizzle + Postgres dev packages; `tsx`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the pinned `typescript`                                                                                                                                                                                                                                               |
+| configs                | the tsconfigs, `eslint.config.js` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres. ESLint turns `@typescript-eslint/require-await` off for `*.controller.ts`, because every handler is `async` for one shape                                                                                                                                                                                                               |
+| `.env.example`         | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                        |
+| `docker-compose.yml`   | one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and Node + Docker Compose's `migrate` and `api` services, in that order                                                                                                                                                                                                                                                                                            |
+| `.gitignore`           | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.DS_Store`, and `db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                             |
+| `.prettierignore`      | `node_modules`, `dist`, `db/migrations`, `db/data`, `pnpm-lock.yaml`                                                                                                                                                                                                                                                                                                                                                                                                |
+| `Dockerfile`, services | Node + Docker Compose's compiled API image and its `migrate` and `api` services, as given                                                                                                                                                                                                                                                                                                                                                                           |
+| `.dockerignore`        | `**/node_modules`, `dist`, `.git`, `.env`, `db/data`, `coverage`                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Reference code
 
@@ -137,11 +137,10 @@ The config files as a fresh scaffold writes them; the tables above say why each 
     // Environment, modules, output
     "composite": false,
     "noEmit": true,
-    "outDir": null,
     "rootDir": ".",
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "drizzle.config.ts", "vitest.config.ts"]
+  "include": ["drizzle.config.ts", "vitest.config.ts", "tests/**/*.ts"]
 }
 ```
 
@@ -150,12 +149,21 @@ The config files as a fresh scaffold writes them; the tables above say why each 
 ```js
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
-import eslintConfigPrettier from 'eslint-config-prettier/flat';
+import prettier from 'eslint-config-prettier/flat';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default defineConfig(
-  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', 'dist/**', 'db/**', 'eslint.config.js']),
+export default defineConfig([
+  globalIgnores([
+    '**/node_modules/**',
+    '**/coverage/**',
+    '**/.cache/**',
+    '**/*.tsbuildinfo',
+    'dist/**',
+    'db/**',
+    // No TypeScript project includes the ESLint config itself
+    'eslint.config.js'
+  ]),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
@@ -163,13 +171,13 @@ export default defineConfig(
     languageOptions: {
       globals: globals.node,
       parserOptions: {
-        // src/ belongs to tsconfig.app.json; tests and config files to tsconfig.node.json.
+        // src/ belongs to tsconfig.app.json; tests and config files to tsconfig.node.json
         projectService: true,
         tsconfigRootDir: import.meta.dirname
       }
     }
   },
-  eslintConfigPrettier,
+  prettier,
   {
     rules: {
       // Correctness
@@ -198,16 +206,16 @@ export default defineConfig(
     }
   },
   {
-    // Every handler is async for one shape, even where nothing is awaited.
+    // Every handler is async for one shape, even when nothing is awaited
     files: ['**/*.controller.ts'],
     rules: { '@typescript-eslint/require-await': 'off' }
   },
   {
-    // A describe holds every case for one module.
+    // A describe holds every case for one module
     files: ['tests/**/*.ts'],
     rules: { 'max-lines-per-function': 'off', 'max-nested-callbacks': 'off', 'max-statements': 'off' }
   }
-);
+]);
 ```
 
 `vitest.config.ts`:
@@ -229,8 +237,6 @@ export default defineConfig({
 
 ## Scaffold
 
-- **Check the ports first**; stop with the user if one is taken, or set another `PORT` in `.env`.
-- **The manifest is written by the tools** (`pnpm init`, `pnpm pkg set`), with `type: "module"`.
 - **`cp .env.example .env`** once `.env.example` is written.
 - **Generate the `init` migration before the first `compose:up`**: the image carries `db/migrations/`, and the
   `migrate` service applies it before the API starts. It produces exactly one migration, committed with the scaffold.
@@ -268,11 +274,11 @@ the template every later resource copies.
 
 ### Testing tiers
 
-| Tier       | Lives in                       | Real                                   | Run                     |
-| ---------- | ------------------------------ | -------------------------------------- | ----------------------- |
-| unit       | `tests/unit/` (mirrors `src/`) | the function; DAO and HTTP stubbed     | `pnpm test`             |
-| DAO        | `tests/db/`                    | DAO, Drizzle, Postgres                 | `pnpm test:integration` |
-| end to end | `tests/api/`                   | HTTP, Hono, controllers, DAO, Postgres | `pnpm test:integration` |
+| Tier       | Lives in                       | Real                                                                           | Run                     |
+| ---------- | ------------------------------ | ------------------------------------------------------------------------------ | ----------------------- |
+| unit       | `tests/unit/` (mirrors `src/`) | the handler through `createApp(stub).request()`, so the route too; DAO stubbed | `pnpm test`             |
+| DAO        | `tests/db/`                    | DAO, Drizzle, Postgres                                                         | `pnpm test:integration` |
+| end to end | `tests/api/`                   | HTTP, Hono, controllers, DAO, Postgres                                         | `pnpm test:integration` |
 
 | Change                             | Tests                                                                         |
 | ---------------------------------- | ----------------------------------------------------------------------------- |
@@ -293,8 +299,6 @@ add the schema, controller (with a stub in `createStubContext`), DAO (with a see
 ### Before you merge
 
 - [ ] The five checks pass; `pnpm test:integration` if you touched the DAOs, schemas, controllers or `app.ts`.
-- [ ] A schema change comes with its migration, committed.
-- [ ] A change to a response's shape is a change to the API's clients, made in the same commit where they live here.
 
 ## Smoke test
 

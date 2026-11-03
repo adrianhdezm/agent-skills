@@ -53,6 +53,7 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 ├── angular.json / package.json / tsconfig{,.app,.spec,.node}.json / vitest.config.mts
 ├── pnpm-lock.yaml / pnpm-workspace.yaml
 ├── Dockerfile / nginx.conf    # Node build → Nginx, SPA fallback
+├── docker-compose.yml         # the web service
 ├── coding-conventions.md      # assembled from the stack blueprint
 └── src/
     ├── index.html / main.ts / styles.css / test-setup.ts
@@ -68,18 +69,21 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 
 ## Required values
 
-| What                | Value                                                                                                                                                                                                                                                                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports               | 4200 (`ng serve`), 6006 (Storybook)                                                                                                                                                                                                                                                                                                |
-| manifest            | the CLI's `package.json`, keeping its `name`, with `version`, `description`, `private`, `engines.node` and `packageManager` set by `pnpm pkg set`                                                                                                                                                                                  |
-| `allowBuilds`       | `esbuild: true`; `'@parcel/watcher'`, `lmdb` and `msgpackr-extract` `false` (the Angular build's optional native dependencies)                                                                                                                                                                                                     |
-| dependencies        | the CLI's Angular packages and the NgRx doc's                                                                                                                                                                                                                                                                                      |
-| devDependencies     | the Angular, NgRx and integrations' dev packages and `@playwright/test@1`; the shared tooling (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `@types/node@24`); the CLI's `typescript` replaced by the exact 6.0.x and its `vitest` by `vitest@5`; the CLI's `prettier` kept                   |
-| environments        | development: `production: false`, `appName: '<App name>'`, `apiBaseUrl` the development URL (default `http://localhost:3000`); production: `production: true`, the same `appName`, `apiBaseUrl` the production URL (default `` `${window.location.protocol}//${window.location.hostname}:3000` ``, so one build works on any host) |
-| `src/index.html`    | `<title>` is `<App name>`                                                                                                                                                                                                                                                                                                          |
-| `eslint.config.mjs` | under Reference code: the Angular + ESLint presets, selectors, overrides and ignores                                                                                                                                                                                                                                               |
-| `.prettierrc`       | shared, with the HTML override; `.prettierignore`: Angular + Prettier's list                                                                                                                                                                                                                                                       |
-| `Dockerfile`        | Nginx + Docker Compose's two stages, as Angular + Nginx says                                                                                                                                                                                                                                                                       |
+| What                 | Value                                                                                                                                                                                                                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ports                | 4200 (`ng serve`, and the Compose `web` on `WEB_PORT`), 6006 (Storybook)                                                                                                                                                                                                                                                           |
+| manifest             | the CLI's `package.json`, keeping its `name`, with `version`, `description`, `private`, `engines.node` and `packageManager` set by `pnpm pkg set`                                                                                                                                                                                  |
+| scripts              | the Angular, Angular + Vitest, Angular + Storybook and Angular + Prettier docs' scripts; `lint` `eslint .`; `compose:up`, `compose:down`                                                                                                                                                                                           |
+| `allowBuilds`        | `esbuild: true`; `'@parcel/watcher'`, `lmdb` and `msgpackr-extract` `false` (the Angular build's optional native dependencies)                                                                                                                                                                                                     |
+| dependencies         | the CLI's Angular packages and the NgRx doc's                                                                                                                                                                                                                                                                                      |
+| devDependencies      | the Angular, NgRx and integrations' dev packages and `@playwright/test@1`; the shared tooling (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `@types/node@24`); the CLI's `typescript` replaced by the exact 6.0.x and its `vitest` by `vitest@5`; the CLI's `prettier` kept                   |
+| environments         | development: `production: false`, `appName: '<App name>'`, `apiBaseUrl` the development URL (default `http://localhost:3000`); production: `production: true`, the same `appName`, `apiBaseUrl` the production URL (default `` `${window.location.protocol}//${window.location.hostname}:3000` ``, so one build works on any host) |
+| `src/index.html`     | `<title>` is `<App name>`                                                                                                                                                                                                                                                                                                          |
+| `eslint.config.mjs`  | under Reference code: the Angular + ESLint presets, selectors, overrides and ignores                                                                                                                                                                                                                                               |
+| `.prettierrc`        | shared, with the HTML override; `.prettierignore`: Angular + Prettier's list                                                                                                                                                                                                                                                       |
+| `Dockerfile`         | Nginx + Docker Compose's two stages, as Angular + Nginx says                                                                                                                                                                                                                                                                       |
+| `docker-compose.yml` | one `web` service: Nginx + Docker Compose's, `build: .`, ports `'${WEB_PORT:-4200}:80'`, with nothing to depend on                                                                                                                                                                                                                 |
+| `.gitignore`         | the CLI's, plus Storybook's and Angular + Vitest's additions                                                                                                                                                                                                                                                                       |
 
 `<App name>` is the repo name in Title Case.
 
@@ -179,7 +183,7 @@ import storybook from 'eslint-plugin-storybook';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default defineConfig(
+export default defineConfig([
   globalIgnores([
     '**/node_modules/**',
     '**/coverage/**',
@@ -193,17 +197,13 @@ export default defineConfig(
   js.configs.recommended,
   {
     files: ['**/*.ts'],
-    extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       // src/app and src/testing run in the browser (tsconfig.app.json, tsconfig.spec.json); vitest.config.mts runs on Node (tsconfig.node.json).
       globals: { ...globals.browser },
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname }
     },
-    processor: angular.processInlineTemplates
-  },
-  {
-    files: ['**/*.ts'],
-    extends: [angular.configs.tsRecommended],
+    processor: angular.processInlineTemplates,
+    extends: [tseslint.configs.recommendedTypeChecked, angular.configs.tsRecommended],
     rules: {
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }]
@@ -221,7 +221,7 @@ export default defineConfig(
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility]
   },
-  storybook.configs['flat/recommended'],
+  ...storybook.configs['flat/recommended'],
   prettier,
   {
     files: ['**/*.ts'],
@@ -264,7 +264,7 @@ export default defineConfig(
       'no-restricted-imports': ['error', { paths: [{ name: '@vitest/browser/context', message: 'Use vitest/browser.' }] }]
     }
   }
-);
+]);
 ```
 
 `vitest.config.mts`:
@@ -306,26 +306,29 @@ export default defineConfig({
 
 - **The Angular CLI creates the package**, then its cleanup, as the Angular doc says; `git init -q` in it afterwards,
   since the CLI skips git.
-- **`pnpm-workspace.yaml` is written before the first install.**
 - **Check that `@angular/compiler-cli@22`'s and typescript-eslint's TypeScript ranges overlap** before pinning.
-- **`pnpm exec playwright install chromium`** after the install, once.
 - **With Fundamental NGX**: add the example's registry components after the other installs, from the package folder,
   then run the integration's placement check.
 
 ## Conventions
 
-### Shape
+### Layout
 
-```
-<repo>/
-├── src/app/
-│   ├── pages/ layouts/ components/ components/ui/
-│   ├── models/ services/ helpers/
-│   └── store/            # app-context/, app-router/, one slice per page
-├── src/environments/      # the API base URL, per build
-├── .storybook/  Dockerfile  nginx.conf
-└── coding-conventions.md  # this file
-```
+| Path                     | Holds                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `src/app/pages/`         | one page component per route, each reading its slice and loading from its watch |
+| `src/app/layouts/`       | the layouts the routes nest in                                                  |
+| `src/app/components/`    | app components, each with a story and a browser spec                            |
+| `src/app/components/ui/` | the primitives, selectors prefixed `ui`, each with a story and a browser spec   |
+| `src/app/models/`        | the resources' types, mirroring the API's                                       |
+| `src/app/services/`      | one HTTP service per resource                                                   |
+| `src/app/helpers/`       | the list-params and filter-form helpers                                         |
+| `src/app/store/`         | `app-context/`, `app-router/`, one slice per page                               |
+| `src/environments/`      | the API base URL, per build                                                     |
+| `.storybook/`            | Storybook's `main.ts`, `preview.ts`, `tsconfig.json`, `typings.d.ts`            |
+| `Dockerfile`             | the Node build, then Nginx serving it                                           |
+| `nginx.conf`             | the SPA fallback                                                                |
+| `docker-compose.yml`     | the `web` service                                                               |
 
 ### Commands
 
@@ -338,6 +341,7 @@ export default defineConfig({
 | `pnpm test:browser`                               | the `browser` project (Chromium)    |
 | `pnpm storybook`                                  | Storybook on `:6006`                |
 | `pnpm lint` / `pnpm format` / `pnpm format:check` | ESLint / Prettier                   |
+| `pnpm compose:up` / `pnpm compose:down`           | the Nginx image on `WEB_PORT`       |
 
 `build`, `typecheck`, `test`, `lint` and `format:check` are the five required checks.
 
@@ -353,13 +357,11 @@ export default defineConfig({
 ### Before you merge
 
 - [ ] The five checks pass, and `pnpm test:browser` if you touched a component or page.
-- [ ] A new page route declares its `data: { state }`; the page reads only its slice and loads from its watch.
-- [ ] A new read effect ends on its page's `Leave`; a write's follow-up acts only for the page that started it.
-- [ ] A new component sits in its tier and has a story and a browser spec.
 
 ## Smoke test
 
 - `pnpm test:browser` passes, and `pnpm build-storybook` builds with `storybook-static/index.json` listing the
   example's stories.
-- The image builds (`docker build -t <name> .`) and serves the app: run it on a free port and fetch `/entities`, which
-  answers 200 with the app's `<title>` through the SPA fallback.
+- `pnpm compose:up` builds the image and serves the app on `WEB_PORT` (default 4200): fetch `/entities`, which answers
+  200 with the app's `<title>` through the SPA fallback; with an API at the development `apiBaseUrl`, the page lists its
+  entities (the call the page makes, as Angular + the API contract says).

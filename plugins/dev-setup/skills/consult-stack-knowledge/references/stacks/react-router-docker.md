@@ -92,6 +92,7 @@ my-app/
 ├── app/                       # as on Workers; context.ts holds the server's configuration
 ├── db/scripts/init.sql
 ├── public/favicon.ico
+├── tests/setup.ts             # imports app/app.css for the browser tests
 ├── tests/unit/                # mirrors app/
 └── workers/app.ts             # Hono → React Router
 ```
@@ -100,12 +101,12 @@ my-app/
 
 | What                 | Value                                                                                                                                                                                                                                                                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000), Vite's HMR socket 24678 in development (moved with `HMR_PORT`), Vitest's browser-mode API 63315 during tests, RustFS 9000 (moved with `RUSTFS_PORT`) and Storybook 6006 when picked                                                                                       |
+| ports                | Postgres 5432 (moved with `DB_PORT`), the app's `PORT` (default 3000), Vite's HMR socket 24678 in development (moved with `HMR_PORT`), RustFS 9000 (moved with `RUSTFS_PORT`) and Storybook 6006 when picked                                                                                                                                     |
 | scripts              | `dev` `node --env-file=.env server.ts`; `build` `react-router build`; `start` `node server.ts` (production gets its environment from Compose); `typecheck` `react-router typegen && tsc -b`; `lint`, `test`, `format`, `format:check`, `compose:up`, `compose:down`                                                                              |
 | `allowBuilds`        | `esbuild`                                                                                                                                                                                                                                                                                                                                        |
 | dependencies         | the React Router set and the shadcn/ui packages from their docs; `hono`, `@hono/node-server`                                                                                                                                                                                                                                                     |
 | devDependencies      | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `@types/node@24`, and the pinned `typescript`                                                                                |
-| configs              | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; `tsconfig.node.json` also holds `server.ts`, under Node's rules (`module: "NodeNext"`, `allowImportingTsExtensions`), and Vite takes the SSR input from the React Router + Vite integration                                                             |
+| configs              | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; `server.ts` in `tsconfig.node.json`, as Hono + Node says, and the SSR input in `vite.config.ts`, as React Router + Vite says                                                                                                                    |
 | `.env.example`       | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `NODE_ENV=development`, `APP_NAME=<App name>`; with authentication `AUTH_SECRET=` (empty) and `BETTER_AUTH_URL=http://localhost:3000`; with file storage `RUSTFS_PORT=9000`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (empty), `S3_BUCKET=app-files` |
 | `docker-compose.yml` | the Postgres + Docker Compose `db` service with the data at `./db/data`, and the React Router + Docker Compose `app` service                                                                                                                                                                                                                     |
 | `Dockerfile`         | React Router + Docker Compose's two stages                                                                                                                                                                                                                                                                                                       |
@@ -359,12 +360,9 @@ import '../app/app.css';
 
 ## Scaffold
 
-- **Check the ports first**; stop with the user if one is taken, or set another `PORT` in `.env`.
-- **`pnpm exec playwright install chromium`** after the install, once.
-- **`cp .env.example .env`** once `.env.example` is written, then fill its secrets: `AUTH_SECRET` with
-  `openssl rand -base64 32`, and `S3_ACCESS_KEY` / `S3_SECRET_KEY` with any values (Compose hands them to RustFS as its
-  credentials). `HMR_PORT` is optional: set it to move Vite's live-reload socket.
-- **Add the shadcn primitives after the app files**, then check none landed in a `~` folder.
+- **`cp .env.example .env`** once `.env.example` is written, then fill its secrets as Authentication and S3 storage +
+  Docker Compose say; `HMR_PORT` is optional.
+- **Add the shadcn primitives after the app files.**
 
 ## Conventions
 
@@ -377,6 +375,7 @@ import '../app/app.css';
 | `app/context.ts`  | `appContext`: the server's configuration, later its database client            |
 | `app/routes/`     | route modules, declared in `app/routes.ts`                                     |
 | `app/components/` | app components; `app/components/ui/` the shadcn primitives                     |
+| `app/lib/`        | pure helpers                                                                   |
 | `tests/unit/`     | mirrors `app/`; runs in Chromium                                               |
 | `db/`             | `scripts/init.sql`, and the bind-mounted Postgres data                         |
 
@@ -389,17 +388,13 @@ required checks.
 ### Before you merge
 
 - [ ] The five checks pass.
-- [ ] Every new route has a unit test.
-- [ ] A new dependency of the routes is built in `workers/app.ts` and typed in `app/context.ts`.
-- [ ] A new environment variable is in `.env.example` and, if the image needs it, in `docker-compose.yml`.
 
 ## Smoke test
 
 - **Production**: after `pnpm build`, `NODE_ENV=production PORT=<port> node --env-file=.env server.ts` serves the
   welcome heading, the stylesheet under `/assets/` with `cache-control: public, max-age=31536000, immutable`, and a 404
-  for an unknown path. Both prefixes are needed: `node server.ts` alone reads no `.env` (it fails on the first required
-  variable once a database is added), and `--env-file` never overrides a variable already set, so `.env`'s
-  `NODE_ENV=development` would otherwise start the dev server.
+  for an unknown path. `NODE_ENV=production` goes on the command line, since `--env-file` never overrides a set
+  variable (Node's pitfall) and `.env` holds `NODE_ENV=development`.
 - **Development**: `pnpm dev` serves the welcome heading.
 - **Compose**: `pnpm compose:up` brings `db` up healthy, `migrate` to exit 0 when the database entry is picked, and then
   `app` healthy; with file storage, `pnpm storage:bucket` then creates the bucket. The app container serves the heading,

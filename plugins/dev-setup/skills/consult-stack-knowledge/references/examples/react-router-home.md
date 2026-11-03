@@ -10,13 +10,13 @@ with it; only where the value comes from differs by runtime.
 
 ## Demonstrates
 
-| Part                               | Applies                                                                                                                           |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `app/context.ts`, `workers/app.ts` | Hono + React Router (one handler, typed `appContext`), the runtime's integration                                                  |
-| the home route's loader            | React Router (loaders read, `context.get(appContext)`, generated `+types`)                                                        |
-| the home page                      | React Router + shadcn/ui (a primitive from `app/components/ui/`, theme tokens), [UI components](../architecture/ui-components.md) |
-| `tests/unit/lib/utils.test.ts`     | React Router + Vitest (browser mode; proves the `~/` alias resolves)                                                              |
-| `tests/unit/routes/home.test.tsx`  | React Router (`createRoutesStub` with a stubbed loader), React Router + Vitest (queried by role)                                  |
+| Part                               | Applies                                                                                                                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/context.ts`, `workers/app.ts` | Hono + React Router (one handler, typed `appContext`), the runtime's integration                                                                                |
+| the home route's loader            | React Router (loaders read, `context.get(appContext)`, generated `+types`)                                                                                      |
+| the home page                      | React Router + shadcn/ui (a primitive from `app/components/ui/`), React Router + Tailwind (the theme tokens), [UI components](../architecture/ui-components.md) |
+| `tests/unit/lib/utils.test.ts`     | React Router + Vitest (browser mode; proves the `~/` alias resolves)                                                                                            |
+| `tests/unit/routes/home.test.tsx`  | React Router (`createRoutesStub` with a stubbed loader), React Router + Vitest (queried by role)                                                                |
 
 ## Data
 
