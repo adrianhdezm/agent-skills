@@ -39,12 +39,6 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 - [Vitest](../technologies/vitest.md)
 - [Angular + Vitest](../integrations/angular-vitest.md)
 
-## Examples
-
-- [Entity CRUDL](../examples/entity-crudl.md): its Web part, and its Fundamental NGX variant when opted in. The API it
-  calls must speak the API contract for the example to work against it; the example is the template for the user's own
-  resources either way.
-
 ## Shape
 
 ```
@@ -308,8 +302,104 @@ export default defineConfig({
 - **The Angular CLI creates the package**, then its cleanup, as the Angular doc says; `git init -q` in it afterwards,
   since the CLI skips git.
 - **Check that `@angular/compiler-cli@22`'s and typescript-eslint's TypeScript ranges overlap** before pinning.
-- **With Fundamental NGX**: add the example's registry components after the other installs, from the package folder,
+- **With Fundamental NGX**: add the Starter's registry components after the other installs, from the package folder,
   then run the integration's placement check.
+
+## Starter
+
+What a fresh scaffold ships: one resource, `entity`, listed with filter, sort and pagination, shown, created, edited and
+deleted, the template every later resource copies. Build it by applying the docs above, and take from here what they
+leave open: names, values, behaviours and tests. When the user names the first resource, it takes this one's name and
+keeps its fields, routes and tests. It works against any API that speaks the API contract.
+
+### The resource
+
+| Field         | Type                     | Rules                    | Filter           | Sort |
+| ------------- | ------------------------ | ------------------------ | ---------------- | ---- |
+| `id`          | UUID, generated          |                          | id operators     |      |
+| `name`        | text                     | required, 1 to 200 chars | string operators | yes  |
+| `description` | text or `null`           | up to 2000 chars         | string operators |      |
+| `createdAt`   | timestamp, set on insert |                          | date operators   | yes  |
+| `updatedAt`   | timestamp                |                          | date operators   | yes  |
+
+The default sort is `createdAt DESC`. An update needs at least one field besides `id`. The web mirrors them by hand in
+`models/entity.model.ts` (dates as ISO strings), as the API's contract has them.
+
+### Web
+
+**Shell.** `App` renders `MainLayout`: a header bar with the app name (from `selectAppName`) over a `<main>` holding the
+router outlet. `''` redirects to `entities`. The `appContext` slice holds `{ apiBaseUrl, appName }` from `environment`,
+and has no handlers and no spec.
+
+**Model, service, helpers.**
+
+| Piece                          | Contract                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EntityService`                | `list`, `get`, `create` (POST), `update` (PATCH), `delete`, each an `Observable`                                                                                                                                                                                                                                      |
+| `entity-list-params.helper.ts` | `DEFAULT_PAGE` 1, `DEFAULT_PAGE_SIZE` 20; `parseListInput` never throws (bad filter, unknown sort field or page below 1 fall back; no `sortField` means the default sort, `createdAt DESC`, and with a field any direction but `DESC` is `ASC`); `toParams` maps absent and default values to `null`; `sameListInput` |
+| `entity-filter-form.helper.ts` | `FilterForm` (`name`, `description`, `createdFrom`, `createdBefore`) ⇄ `EntityFilterInput` (trimmed `contains`, `createdAt.ge` / `.lt`, a day as local midnight in ISO-8601); reads back only what the strip can express; `formatRange` → `0 of 0` or `first–last of total · page X of Y`                             |
+
+**Slices.** One per page: the list, form and detail slices are the NgRx reference code.
+
+**Components**, store-free, each with a story and a browser spec:
+
+| Component                            | Inputs → outputs                                                           | Behaviour                                                                                                                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UiDialog` (`ui-dialog`)             | `title` (required), `description`, `dismissible` = true → `dismissed`      | a modal `role="dialog"` named by its title, described by its description; Escape dismisses unless not dismissible; a body and a `[uiDialogFooter]` slot                               |
+| `UiSelect` (`ui-select`)             | `label`, `name`, `options` (`{ value, label }[]`), `value` → `valueChange` | its own label names a native select; the option matching `value` is selected                                                                                                          |
+| `UiPagination` (`ui-pagination`)     | `page`, `pageCount` → `pageChange`                                         | a `nav` named Pagination; projected status text; _Previous_ / _Next_ disabled at the ends                                                                                             |
+| `DeleteDialog` (`app-delete-dialog`) | `itemKind`, `itemName`, `busy` = false → `confirmed`, `cancelled`          | a `UiDialog` titled `Delete <itemKind>`, described `Delete “<itemName>”? This cannot be undone.`; _Cancel_ and a red _Delete_ (_Deleting…_ while busy); busy disables both and Escape |
+
+Stories: `UI/Dialog` (`Default`, through a template filling the slots), `UI/Select` (`Default`), `UI/Pagination`
+(`Middle`, `FirstPage`), `Components/DeleteDialog` (`Default`, `Busy`).
+
+**Pages**, each on the NgRx page contract.
+
+| Page   | Routes and state                                                 | Accessible names                                                                                                                                                                                                           |
+| ------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| list   | `/entities`, `entity-list`                                       | heading _Entities_; link _New entity_; _Name contains_, _Description contains_, _Created on or after_, _Created before_, _Sort_, _Per page_; _Apply_, _Clear_, _Previous_, _Next_; _Delete_ per row, the row's name a link |
+| detail | `/entities/:id`, `entity-detail`                                 | the entity's name as heading; _Edit_; _← Back to entities_                                                                                                                                                                 |
+| form   | `/entities/new` `entity-new`, `/entities/:id/edit` `entity-edit` | heading _New entity_ / _Edit entity_; _Name_, _Description_; _Save_; _← Cancel_                                                                                                                                            |
+
+- **List.** Every control (filter strip, sort, page size, pagination) navigates with the next list input in the URL and
+  never fetches. Sort options, in order: _Newest first_ (`createdAt:DESC`, default), _Oldest first_, _Name A–Z_, _Name
+  Z–A_, _Recently updated_ (`updatedAt:DESC`); page sizes 10, 20, 50, 100. Changing the filter, sort or page size goes to
+  page 1. The filter strip keeps local edits until _Apply_ and resyncs whenever the URL's input changes; _Clear_ drops
+  the filter and keeps sort and page size. Rows show the name, the description and `createdAt` (`medium`). The empty
+  row reads _Loading…_, _No entities match the filter._ or _No entities yet._; an error shows in a banner. Delete opens
+  `DeleteDialog`, which stays open and busy until the refetched page arrives, and on failure stays open, not busy, over
+  the banner. A page past the end after a delete steps back with `replaceUrl`.
+- **Detail.** Shows the description (`—` for `null`) and both dates; a link to another entity reuses the page and loads
+  the new id.
+- **Form.** One page for both states; fills itself when the edited entity arrives. Validation mirrors the API: name
+  required and at most 200, description at most 2000; values are sent trimmed, an empty description as `null`. _Save_
+  is disabled while loading or saving, labelled _Loading…_ / _Saving…_ / _Save_. After a save, the slice navigates to the
+  detail page only if this visit of the form is still open; _← Cancel_ works mid-save.
+
+### Web tests
+
+| Tier    | Files                                 | Covers                                                                                                                                                                                                                                |
+| ------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unit    | the service and each helper's spec    | each request's method, URL and body; the list params round trip and fallbacks; the filter form mapping                                                                                                                                |
+| unit    | `app-router.serializer.spec.ts`       | the deepest route's state, merged params, `null` with no state                                                                                                                                                                        |
+| unit    | each slice's reducer and effects spec | as the NgRx testing conventions say: own-state navigation, `Leave`, each status; `switchMap` cancelling, `concatMap` ordering, nothing after `Leave`, a write from another visit ignored, stepping back past the last page            |
+| browser | each component's spec                 | the behaviour in the component table                                                                                                                                                                                                  |
+| browser | each page's spec                      | the watch (first load, equal value ignored, new value reloads, `null` waits, `Leave` on destroy); each UI state; list: the delete flow and the exact `navigate` each control dispatches; form: fill on load, no save for a blank name |
+
+### With `angular-fundamental-ngx`
+
+When the project opts in, the registry's `button`, `dialog`, `select`, `pagination`, `input`, `form` and
+`message-strip` replace the hand-written primitives, which go with their stories and specs. The rest holds, with these
+differences:
+
+- `DeleteDialog` composes `fd-dialog` (header, body, footer; `fdButton`, the confirm `variant="negative"`) with the same
+  inputs, outputs and wording, and handles Escape itself.
+- The list page uses two `fd-select`s (page size binds numbers) and `fd-pagination` bound one way with
+  `displayTotalItems` off, beside the page's own range text.
+- Buttons take `fdButton` (`emphasized` for the primary action, `transparent` for _Clear_ and row _Delete_), inputs
+  `fdFormControl` with their own `fdFormLabel`; the banner is `fd-message-strip`.
+- Specs: the three primitive specs go; the list spec drives `fd-select` as a combobox and clicks _Next page_; the dialog
+  spec matches _Delete_ loosely. Storybook lists only the two `Components/DeleteDialog` stories.
 
 ## Conventions
 
@@ -362,7 +452,7 @@ export default defineConfig({
 ## Smoke test
 
 - `pnpm test:browser` passes, and `pnpm build-storybook` builds with `storybook-static/index.json` listing the
-  example's stories.
+  Starter's stories.
 - `pnpm compose:up` builds the image and serves the app on `WEB_PORT` (default 4200): fetch `/entities`, which answers
   200 with the app's `<title>` through the SPA fallback; with an API at the development `apiBaseUrl`, the page lists its
   entities (the call the page makes, as Angular + the API contract says).

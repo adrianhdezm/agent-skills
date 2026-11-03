@@ -1560,31 +1560,7 @@
       "unless": []
     }
   },
-  "examples": {
-    "entity-crudl": {
-      "id": "entity-crudl",
-      "title": "Entity CRUDL",
-      "file": "examples/entity-crudl.md",
-      "needs": [
-        [
-          "express",
-          "drizzle"
-        ],
-        [
-          "hono",
-          "node",
-          "drizzle"
-        ],
-        [
-          "angular"
-        ]
-      ],
-      "unless": [
-        "react-router"
-      ],
-      "kind": "example"
-    }
-  },
+  "examples": {},
   "stacks": {
     "angular-app": {
       "id": "angular-app",
@@ -1770,14 +1746,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "entity-crudl",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "one page component per route, each reading its slice and loading from its watch",
@@ -2108,14 +2077,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "entity-crudl",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the Express 5 + Drizzle + Postgres API, with zod and Pino",
@@ -2340,14 +2302,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "entity-crudl",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
@@ -2696,14 +2651,7 @@
           "optional": false
         }
       ],
-      "examples": [
-        {
-          "layer": "examples",
-          "kind": "example",
-          "id": "entity-crudl",
-          "optional": false
-        }
-      ],
+      "examples": [],
       "owns": [
         {
           "holds": "the composition root: the pool, the DAOs, the `AppContext`, the listener, shutdown",
@@ -3625,9 +3573,7 @@
       "s3-storage-docker-compose",
       "drizzle-s3-storage"
     ],
-    "example": [
-      "entity-crudl"
-    ],
+    "example": [],
     "stack": [
       "angular-app",
       "angular-fullstack",
