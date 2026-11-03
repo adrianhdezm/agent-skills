@@ -3,7 +3,7 @@ kind: technology
 role: service
 realises: [file-storage]
 detect:
-  dependencies: [@aws-sdk/client-s3]
+  dependencies: ['@aws-sdk/client-s3']
 aliases: [RustFS, S3]
 ---
 # S3 storage

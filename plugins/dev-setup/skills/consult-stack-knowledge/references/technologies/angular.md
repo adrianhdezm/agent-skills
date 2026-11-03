@@ -4,7 +4,7 @@ role: framework
 detect:
   files: [angular.json]
 realises: [ui-components]
-aliases: [Angular, @angular/]
+aliases: [Angular, '@angular/']
 ---
 # Angular
 
@@ -23,7 +23,7 @@ two tiers of tests, and a static build.
   ```
 
   then the cleanup, at once: delete `.editorconfig` (the formatter owns indentation), `README.md` (the docs live at the
-  repo root), the CLI's root component (`app.ts`, `app.html`, `app.scss`, `app.spec.ts`: the root component is wiring,
+  repo root), the CLI's root component (`app.ts`, `app.html`, `app.css`, `app.spec.ts`: the root component is wiring,
   and has no spec); in a workspace package also delete `packageManager` (the root's) and the shared tools' entries
   (the root catalog adds them back), its `.gitignore` (the root's covers it) and its `.prettierrc` (rewritten with the
   shared config). The new root component is `app.component.ts` (class `App`), so `src/main.ts` imports
@@ -33,7 +33,7 @@ two tiers of tests, and a static build.
 - **Standalone, zoneless, signal components.** Every component takes signal `input()` / `output()`, never `@Input()`;
   none sets `changeDetection`, because `OnPush` is Angular 22's default and writing it on one makes the others look
   eager. No `zone.js` anywhere: the app and everything that renders its components run zoneless.
-- **One file per component**: inline `template`, no `.html` or `.scss` siblings, styled through its `host` and its
+- **One file per component**: inline `template`, no `.html` or `.css` siblings, styled through its `host` and its
   template's classes. Files sit flat in their folder with the `.component.ts` suffix
   (`pages/entity-list-page.component.ts`), classes have no suffix (`EntityListPage`), and the one nested component
   folder is `components/ui/`.
@@ -71,7 +71,7 @@ two tiers of tests, and a static build.
 
 ### Components and templates
 
-- **One file per component**, inline `template`, no `.html` or `.scss`; the only global stylesheet is
+- **One file per component**, inline `template`, no `.html` or `.css`; the only global stylesheet is
   `src/styles.css`.
 - **Signal `input()` / `output()` only**, no `@Input()`; no component sets `changeDetection` (`OnPush` is the default);
   everything runs zoneless.

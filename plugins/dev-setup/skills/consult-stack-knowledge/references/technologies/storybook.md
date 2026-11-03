@@ -4,7 +4,7 @@ role: tooling
 realises: [ui-components]
 detect:
   files: [.storybook/]
-aliases: [Storybook, @storybook/, storybook@]
+aliases: [Storybook, '@storybook/', storybook@]
 ---
 # Storybook
 

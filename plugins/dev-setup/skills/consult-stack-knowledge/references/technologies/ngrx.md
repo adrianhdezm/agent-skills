@@ -4,8 +4,8 @@ role: library
 family: angular
 realises: [resource-operations]
 detect:
-  dependencies: [@ngrx/store]
-aliases: [NgRx, @ngrx/]
+  dependencies: ['@ngrx/store']
+aliases: [NgRx, '@ngrx/']
 ---
 # NgRx
 
