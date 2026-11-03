@@ -66,7 +66,7 @@ my-app/
 ├── package.json              # root scripts; packageManager
 ├── pnpm-lock.yaml / pnpm-workspace.yaml   # packages + catalog + allowBuilds
 ├── api/
-│   ├── Dockerfile / drizzle.config.ts / eslint.config.mjs / .prettierrc / .prettierignore
+│   ├── Dockerfile / drizzle.config.ts / eslint.config.js / .prettierrc / .prettierignore
 │   ├── package.json / tsconfig{,.app,.node}.json / vitest.config.ts
 │   ├── db/scripts/init.sql, db/migrations/   # the init migration the scaffold generated
 │   ├── src/
@@ -84,52 +84,33 @@ my-app/
 │       └── utils/            # http-mocks, test-server, pg-container, entity-seed
 └── web/                      # the Angular app's package, plus the e2e suite:
     ├── tsconfig.node.json    # vitest.config.mts and playwright.config.ts, as in the Angular app
+    ├── src/environments/environment.e2e.ts   # apiBaseUrl at localhost:3100 for the e2e build
     ├── playwright.config.ts
     └── e2e/                  # global-setup, global-teardown, tsconfig.json, pages/, utils/{env,api}.ts
 ```
-
-## Compose
-
-The `db` service from [Postgres + Docker Compose](../integrations/postgres-docker-compose.md#required-values) with `<owner>` = `api`,
-then:
-
-- **`api`**: Node + Docker Compose's service, with `build: { context: ., dockerfile: api/Dockerfile }`, ports
-  `'${PORT:-3000}:3000'` and its `/health` healthcheck.
-- **`web`**: `build: { context: ., dockerfile: web/Dockerfile }`, ports `'${WEB_PORT:-4200}:80'` (Nginx listens on 80),
-  depending on `api` being healthy.
-
-Both images build from the repo root, copying the root manifests and their own, and installing with
-`--filter <pkg> --frozen-lockfile`. The API image installs with `--ignore-scripts` in both stages (its build and runtime
-never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/server.js` from `api/` with
-`NODE_ENV=production`. The web image builds with `pnpm --filter web build` and copies `web/dist/web/browser` and
-`web/nginx.conf` into Nginx.
-
-## Where it differs from the shared tooling
-
-- **Two packages with their own configs**, the shared tool versions in the root catalog, and the Angular CLI's tsconfig
-  layout in `web/`. The API compiles with `composite` and `outDir`, as Node + TypeScript says.
-- **`lint` passes warnings**: no `--max-warnings 0`.
-- **Web specs sit beside the file they test**, and `null` marks absence in the DAO contract and the store slices.
 
 ## Required values
 
 `<App name>` is the repo name in Title Case; the database name defaults to `app`.
 
-| What                  | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports                 | 5432 (Postgres, moved with `DB_PORT`), 3000 (API), 4200 (web), 3100 and 4300 (the e2e API and web), 6006 (Storybook)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `pnpm-workspace.yaml` | `packages: [api, web]`; `allowBuilds` with `esbuild: true` and `'@parcel/watcher'`, `cpu-features`, `lmdb`, `msgpackr-extract`, `protobufjs`, `ssh2` all `false`; the catalog                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| root `package.json`   | `name`, `version: "0.0.0"`, `private: true`, `engines.node: ">=24"`, `packageManager`; no Prettier or ESLint of its own                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| root scripts          | `dev:api` `pnpm --filter api dev`; `dev:web` `pnpm --filter web start`; `build`, `typecheck`, `lint`, `test`, `format`, `format:check` `pnpm -r <script>`; `test:integration` `pnpm --filter api test:integration`; `test:browser` `pnpm --filter web test:browser`; `test:e2e` `pnpm --filter web test:e2e`; `storybook` `pnpm --filter web storybook`; `compose:up` `docker compose up --build -d --wait`; `compose:down` `docker compose down`                                                                                                                                                              |
-| `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.angular/`, `.vitest/`, `.DS_Store`, and `api/db/data/` under a comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `.dockerignore`       | `**/node_modules`, `**/dist`, `**/.angular`, `.git`, `.env`, `api/db/data`, `web/storybook-static`, `web/test-results`, `web/playwright-report`, `web/.vitest`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `WEB_PORT=4200`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| shared tooling        | in the catalog, read as `catalog:` by both packages: `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the exact `typescript`                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `api/package.json`    | `name: "api"`, `version: "0.0.0"`, `private`, `type: "module"`, written by hand; dependencies from the Express and Drizzle docs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `"**/*.{ts,js,mjs,json,md,yml,yaml}"`; `start` `node --env-file=../.env dist/server.js`; `db:generate`, `db:migrate` as the Drizzle doc says |
-| API configs           | the tsconfigs, `eslint.config.mjs` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`                                                                                                                                                                                                                                                                                                                                                                                                              |
-| web package           | the Angular app blueprint's values with `<name>` = `web`, minus `packageManager` and the CLI's `prettier` and `typescript` entries (the catalog has them); the browser calls the API directly and Nginx proxies nothing                                                                                                                                                                                                                                                                                                                                                                                        |
-| e2e                   | `@playwright/test@1`; its Reference code below; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`; Playwright loads `playwright.config.ts` and `e2e/**` as CommonJS, where `import.meta` throws: use `__dirname` there                                                                                                                                                                                                                                                                                                              |
+| What                  | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ports                 | 5432 (Postgres, moved with `DB_PORT`), 3000 (API), 4200 (web), 3100 and 4300 (the e2e API and web), 6006 (Storybook)                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `pnpm-workspace.yaml` | `packages: [api, web]`; `allowBuilds` with `esbuild: true` and `'@parcel/watcher'`, `cpu-features`, `lmdb`, `msgpackr-extract`, `protobufjs`, `ssh2` all `false`; the catalog                                                                                                                                                                                                                                                                                                                                                                                                   |
+| root `package.json`   | `name`, `version: "0.1.0"`, `private: true`, `engines.node: ">=24"`, `packageManager`; no Prettier or ESLint of its own                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| root scripts          | `dev:api` `pnpm --filter api dev`; `dev:web` `pnpm --filter web start`; `build`, `typecheck`, `lint`, `test`, `format`, `format:check` `pnpm -r <script>`; `test:integration` `pnpm --filter api test:integration`; `test:browser` `pnpm --filter web test:browser`; `test:e2e` `pnpm --filter web test:e2e`; `storybook` `pnpm --filter web storybook`; `compose:up` `docker compose up --build -d --wait`; `compose:down` `docker compose down`                                                                                                                               |
+| `.gitignore`          | `node_modules/`, `dist/`, `.env`, `*.log`, `*.tsbuildinfo`, `.angular/`, `.vitest/`, `storybook-static/`, `*storybook.log`, `test-results/`, `playwright-report/`, `blob-report/`, `playwright/.cache/`, `.DS_Store`, and `api/db/data/` under a comment                                                                                                                                                                                                                                                                                                                        |
+| `.dockerignore`       | `**/node_modules`, `**/dist`, `**/.angular`, `.git`, `.env`, `api/db/data`, `web/storybook-static`, `web/test-results`, `web/playwright-report`, `web/.vitest`                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `.env.example`        | `DB_PASSWORD`, `DB_PORT=5432`, `DATABASE_URL` (`…@localhost:5432/app`), `PORT=3000`, `WEB_PORT=4200`, a commented `LOG_LEVEL`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| shared tooling        | in the catalog, read as `catalog:` by both packages: `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `globals`, `prettier`, `@types/node@24`, `vitest@5`, and the exact `typescript`                                                                                                                                                                                                                                                                                                                                                                     |
+| `api/package.json`    | `name: "api"`, `version: "0.0.0"`, `private`, `type: "module"`, written by hand; dependencies: the Express, Express + Pino, Pino, Drizzle and Postgres docs' runtime packages; devDependencies: the Express, Pino, Drizzle and Drizzle + Postgres dev packages                                                                                                                                                                                                                                                                                                                  |
+| API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts` piped as Express + Pino says; `build` `tsc -p tsconfig.app.json`; `start` `node dist/server.js`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `.`; `db:generate`, `db:migrate` as the Drizzle doc says                                                                                                            |
+| API configs           | the tsconfigs, `eslint.config.js` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`, as Prettier says for a package in a workspace                                                                                                                                                                                                                                                                                                                                 |
+| web package           | the Angular app blueprint's values with `<name>` = `web`, minus `packageManager` and the CLI's `prettier` and `typescript` entries (the catalog has them); the browser calls the API directly and Nginx proxies nothing                                                                                                                                                                                                                                                                                                                                                         |
+| e2e                   | `@playwright/test@1`; its Reference code below; web scripts `test:e2e` `playwright test`; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`; `angular.json`: an `e2e` build configuration (`optimization: false`, `extractLicenses: false`, `sourceMap: true`, `fileReplacements` to `src/environments/environment.e2e.ts`) and an `e2e` serve configuration on `web:build:e2e`; Playwright loads `playwright.config.ts` and `e2e/**` as CommonJS, where `import.meta` throws: use `__dirname` there |
+| `docker-compose.yml`  | the `db` service from Postgres + Docker Compose with `<owner>` = `api`, then `migrate`, `api` (Node + Docker Compose's, `build: { context: ., dockerfile: api/Dockerfile }`, ports `'${PORT:-3000}:3000'`) and `web` (Nginx + Docker Compose's, `dockerfile: web/Dockerfile`, ports `'${WEB_PORT:-4200}:80'`, depending on `api` healthy)                                                                                                                                                                                                                                       |
+| `api/Dockerfile`      | Node + Docker Compose's image in a workspace                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `web/Dockerfile`      | Nginx + Docker Compose's, copying `web/dist/web/browser`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Reference code
 
@@ -190,7 +171,7 @@ The API's configs as a fresh scaffold writes them (strict presets), and the web'
 }
 ```
 
-`api/eslint.config.mjs`:
+`api/eslint.config.js`:
 
 ```js
 import js from '@eslint/js';
@@ -200,7 +181,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', 'dist/**', 'db/**', 'eslint.config.mjs']),
+  globalIgnores(['**/node_modules/**', '**/coverage/**', '**/.cache/**', '**/*.tsbuildinfo', 'dist/**', 'db/**', 'eslint.config.js']),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
@@ -292,8 +273,8 @@ export default defineConfig([
     'dist/**',
     '.angular/**',
     'storybook-static/**',
+    // No TypeScript project includes the ESLint config itself.
     'eslint.config.mjs'
-    // Config files that no type-checked project includes.
   ]),
   js.configs.recommended,
   {
@@ -386,226 +367,6 @@ export default defineConfig([
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   "include": ["vitest.config.mts", "playwright.config.ts"]
-}
-```
-
-`api/Dockerfile`: the compiled API image inside the workspace: both manifests copied so the frozen lockfile resolves, `--filter api`, and the runtime working directory `/app/api`, so `dist/migrate.js` finds `../db/migrations`:
-
-```dockerfile
-FROM node:24-alpine AS build
-WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY api/package.json ./api/
-COPY web/package.json ./web/
-RUN pnpm install --filter api --frozen-lockfile --ignore-scripts
-COPY api/tsconfig.json api/tsconfig.app.json ./api/
-COPY api/src ./api/src
-RUN pnpm --filter api build
-
-FROM node:24-alpine
-WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY api/package.json ./api/
-COPY web/package.json ./web/
-RUN pnpm install --filter api --prod --frozen-lockfile --ignore-scripts
-COPY --from=build /app/api/dist ./api/dist
-COPY api/db/migrations ./api/db/migrations
-WORKDIR /app/api
-ENV NODE_ENV=production
-USER node
-EXPOSE 3000
-CMD ["node", "dist/server.js"]
-```
-
-`web/Dockerfile`: a Node build of the web, then Nginx serving it:
-
-```dockerfile
-FROM node:24-alpine AS build
-WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY api/package.json ./api/
-COPY web/package.json ./web/
-RUN pnpm install --filter web --frozen-lockfile
-COPY web ./web
-RUN pnpm --filter web build
-
-FROM nginx:1.27-alpine
-COPY --from=build /app/web/dist/web/browser /usr/share/nginx/html
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-```
-
-The `migrate`, `api` and `web` services, beside the `db` service:
-
-```yaml
-  migrate:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
-    command: ['node', 'dist/migrate.js']
-    environment:
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: 'no'
-
-  api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-s3cr3t}@db:5432/app
-      PORT: '3000'
-    ports:
-      - '${PORT:-3000}:3000'
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health >/dev/null || exit 1']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  web:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    restart: unless-stopped
-    ports:
-      - '${WEB_PORT:-4200}:80'
-    depends_on:
-      api:
-        condition: service_healthy
-```
-
-`web/angular.json`:
-
-```jsonc
-{
-  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
-  "version": 1,
-  "cli": {
-    "packageManager": "pnpm"
-  },
-  "newProjectRoot": "projects",
-  "projects": {
-    "web": {
-      "projectType": "application",
-      "schematics": {
-        "@schematics/angular:component": {
-          "style": "css"
-        }
-      },
-      "root": "",
-      "sourceRoot": "src",
-      "prefix": "app",
-      "architect": {
-        "build": {
-          "builder": "@angular/build:application",
-          "options": {
-            "browser": "src/main.ts",
-            "tsConfig": "tsconfig.app.json",
-            "inlineStyleLanguage": "css",
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "public"
-              }
-            ],
-            "styles": ["src/styles.css"]
-          },
-          "configurations": {
-            "production": {
-              "budgets": [
-                {
-                  "type": "initial",
-                  "maximumWarning": "2mb",
-                  "maximumError": "4mb"
-                },
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
-                }
-              ],
-              "outputHashing": "all"
-            },
-            "development": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true,
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.development.ts"
-                }
-              ]
-            },
-            "e2e": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true,
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.e2e.ts"
-                }
-              ]
-            }
-          },
-          "defaultConfiguration": "production"
-        },
-        "serve": {
-          "builder": "@angular/build:dev-server",
-          "configurations": {
-            "production": {
-              "buildTarget": "web:build:production"
-            },
-            "development": {
-              "buildTarget": "web:build:development"
-            },
-            "e2e": {
-              "buildTarget": "web:build:e2e"
-            }
-          },
-          "defaultConfiguration": "development"
-        },
-        "test": {
-          "builder": "@analogjs/vitest-angular:test",
-          "options": {
-            "project": ["unit"]
-          },
-          "configurations": {
-            "browser": {
-              "project": ["browser"]
-            }
-          }
-        },
-        "storybook": {
-          "builder": "@storybook/angular-vite:start-storybook",
-          "options": {
-            "configDir": ".storybook",
-            "browserTarget": "web:build",
-            "port": 6006
-          }
-        },
-        "build-storybook": {
-          "builder": "@storybook/angular-vite:build-storybook",
-          "options": {
-            "configDir": ".storybook",
-            "browserTarget": "web:build",
-            "outputDir": "storybook-static"
-          }
-        }
-      }
-    }
-  }
 }
 ```
 
@@ -764,54 +525,12 @@ export function listUrl(prefix: string, params: Record<string, string> = {}): st
 }
 ```
 
-`api/tests/utils/entity-seed.ts`:
-
-```ts
-import type { DbClient } from '../../src/db/client.js';
-import { entity } from '../../src/db/schemas/entity.schema.js';
-
-/** A fixed UTC day in 2026, so tests control timestamps. */
-export function day(n: number): Date {
-  return new Date(Date.UTC(2026, 0, n, 12, 0, 0));
-}
-
-export interface SeedEntity {
-  readonly name: string;
-  readonly description?: string | null;
-  readonly createdAt?: Date;
-  readonly updatedAt?: Date;
-}
-
-/** Insert rows directly, bypassing the DAO, so timestamps are the test's own. */
-export async function seedEntities(db: DbClient, rows: readonly SeedEntity[]) {
-  if (rows.length === 0) {
-    return [];
-  }
-  return db
-    .insert(entity)
-    .values(rows.map((row) => ({ ...row, updatedAt: row.updatedAt ?? row.createdAt })))
-    .returning();
-}
-
-/** `alpha` to `echo` on consecutive days; `charlie` has a null description. */
-export async function seedCanonical(db: DbClient) {
-  return seedEntities(db, [
-    { name: 'alpha', description: 'first letter', createdAt: day(1) },
-    { name: 'bravo', description: 'second letter', createdAt: day(2) },
-    { name: 'charlie', description: null, createdAt: day(3) },
-    { name: 'delta', description: 'fourth letter', createdAt: day(4) },
-    { name: 'echo', description: 'fifth letter', createdAt: day(5) }
-  ]);
-}
-```
-
 ## Scaffold
 
-- **Check every port first**; stop with the user if one is taken.
 - **Write every file before installing**, then install each package once, in this order: the API's dependencies; the
-  web's, then `pnpm --filter web exec playwright install chromium`; with Fundamental NGX, the registry components from
-  `web/` and the placement check; then the shared tooling into the catalog, after checking that typescript-eslint's and
-  `@angular/compiler-cli@22`'s TypeScript ranges still overlap:
+  web's; with Fundamental NGX, the registry components from `web/` and the placement check; then the shared tooling
+  into the catalog, after checking that typescript-eslint's and `@angular/compiler-cli@22`'s TypeScript ranges still
+  overlap:
 
   ```sh
   pnpm --filter api --filter web add -D --save-catalog \
@@ -827,16 +546,18 @@ export async function seedCanonical(db: DbClient) {
 
 ## Conventions
 
-### Repository
+### Layout
 
-```
-<repo>/
-├── api/                    # Express 5 + Drizzle + Postgres + zod + Pino
-├── web/                    # Angular 22 + NgRx + router-store + Tailwind 4
-├── docker-compose.yml      # db + api + web
-├── .env / .env.example     # the single env file; only .env.example is committed
-└── coding-conventions.md   # this file
-```
+| Path                    | Holds                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `api/`                  | the Express 5 + Drizzle + Postgres API, with zod and Pino                                |
+| `web/`                  | the Angular 22 app: NgRx with router-store, Tailwind 4, Storybook, and the e2e suite     |
+| `docker-compose.yml`    | the `db`, `migrate`, `api` and `web` services                                            |
+| `.env` / `.env.example` | the single env file, feeding Compose and both packages; only `.env.example` is committed |
+| `web/e2e/`              | the Playwright suite: `pages/`, the global setup and teardown, `utils/{env,api}.ts`      |
+| `web/src/environments/` | the API base URL per build: production, development and e2e                              |
+
+### Commands
 
 | Command                                                         | Does                                                                            | Needs                          |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------ |
@@ -852,19 +573,8 @@ export async function seedCanonical(db: DbClient) {
 
 `build`, `typecheck`, `test`, `lint` and `format:check` are the five required checks.
 
-| Port            | What                        |
-| --------------- | --------------------------- |
-| `5432`          | Postgres (Compose `db`)     |
-| `3000`          | API, local and Compose      |
-| `4200`          | web, `ng serve` and Compose |
-| `3100` / `4300` | the e2e API and web         |
-| `6006`          | Storybook                   |
-
-The web has no runtime environment: its API base URL is build-time, in `web/src/environments/` (production derives it
-from the page's host on port 3000, development and e2e name `localhost:3000` and `localhost:3100`). So `PORT` moves the
-API in development only: the production image calls port 3000, and moving the published API port means changing the
-production environment file too. The e2e ports live in two files, `web/src/environments/environment.e2e.ts` (the API)
-and `web/e2e/utils/env.ts` (both servers, which `playwright.config.ts` reads), and change together.
+The e2e ports live in two files, `web/src/environments/environment.e2e.ts` (the API) and `web/e2e/utils/env.ts` (both
+servers, which `playwright.config.ts` reads), and change together.
 
 ### HTTP contract
 
@@ -873,14 +583,12 @@ the template every later resource copies.
 
 ### Testing tiers
 
-| Tier           | Lives in                            | Real                                      | Run                     |
-| -------------- | ----------------------------------- | ----------------------------------------- | ----------------------- |
-| API unit       | `api/tests/unit/` (mirrors `src/`)  | the function; DAO and HTTP stubbed        | `pnpm test`             |
-| API DAO        | `api/tests/db/`                     | DAO, Drizzle, Postgres                    | `pnpm test:integration` |
-| API end to end | `api/tests/api/`                    | HTTP, Express, controllers, DAO, Postgres | `pnpm test:integration` |
-| web unit       | `*.spec.ts` beside the file         | the unit, `TestBed`                       | `pnpm test`             |
-| web browser    | `*.browser.spec.ts` beside the file | the component, Chromium, Tailwind         | `pnpm test:browser`     |
-| e2e            | `web/e2e/pages/`                    | everything, on its own database and ports | `pnpm test:e2e`         |
+| Tier           | Lives in                           | Real                                      | Run                     |
+| -------------- | ---------------------------------- | ----------------------------------------- | ----------------------- |
+| API unit       | `api/tests/unit/` (mirrors `src/`) | the function; DAO and HTTP stubbed        | `pnpm test`             |
+| API DAO        | `api/tests/db/`                    | DAO, Drizzle, Postgres                    | `pnpm test:integration` |
+| API end to end | `api/tests/api/`                   | HTTP, Express, controllers, DAO, Postgres | `pnpm test:integration` |
+| e2e            | `web/e2e/pages/`                   | everything, on its own database and ports | `pnpm test:e2e`         |
 
 | Change                             | Tests                                                                         |
 | ---------------------------------- | ----------------------------------------------------------------------------- |
@@ -910,10 +618,6 @@ slice and browser specs, and an e2e spec per page.
 
 - [ ] The five checks pass; `pnpm test:integration` if you touched the API's DAOs, schemas, controllers or `app.ts`;
       `pnpm test:browser` for a component or page; `pnpm test:e2e` for a user flow or the web↔API contract.
-- [ ] A schema change comes with its migration, committed; an API type change is mirrored in the web's `models/`.
-- [ ] A new page route declares its `data: { state }`, reads only its slice and loads from its watch; a new read ends on
-      `Leave` and a write's follow-up acts only for its page.
-- [ ] A new component sits in its tier, with a story and a browser spec.
 
 ## Smoke test
 
@@ -922,8 +626,8 @@ pnpm --filter api db:generate --name init     # exactly one migration
 pnpm compose:up                               # db healthy, migrate exits 0, then api and web
 pnpm test:integration
 curl -s "http://localhost:${PORT:-3000}/health"   # {"status":"ok","db":"up",…}, on the PORT in .env
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4200/entities   # 200
-curl -s -H 'Origin: http://localhost:4200' http://localhost:3000/entities  # the call the page makes, with CORS
+curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:${WEB_PORT:-4200}/entities"   # 200
+curl -s -H "Origin: http://localhost:${WEB_PORT:-4200}" "http://localhost:${PORT:-3000}/entities"  # the page's call
 pnpm test:browser && pnpm test:e2e
 pnpm --filter web build-storybook             # storybook-static/index.json lists the six stories
 ```

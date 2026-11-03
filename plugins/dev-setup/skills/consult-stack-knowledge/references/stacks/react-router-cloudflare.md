@@ -86,23 +86,24 @@ my-app/
 │   ├── lib/utils.ts           # cn
 │   └── routes/
 ├── public/favicon.ico
+├── tests/setup.ts             # imports app/app.css for the browser tests
 ├── tests/unit/                # mirrors app/
 └── workers/app.ts             # the Worker: Hono → React Router
 ```
 
 ## Required values
 
-| What              | Value                                                                                                                                                                                                                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ports             | 5173 (`pnpm dev`, Vite), 4173 (`vite preview`), 6006 (Storybook, when picked)                                                                                                                                                                                                          |
-| scripts           | `dev` `react-router dev`; `build` `react-router build`; `preview`, `cf:deploy`, `cf-typegen`; `typecheck` `wrangler types && react-router typegen && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                         |
-| `allowBuilds`     | `esbuild`, `workerd`                                                                                                                                                                                                                                                                   |
-| dependencies      | the React Router set and the shadcn/ui packages from their docs; `hono`                                                                                                                                                                                                                |
-| devDependencies   | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `wrangler`, `@cloudflare/vite-plugin`, and the pinned `typescript` |
-| `wrangler.jsonc`  | `main: "./workers/app.ts"`, `vars: { "APP_NAME": "<App name>" }`, `observability: { "enabled": true }`                                                                                                                                                                                 |
-| configs           | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code; Vite's plugins run `cloudflare({ viteEnvironment: { name: 'ssr' } })`, `tailwindcss()`, `reactRouter()`, in that order                                                                |
-| `.gitignore`      | `node_modules/`, `build/`, `.react-router/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                                                        |
-| `.prettierignore` | `pnpm-lock.yaml`, `worker-configuration.d.ts`                                                                                                                                                                                                                                          |
+| What              | Value                                                                                                                                                                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ports             | 5173 (`pnpm dev`, Vite), 4173 (`vite preview`), 6006 (Storybook, when picked)                                                                                                                                                                                                                            |
+| scripts           | `dev` `react-router dev`; `build` `react-router build`; `preview`, `cf:deploy`, `cf-typegen`; `typecheck` `wrangler types && react-router typegen && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                                           |
+| `allowBuilds`     | `esbuild`, `workerd`                                                                                                                                                                                                                                                                                     |
+| dependencies      | the React Router set and the shadcn/ui packages from their docs; `hono`                                                                                                                                                                                                                                  |
+| devDependencies   | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `wrangler`, `@cloudflare/vite-plugin`, `@types/node@24`, and the pinned `typescript` |
+| `wrangler.jsonc`  | `main: "./workers/app.ts"`, `vars: { "APP_NAME": "<App name>" }`, `observability: { "enabled": true }`                                                                                                                                                                                                   |
+| configs           | the tsconfigs, `eslint.config.js`, `vite.config.ts` and `vitest.config.ts` under Reference code                                                                                                                                                                                                          |
+| `.gitignore`      | `node_modules/`, `build/`, `.react-router/`, `.wrangler/`, `.env`, `*.tsbuildinfo`, `.DS_Store`                                                                                                                                                                                                          |
+| `.prettierignore` | `pnpm-lock.yaml`, `worker-configuration.d.ts`                                                                                                                                                                                                                                                            |
 
 ## Reference code
 
@@ -156,7 +157,7 @@ The config files as a fresh scaffold writes them, before any optional entry adds
 
 ```jsonc
 {
-  "include": ["eslint.config.js", "react-router.config.ts", "vite.config.ts", "vitest.config.ts"],
+  "include": ["react-router.config.ts", "vite.config.ts", "vitest.config.ts"],
   "compilerOptions": {
     // Environment, modules, output
     "noEmit": true,
@@ -319,6 +320,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['tests/unit/**/*.test.{ts,tsx}'],
+          setupFiles: ['tests/setup.ts'],
           browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] }
         }
       }
@@ -327,11 +329,16 @@ export default defineConfig({
 });
 ```
 
+`tests/setup.ts`, the unit project's setup file, loading the app's stylesheet so browser tests render with its styles:
+
+```ts
+import '../app/app.css';
+```
+
 ## Scaffold
 
-- **`pnpm exec playwright install chromium`** after the install, once.
 - **Run `pnpm cf-typegen`** once the configs are written, before the app code.
-- **Add the shadcn primitives after the app files**, then check none landed in a `~` folder.
+- **Add the shadcn primitives after the app files.**
 
 ## Conventions
 
@@ -354,11 +361,9 @@ export default defineConfig({
 ### Before you merge
 
 - [ ] The five checks pass.
-- [ ] Every new route has a unit test.
-- [ ] A new binding is in `wrangler.jsonc`, `worker-configuration.d.ts` is regenerated and committed, and the binding
-      reaches routes through `app/context.ts`.
 
 ## Smoke test
 
-`pnpm exec vite preview --port <free port>` runs the build in workerd: `/` renders the welcome heading (proving the
-loader read `APP_NAME` from the bindings), the stylesheet it links answers 200, and an unknown path answers 404.
+`pnpm build`, then `pnpm exec vite preview --port <free port>`, runs the build in workerd: `/` renders the welcome
+heading (proving the loader read `APP_NAME` from the bindings), the stylesheet it links answers 200, and an unknown
+path answers 404.

@@ -1847,11 +1847,63 @@
       ],
       "owns": [
         {
+          "holds": "one page component per route, each reading its slice and loading from its watch",
+          "source": "Layout"
+        },
+        {
+          "holds": "the layouts the routes nest in",
+          "source": "Layout"
+        },
+        {
+          "holds": "app components, each with a story and a browser spec",
+          "source": "Layout"
+        },
+        {
+          "holds": "the primitives, selectors prefixed `ui`, each with a story and a browser spec",
+          "source": "Layout"
+        },
+        {
+          "holds": "the resources' types, mirroring the API's",
+          "source": "Layout"
+        },
+        {
+          "holds": "one HTTP service per resource",
+          "source": "Layout"
+        },
+        {
+          "holds": "the list-params and filter-form helpers",
+          "source": "Layout"
+        },
+        {
+          "holds": "`app-context/`, `app-router/`, one slice per page",
+          "source": "Layout"
+        },
+        {
+          "holds": "the API base URL, per build",
+          "source": "Layout"
+        },
+        {
+          "holds": "Storybook's `main.ts`, `preview.ts`, `tsconfig.json`, `typings.d.ts`",
+          "source": "Layout"
+        },
+        {
+          "holds": "the SPA fallback",
+          "source": "Layout"
+        },
+        {
+          "holds": "the `web` service",
+          "source": "Layout"
+        },
+        {
           "holds": "`<title>` is `<App name>`",
           "source": "Required values"
         },
         {
           "holds": "under Reference code: the Angular + ESLint presets, selectors, overrides and ignores",
+          "source": "Required values"
+        },
+        {
+          "holds": "one `web` service: Nginx + Docker Compose's, `build: .`, ports `'${WEB_PORT:-4200}:80'`, with nothing to depend on",
           "source": "Required values"
         }
       ]
@@ -2127,11 +2179,39 @@
       ],
       "owns": [
         {
+          "holds": "the Express 5 + Drizzle + Postgres API, with zod and Pino",
+          "source": "Layout"
+        },
+        {
+          "holds": "the Angular 22 app: NgRx with router-store, Tailwind 4, Storybook, and the e2e suite",
+          "source": "Layout"
+        },
+        {
+          "holds": "the `db`, `migrate`, `api` and `web` services",
+          "source": "Layout"
+        },
+        {
+          "holds": "the single env file, feeding Compose and both packages; only `.env.example` is committed",
+          "source": "Layout"
+        },
+        {
+          "holds": "the single env file, feeding Compose and both packages; only `.env.example` is committed",
+          "source": "Layout"
+        },
+        {
+          "holds": "the Playwright suite: `pages/`, the global setup and teardown, `utils/{env,api}.ts`",
+          "source": "Layout"
+        },
+        {
+          "holds": "the API base URL per build: production, development and e2e",
+          "source": "Layout"
+        },
+        {
           "holds": "`packages: [api, web]`; `allowBuilds` with `esbuild: true` and `'@parcel/watcher'`, `cpu-features`, `lmdb`, `msgpackr-extract`, `protobufjs`, `ssh2` all `false`; the catalog",
           "source": "Required values"
         },
         {
-          "holds": "`name`, `version: \"0.0.0\"`, `private: true`, `engines.node: \">=24\"`, `packageManager`; no Prettier or ESLint of its own",
+          "holds": "`name`, `version: \"0.1.0\"`, `private: true`, `engines.node: \">=24\"`, `packageManager`; no Prettier or ESLint of its own",
           "source": "Required values"
         },
         {
@@ -2139,7 +2219,11 @@
           "source": "Required values"
         },
         {
-          "holds": "`name: \"api\"`, `version: \"0.0.0\"`, `private`, `type: \"module\"`, written by hand; dependencies from the Express and Drizzle docs",
+          "holds": "`name: \"api\"`, `version: \"0.0.0\"`, `private`, `type: \"module\"`, written by hand; dependencies: the Express, Express + Pino, Pino, Drizzle and Postgres docs' runtime packages; devDependencies: the Express, Pino, Drizzle and Drizzle + Postgres dev packages",
+          "source": "Required values"
+        },
+        {
+          "holds": "the `db` service from Postgres + Docker Compose with `<owner>` = `api`, then `migrate`, `api` (Node + Docker Compose's, `build: { context: ., dockerfile: api/Dockerfile }`, ports `'${PORT:-3000}:3000'`) and `web` (Nginx + Docker Compose's, `dockerfile: web/Dockerfile`, ports `'${WEB_PORT:-4200}:80'`, depending on `api` healthy)",
           "source": "Required values"
         }
       ]
@@ -2484,6 +2568,18 @@
       ],
       "owns": [
         {
+          "holds": "the Hono app, the default export; routes grow there or in modules it imports",
+          "source": "Layout"
+        },
+        {
+          "holds": "one test file per module in `src/`, same name",
+          "source": "Layout"
+        },
+        {
+          "holds": "generated by `wrangler types`, committed",
+          "source": "Layout"
+        },
+        {
           "holds": "`main: \"./src/app.ts\"`",
           "source": "Required values"
         }
@@ -2787,7 +2883,24 @@
           "optional": false
         }
       ],
-      "owns": []
+      "owns": [
+        {
+          "holds": "the entry point, the one file with side effects (Node says why)",
+          "source": "Layout"
+        },
+        {
+          "holds": "exports only",
+          "source": "Layout"
+        },
+        {
+          "holds": "error classes with a name the caller can check",
+          "source": "Layout"
+        },
+        {
+          "holds": "one per module in `src/`, same base name, importing from `../src/….ts`; `main.ts` has none",
+          "source": "Layout"
+        }
+      ]
     },
     "react-router-cloudflare": {
       "id": "react-router-cloudflare",
@@ -3489,6 +3602,10 @@
         },
         {
           "holds": "app components; `app/components/ui/` the shadcn primitives",
+          "source": "Layout"
+        },
+        {
+          "holds": "pure helpers",
           "source": "Layout"
         },
         {

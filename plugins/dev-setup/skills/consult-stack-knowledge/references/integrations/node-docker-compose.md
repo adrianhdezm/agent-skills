@@ -67,6 +67,37 @@ EXPOSE 3000
 CMD ["node", "dist/server.js"]
 ```
 
+The image in a workspace (`api/Dockerfile`, built from the repo root): both manifests copied so the frozen lockfile
+resolves, `--filter api`, the runtime working directory `/app/api` so `dist/migrate.js` finds `../db/migrations`:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter api --frozen-lockfile --ignore-scripts
+COPY api/tsconfig.json api/tsconfig.app.json ./api/
+COPY api/src ./api/src
+RUN pnpm --filter api build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter api --prod --frozen-lockfile --ignore-scripts
+COPY --from=build /app/api/dist ./api/dist
+COPY api/db/migrations ./api/db/migrations
+WORKDIR /app/api
+ENV NODE_ENV=production
+USER node
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
 Its two services beside the database's: `migrate` runs the image's migration entry once and exits, and `api` starts
 after it and reports healthy only when its health route answers:
 

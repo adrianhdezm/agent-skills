@@ -34,6 +34,44 @@ docker-compose.yml: web (ports '<host>:80') ─► the browser calls the API at 
 - **A runtime stage that still installs packages** carries a Node toolchain it never uses: the static files are all it
   needs.
 
+## Reference code
+
+`<pkg>/Dockerfile`, with `<pkg>` = `web`: a Node build of the web inside a workspace (every package's manifest copied
+so the frozen lockfile resolves, `--filter web`), then Nginx serving the static build, here `web/dist/web/browser`:
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+RUN pnpm install --filter web --frozen-lockfile
+COPY web ./web
+RUN pnpm --filter web build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/web/dist/web/browser /usr/share/nginx/html
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+Its Compose service, beside the services of the API the browser calls: it publishes Nginx's port 80 on the app's host
+port and starts once `api` is healthy:
+
+```yaml
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-4200}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+```
+
 ## Conventions
 
 - **A static web image is two stages: a Node build, then Nginx serving the files** with the SPA fallback.

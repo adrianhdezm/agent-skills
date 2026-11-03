@@ -31,11 +31,11 @@ rustfs:
     - ./<owner>/storage/data:/data # Persist objects (host-bound)
 ```
 
-| What        | Value                                                                                                                                                      |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`      | `RUSTFS_PORT=9000`, `S3_ENDPOINT=http://localhost:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`                                                     |
-| ignores     | `<owner>/storage/data/` in `.gitignore`, `.dockerignore` and `.prettierignore`                                                                             |
-| app service | sets `S3_ENDPOINT: http://rustfs:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` and `S3_BUCKET` from `.env`, and `depends_on: rustfs: condition: service_started` |
+| What        | Value                                                                                                                                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`      | `RUSTFS_PORT=9000`, `S3_ENDPOINT=http://localhost:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`; `S3_ACCESS_KEY` / `S3_SECRET_KEY` take any values: Compose hands them to RustFS as its credentials |
+| ignores     | `<owner>/storage/data/` in `.gitignore`, `.dockerignore` and `.prettierignore`                                                                                                                             |
+| app service | sets `S3_ENDPOINT: http://rustfs:9000`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` and `S3_BUCKET` from `.env`, and `depends_on: rustfs: condition: service_started`                                                 |
 
 ## Pitfalls
 
