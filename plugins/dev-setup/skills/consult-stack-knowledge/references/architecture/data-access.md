@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Data access
+description: one layer touches the database, DAOs on the context, ordered lists, domain errors
 ---
 # Data access
 

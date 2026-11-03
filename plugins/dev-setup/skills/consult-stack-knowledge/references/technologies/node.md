@@ -1,10 +1,18 @@
 ---
-kind: technology
+type: Technology
+title: Node
+description: running TypeScript as it is, `--env-file`, the dev loop
+resource: https://nodejs.org
 role: runtime
 detect:
   manifest: [engines.node]
   scripts: ['node .*\.ts']
 aliases: [Node]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: node-schedule
+    resource: https://github.com/nodejs/release#release-schedule
+    title: Node.js release schedule
 ---
 # Node
 
@@ -33,7 +41,9 @@ Node 24 as a runtime: loading the environment, configuration that fails loudly, 
 
 ## Conventions
 
-- **Node 24 or newer.**
+- **Node 24 or newer.**[^node-schedule]
 - **The environment comes from the root `.env`** (git-ignored; `.env.example` is committed and lists every variable).
   A missing `.env` or a missing required variable fails at start; there are no fallback values for configuration.
 - **The entry point is the only file with side effects**; everything else exports, and is tested through its exports.
+
+[^node-schedule]: Node.js release schedule

@@ -1,10 +1,18 @@
 ---
-kind: technology
+type: Technology
+title: Vitest
+description: one config of named projects, picking an environment, how tests are written
+resource: https://vitest.dev
 role: tooling
 realises: [testing]
 detect:
   files: ['vitest.config.*']
 aliases: [Vitest, vitest]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: vitest-releases
+    resource: https://github.com/vitest-dev/vitest/releases
+    title: Vitest releases
 ---
 # Vitest
 
@@ -28,8 +36,8 @@ The test runner: one config of named projects, an environment per kind of test, 
   `@vitest/browser-playwright`, queried with `page` from `vitest/browser`. A runtime or framework with its own
   environment has an integration that says how.
 - **Browser tests download Chromium once**: `pnpm exec playwright install chromium`.
-- **Vitest 5**, one major across a monorepo through the catalog; every `@vitest/*` package and every plugin follows the
-  same major.
+- **Vitest 5**[^vitest-releases], one major across a monorepo through the catalog; every `@vitest/*` package and every
+  plugin follows the same major.
 
 ## Required values
 
@@ -58,3 +66,5 @@ The test runner: one config of named projects, an environment per kind of test, 
 - **`// Arrange`, `// Act`, `// Assert` comments** once a phase has more than one line.
 - **Import from `vitest`** (`describe`, `it`, `expect`, `vi`); no globals.
 - **`vi.fn()` only where a call or its arguments matter**; cases that differ only in data are one `it.each`.
+
+[^vitest-releases]: Vitest releases

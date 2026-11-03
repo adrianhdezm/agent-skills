@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Authorization
+description: ownership by default, checked where loaded, lists filtered in the query, 404 for another's, 403 for a forbidden action
 ---
 # Authorization
 

@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Tailwind
+description: Tailwind's Vite plugin and its order, `app/app.css` with the theme tokens, the test setup
 connects: [react-router, tailwind]
 realises: [ui-components]
 ---

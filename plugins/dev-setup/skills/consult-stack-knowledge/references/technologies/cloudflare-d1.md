@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Cloudflare D1
+description: the binding, a client per request, SQLite column types, `db.batch()`, Wrangler migrations
+resource: https://developers.cloudflare.com/d1/
 role: service
 family: cloudflare-workers
 realises: [database]

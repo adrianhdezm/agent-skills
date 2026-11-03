@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Node + TypeScript
+description: TypeScript run as it is by Node, or compiled by `tsc`; `.ts` versus `.js` imports
 connects: [node, typescript]
 ---
 # Node + TypeScript

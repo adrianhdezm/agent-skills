@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + shadcn/ui
+description: '`components.json`, the aliases, the shadcn primitives, `cn`'
 connects: [react-router, shadcn]
 realises: [ui-components]
 ---

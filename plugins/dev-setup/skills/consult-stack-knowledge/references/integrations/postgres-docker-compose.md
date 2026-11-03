@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Postgres + Docker Compose
+description: the `db` service, its healthcheck, `init.sql`, host `db`
 connects: [postgres, docker-compose]
 ---
 # Postgres + Docker Compose

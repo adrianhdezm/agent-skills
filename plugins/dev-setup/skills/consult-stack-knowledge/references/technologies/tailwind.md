@@ -1,15 +1,23 @@
 ---
-kind: technology
+type: Technology
+title: Tailwind
+description: utilities only, one global stylesheet with the theme, the build wiring per framework
+resource: https://tailwindcss.com
 role: library
 realises: [ui-components]
 detect:
   dependencies: [tailwindcss]
 aliases: [Tailwind, tailwindcss]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: tailwind-releases
+    resource: https://github.com/tailwindlabs/tailwindcss/releases
+    title: Tailwind CSS releases
 ---
 # Tailwind
 
-Tailwind 4 as the only way components are styled: utilities in the markup, and one global stylesheet holding Tailwind and
-the theme.
+Tailwind 4[^tailwind-releases] as the only way components are styled: utilities in the markup, and one global stylesheet
+holding Tailwind and the theme.
 
 **Realises:** [UI components](../architecture/ui-components.md)
 
@@ -37,3 +45,5 @@ the theme.
 - **Tailwind utilities only**: no per-component `.css` or `.scss` files; the global stylesheet is the only one.
 - **The theme's tokens are CSS variables in the global stylesheet**; utilities read them, components never set raw
   colours.
+
+[^tailwind-releases]: Tailwind CSS releases

@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Cloudflare Workers + Vite
+description: 'the Cloudflare Vite plugin: dev server and build in workerd, `vite preview`'
 connects: [cloudflare-workers, vite]
 ---
 # Cloudflare Workers + Vite

@@ -1,15 +1,23 @@
 ---
-kind: technology
+type: Technology
+title: Express
+description: the app factory, controllers, the error shape
+resource: https://expressjs.com
 role: framework
 realises: [rest-api]
 detect:
   dependencies: [express]
 aliases: [Express, 'express()', '`express`']
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: express-releases
+    resource: https://github.com/expressjs/express/releases
+    title: Express releases
 ---
 # Express
 
-Express 5 as an HTTP API: an app factory, a context singleton, controllers that validate with zod and call the data
-layer, and one error shape.
+Express 5[^express-releases] as an HTTP API: an app factory, a context singleton, controllers that validate with zod and
+call the data layer, and one error shape.
 
 **Realises:** [REST API](../architecture/rest-api.md)
 
@@ -208,3 +216,5 @@ errors:  next(err) ─► notFoundHandler ─► errorHandler ─► { status: '
 - **API tests serve the real app on an ephemeral port**, on the real DAO and a real database, and drive it over
   `fetch`: every route's happy path, the errors only the real stack produces, and what `app.ts` adds
   (malformed JSON → 400, over 100 kB → 413, an unmatched path → 404 in the standard shape).
+
+[^express-releases]: Express releases

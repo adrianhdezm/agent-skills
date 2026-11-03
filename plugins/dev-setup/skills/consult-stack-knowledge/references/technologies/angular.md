@@ -1,15 +1,23 @@
 ---
-kind: technology
+type: Technology
+title: Angular
+description: the CLI and its cleanup, signal components, two tiers of tests, a static build
+resource: https://angular.dev
 role: framework
 detect:
   files: [angular.json]
 realises: [ui-components]
 aliases: [Angular, '@angular/']
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: angular-releases
+    resource: https://github.com/angular/angular/releases
+    title: Angular releases
 ---
 # Angular
 
-Angular 22 as a single-page app: the CLI scaffold and its cleanup, standalone signal components with inline templates,
-two tiers of tests, and a static build.
+Angular 22[^angular-releases] as a single-page app: the CLI scaffold and its cleanup, standalone signal components with
+inline templates, two tiers of tests, and a static build.
 
 **Realises:** [UI components](../architecture/ui-components.md)
 
@@ -104,3 +112,5 @@ Selector prefixes follow the folder: `ui` under `components/ui/`, `app` everywhe
 - **Helpers** get a happy case and an edge case each.
 - **Components** are mounted by hand (`createComponent`, `setInput`, append to `document.body`,
   `autoDetectChanges()`), driven through locators by role and name, with a spy on each output.
+
+[^angular-releases]: Angular releases

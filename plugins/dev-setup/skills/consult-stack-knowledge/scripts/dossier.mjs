@@ -10,11 +10,12 @@
 // name). A doc that owns a file names it in one of those, and drops it when it stops owning it. A doc mentions a topic
 // when a bullet or table row of its sections holds every word. The sections printed default to Conventions and
 // Pitfalls; `--sections all` prints the whole doc. Paths are relative to the project. Nothing claiming a file, or
-// nothing mentioning a topic, is said so and exits non-zero.
+// nothing mentioning a topic, is said so and exits non-zero. A doc that is deprecated, a draft or past its
+// `stale_after` says so under its heading, and a `[^id]` footnote is printed as a link to the source it cites.
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closure, detectTechnologies, expandGroups, headings, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, proseLines, scanProject, section, stackClosure } from './lib/graph.mjs';
+import { citeSources, closure, detectTechnologies, expandGroups, headings, lifecycleNotes, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, proseLines, scanProject, section, stackClosure } from './lib/graph.mjs';
 
 const usage = [
   'usage: dossier.mjs <project dir> <file>... [--sections <name>,...] [--with <group>]...',
@@ -104,8 +105,17 @@ function claimsFor(file) {
   return hits;
 }
 
+/** A doc's body, each `[^id]` footnote turned into a link to the source it cites. */
 function bodyOf(node) {
-  return parseFrontmatter(readFileSync(node.path, 'utf8')).body;
+  return citeSources(parseFrontmatter(readFileSync(node.path, 'utf8')).body, node.sources);
+}
+
+/** A doc's heading in the output, with what to know before relying on it. */
+function printHeading(node, suffix = '') {
+  process.stdout.write(`\n## ${node.title}${suffix}\n\n`);
+  for (const note of lifecycleNotes(node)) {
+    process.stdout.write(`> ${note}\n\n`);
+  }
 }
 
 function printSections(node) {
@@ -175,7 +185,7 @@ for (const file of files) {
       continue;
     }
     seen.add(node.id);
-    process.stdout.write(`\n## ${node.title}\n\n`);
+    printHeading(node);
     printSections(node);
   }
 }
@@ -192,7 +202,7 @@ if (topic.length > 0) {
       continue;
     }
     any = true;
-    process.stdout.write(`\n## ${node.title} (${node.path})\n\n`);
+    printHeading(node, ` (${node.path})`);
     for (const it of matching) {
       process.stdout.write(`- [${it.section}] ${it.text.replace(/^- /, '')}\n`);
     }

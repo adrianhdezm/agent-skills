@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: ESLint + Prettier
+description: '`eslint-config-prettier` and its placement; lint versus format checks'
 connects: [eslint, prettier]
 ---
 # ESLint + Prettier

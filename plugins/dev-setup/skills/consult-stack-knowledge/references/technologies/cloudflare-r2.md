@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Cloudflare R2
+description: the bucket binding, its generated type, what `put()` takes
+resource: https://developers.cloudflare.com/r2/
 role: service
 family: cloudflare-workers
 realises: [file-storage]

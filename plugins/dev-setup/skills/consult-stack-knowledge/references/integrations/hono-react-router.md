@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Hono + React Router
+description: one Hono handler builds the typed `appContext` and calls React Router
 connects: [hono, react-router]
 ---
 # Hono + React Router

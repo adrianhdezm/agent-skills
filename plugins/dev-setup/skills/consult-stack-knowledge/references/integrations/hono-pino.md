@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Hono + Pino
+description: a `requestLog` middleware on the shared logger, errors logged once by `onError`
 connects: [hono, pino]
 ---
 # Hono + Pino

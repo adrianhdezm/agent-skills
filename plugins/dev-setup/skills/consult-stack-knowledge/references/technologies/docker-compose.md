@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Docker Compose
+description: two-stage images, healthchecked services, the root `.env`
+resource: https://docs.docker.com/compose/
 role: runtime
 detect:
   files: [docker-compose.yml, compose.yml]

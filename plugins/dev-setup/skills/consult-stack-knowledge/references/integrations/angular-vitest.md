@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Vitest
+description: Analog's builder, the `unit` and `browser` projects, `tsconfig.spec.json`
 connects: [angular, vitest]
 ---
 # Angular + Vitest

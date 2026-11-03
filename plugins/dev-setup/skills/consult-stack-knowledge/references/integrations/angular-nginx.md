@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Nginx
+description: '`dist/<name>/browser` in the Nginx image, the router behind the SPA fallback'
 connects: [angular, nginx]
 ---
 # Angular + Nginx

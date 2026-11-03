@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: ESLint
+description: flat config, type-checked rules, the shared rules, framework presets
+resource: https://eslint.org
 role: tooling
 detect:
   files: ['eslint.config.*']

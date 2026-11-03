@@ -1,14 +1,22 @@
 ---
-kind: technology
+type: Technology
+title: React Router
+description: framework mode, the context, routes, route tests
+resource: https://reactrouter.com
 role: framework
 detect:
   files: [react-router.config.ts]
 aliases: ['React Router', react-router, 'reactRouter(']
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: react-router-releases
+    resource: https://github.com/remix-run/react-router/releases
+    title: React Router releases
 ---
 # React Router
 
-React Router 8 in framework mode, server-rendered: routes whose loaders and actions are the backend, a typed context,
-and generated route types.
+React Router 8[^react-router-releases] in framework mode, server-rendered: routes whose loaders and actions are the
+backend, a typed context, and generated route types.
 
 ## Use it like this
 
@@ -114,3 +122,5 @@ export default async function handleRequest(
 - **Route components render through `createRoutesStub`** with `loader` and `action` stubs. To show an action's result
   without submitting (a file input, say), pass `hydrationData={{ actionData: … }}`.
 - **Do not test** React Router itself, or primitives a registry provides.
+
+[^react-router-releases]: React Router releases

@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Vitest
+description: route tests in browser mode through `createRoutesStub`
 connects: [react-router, vitest]
 ---
 # React Router + Vitest

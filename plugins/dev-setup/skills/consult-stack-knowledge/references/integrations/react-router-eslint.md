@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + ESLint
+description: the React and accessibility presets, the routes and tests overrides, ESLint 9
 connects: [react-router, eslint]
 ---
 # React Router + ESLint

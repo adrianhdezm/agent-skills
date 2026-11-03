@@ -4,25 +4,30 @@
 //
 //   node build-graph.mjs [--check] [<references dir>]
 //
-// Without --check it writes graph.json and then runs the checks; with --check it only checks, and also fails when the
-// committed graph.json is out of date. The checks: every frontmatter parses; every doc has a row in catalog.md and
-// every catalog row a doc; every edge names a doc that exists; a doc's Realises line lists exactly the concepts its
-// frontmatter does; each blueprint's Composition is exactly what its technologies and optional groups bring (an entry
-// marked `— optional (<group>)` is brought by that group and not by the stack alone, while an entry listed
-// unconditionally though only a group brings it is allowed, since the assembly keeps it: the React Router stacks list
-// Database and Data access ahead of the `database` group); each blueprint has a Starter whose parts name only its own
-// groups; and the Stacks table of SKILL.md names each blueprint and its groups. It prints each violation with the fix,
-// and exits non-zero when there is one.
-import { readFileSync, writeFileSync } from 'node:fs';
+// Without --check it writes graph.json and the index.md files (the bundle root's, carrying `okf_version`, and one per
+// layer listing its docs with their descriptions) and then runs the checks; with --check it only checks, and also fails
+// when a committed one is out of date. The checks: every frontmatter parses, and every markdown file but the reserved
+// index.md and log.md has a `type` (OKF conformance); every doc's type is its layer's, its title its H1, and it has a
+// description; OKF's optional fields are well formed (datetimes with an offset, actors, statuses, sources with a
+// resource, and each `[^id]` footnote naming a source, defined and cited); every doc has a row in catalog.md whose
+// summary is its description, and every catalog row a doc; every edge names a doc that exists; a doc's Realises line
+// lists exactly the concepts its frontmatter does; each blueprint's Composition is exactly what its technologies and
+// optional groups bring (an entry marked `— optional (<group>)` is brought by that group and not by the stack alone,
+// while an entry listed unconditionally though only a group brings it is allowed, since the assembly keeps it: the
+// React Router stacks list Database and Data access ahead of the `database` group); each blueprint has a Starter whose
+// parts name only its own groups; and the Stacks table of SKILL.md names each blueprint and its groups. It prints each
+// violation with the fix, and exits non-zero when there is one.
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closure, expandGroups, linkedIds, loadGraph, parseFrontmatter, stackClosure, stackTechnologies, tableRows } from './lib/graph.mjs';
+import { expandGroups, footnotes, LAYERS, linkedIds, loadGraph, parseFrontmatter, RESERVED, stackClosure, STATUSES, tableRows } from './lib/graph.mjs';
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes('--check');
 const root = resolve(args.find((a) => !a.startsWith('--')) ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'references'));
 const graph = loadGraph(root);
 const problems = [...graph.problems];
+const docs = [...Object.values(graph.concepts), ...Object.values(graph.technologies).filter((t) => !t.external), ...Object.values(graph.integrations), ...Object.values(graph.stacks)];
 
 // --- every edge resolves -------------------------------------------------------------------------------------------
 
@@ -76,7 +81,8 @@ for (const doc of [...Object.values(graph.technologies).filter((t) => !t.externa
 
 // --- the catalog lists every doc, and only docs ---------------------------------------------------------------------
 
-const catalog = linkedIds(readFileSync(join(root, 'catalog.md'), 'utf8'));
+const catalogText = readFileSync(join(root, 'catalog.md'), 'utf8');
+const catalog = linkedIds(catalogText);
 for (const kind of ['concept', 'technology', 'integration']) {
   const layer = { concept: 'architecture', technology: 'technologies', integration: 'integrations' }[kind];
   const listed = catalog.filter((l) => l.layer === layer).map((l) => l.id);
@@ -88,6 +94,118 @@ for (const kind of ['concept', 'technology', 'integration']) {
   for (const id of listed) {
     if (!has(kind, id)) {
       problems.push(`catalog.md: links to ${layer}/${id}.md, which does not exist`);
+    }
+  }
+}
+// A catalog row's second cell is its doc's description, word for word.
+for (const row of tableRows(catalogText)) {
+  const link = linkedIds(row[0])[0];
+  const doc = link && { architecture: graph.concepts, technologies: graph.technologies, integrations: graph.integrations }[link.layer]?.[link.id];
+  if (doc && typeof doc.description === 'string' && row[1] !== doc.description) {
+    problems.push(`catalog.md: the row for ${doc.file} says "${row[1]}" but its description is "${doc.description}": make them the same`);
+  }
+}
+
+// --- OKF: every file conforms, and the optional fields are well formed ---------------------------------------------
+
+const DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+const ACTOR = /^(human|process):\S+$|^[^\s/:]+\/\S+$/;
+const PATH = /^(https?:\/\/\S+|\/\S*|\.{0,2}\/?[\w.-]\S*)$/;
+
+/** Every markdown file under the bundle root but the reserved ones carries a non-empty `type` (OKF §11). */
+function* markdownFiles(dir, rel = '') {
+  for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.isDirectory()) {
+      yield* markdownFiles(join(dir, entry.name), `${rel}${entry.name}/`);
+    } else if (entry.name.endsWith('.md')) {
+      yield { path: join(dir, entry.name), file: `${rel}${entry.name}`, name: entry.name };
+    }
+  }
+}
+const docFiles = new Set(docs.map((d) => d.file));
+for (const { path, file, name } of markdownFiles(root)) {
+  if (RESERVED.has(name) || docFiles.has(file)) {
+    continue; // a doc's type is checked against its layer by loadGraph
+  }
+  let data;
+  try {
+    data = parseFrontmatter(readFileSync(path, 'utf8'), file).data;
+  } catch {
+    problems.push(`${file}: its frontmatter does not parse`);
+    continue;
+  }
+  if (typeof data.type !== 'string' || data.type === '') {
+    problems.push(`${file}: no type in its frontmatter: every markdown file but index.md and log.md needs one (OKF)`);
+  }
+}
+
+function checkDatetime(file, what, value) {
+  if (typeof value !== 'string' || !DATETIME.test(value)) {
+    problems.push(`${file}: ${what} is "${value}", not an ISO 8601 datetime with an offset (2027-05-01T00:00:00Z)`);
+  }
+}
+function checkStamp(file, what, stamp) {
+  if (typeof stamp !== 'object' || Array.isArray(stamp) || typeof stamp.by !== 'string' || !ACTOR.test(stamp.by)) {
+    problems.push(`${file}: ${what} needs by: human:<id>, process:<id> or <producer>/<version>`);
+    return;
+  }
+  if (stamp.at !== undefined) {
+    checkDatetime(file, `${what}.at`, stamp.at);
+  }
+}
+for (const doc of docs) {
+  const { file } = doc;
+  const { body } = parseFrontmatter(readFileSync(doc.path, 'utf8'));
+  if (typeof doc.description !== 'string' || doc.description === '') {
+    problems.push(`${file}: no description: add its one-line summary${doc.kind === 'stack' ? '' : ', the same as its catalog row'}`);
+  }
+  if (doc.resource !== undefined && (typeof doc.resource !== 'string' || !PATH.test(doc.resource))) {
+    problems.push(`${file}: resource "${doc.resource}" is not a URL or a path`);
+  }
+  if (doc.status !== undefined && !STATUSES.includes(doc.status)) {
+    problems.push(`${file}: status "${doc.status}" is not one of ${STATUSES.join(', ')}`);
+  }
+  if (doc.stale_after !== undefined) {
+    checkDatetime(file, 'stale_after', doc.stale_after);
+  }
+  if (doc.generated !== undefined) {
+    checkStamp(file, 'generated', doc.generated);
+  }
+  for (const [n, stamp] of (doc.verified ?? []).entries()) {
+    checkStamp(file, `verified[${n}]`, stamp);
+    if (stamp?.at === undefined) {
+      problems.push(`${file}: verified[${n}] needs at: the datetime it was confirmed`);
+    }
+  }
+  const sources = doc.sources ?? [];
+  if (!Array.isArray(sources)) {
+    problems.push(`${file}: sources is a list of { id, resource, title }`);
+    continue;
+  }
+  const ids = new Set();
+  for (const [n, source] of sources.entries()) {
+    if (typeof source !== 'object' || typeof source.resource !== 'string' || source.resource === '') {
+      problems.push(`${file}: sources[${n}] needs a resource`);
+      continue;
+    }
+    if (source.id !== undefined) {
+      if (ids.has(source.id)) {
+        problems.push(`${file}: two sources have the id "${source.id}"`);
+      }
+      ids.add(source.id);
+    }
+    if (source.last_modified !== undefined) {
+      checkDatetime(file, `sources[${n}].last_modified`, source.last_modified);
+    }
+  }
+  const { markers, definitions } = footnotes(body);
+  for (const label of new Set([...markers, ...definitions])) {
+    if (!ids.has(label)) {
+      problems.push(`${file}: the footnote [^${label}] names no source: add { id: ${label}, resource, title } to its sources`);
+    } else if (!markers.includes(label)) {
+      problems.push(`${file}: the footnote [^${label}] is defined but never cited`);
+    } else if (!definitions.includes(label)) {
+      problems.push(`${file}: the footnote [^${label}] is cited but has no "[^${label}]: <title>" line at the end`);
     }
   }
 }
@@ -181,19 +299,42 @@ const serialised = `${JSON.stringify(
   (key, value) => (key === 'path' || key === 'problems' ? undefined : value),
   2
 )}\n`;
-const target = join(root, 'graph.json');
-if (checkOnly) {
-  let current;
-  try {
-    current = readFileSync(target, 'utf8');
-  } catch {
-    current = '';
+// --- the index.md files: OKF's progressive disclosure, generated like graph.json ---------------------------------
+
+const LAYER_INDEX = {
+  architecture: ['Architecture', 'the concepts: what holds whatever the technology'],
+  technologies: ['Technologies', 'one technology each: how it is used, its required values and pitfalls'],
+  integrations: ['Integrations', 'where code from one technology calls into another'],
+  stacks: ['Blueprints', 'the house stacks, each composed from the docs above']
+};
+const entry = (doc, href) => `* [${doc.title}](${href}) - ${doc.description}${doc.status === 'deprecated' ? ' (deprecated)' : ''}`;
+const generated = new Map([['graph.json', serialised]]);
+const catalogData = parseFrontmatter(catalogText, 'catalog.md').data;
+const rootIndex = ['---', 'okf_version: "0.2"', '---', '# Stack knowledge', '', `* [${catalogData.title}](catalog.md) - ${catalogData.description}`, '', '# Layers', ''];
+for (const [dir, kind] of Object.entries(LAYERS)) {
+  const [heading, about] = LAYER_INDEX[dir];
+  const table = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks }[kind];
+  const ids = graph.order[kind].filter((id) => !table[id].external);
+  rootIndex.push(`* [${heading}](${dir}/) - ${about} (${ids.length} docs)`);
+  generated.set(`${dir}/index.md`, `# ${heading}\n\n${ids.map((id) => entry(table[id], `${id}.md`)).join('\n')}\n`);
+}
+generated.set('index.md', `${rootIndex.join('\n')}\n`);
+
+for (const [file, content] of generated) {
+  const target = join(root, file);
+  if (checkOnly) {
+    let current;
+    try {
+      current = readFileSync(target, 'utf8');
+    } catch {
+      current = '';
+    }
+    if (current !== content) {
+      problems.push(`${file} is out of date: run build-graph.mjs`);
+    }
+  } else {
+    writeFileSync(target, content);
   }
-  if (current !== serialised) {
-    problems.push('graph.json is out of date: run build-graph.mjs');
-  }
-} else {
-  writeFileSync(target, serialised);
 }
 
 if (problems.length > 0) {
@@ -202,4 +343,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 const counts = `${Object.keys(graph.concepts).length} concepts, ${graph.order.technology.length} technologies, ${Object.keys(graph.integrations).length} integrations, ${Object.keys(graph.stacks).length} stacks`;
-console.log(`${checkOnly ? 'graph.json is current' : 'graph.json written'}: ${counts}`);
+console.log(`${checkOnly ? 'graph.json and the index.md files are current' : 'graph.json and the index.md files written'}: ${counts}`);

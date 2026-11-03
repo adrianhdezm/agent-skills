@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Nginx + Docker Compose
+description: 'a static web image: a Node build, then Nginx; its Compose service'
 connects: [nginx, docker-compose]
 ---
 # Nginx + Docker Compose

@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: Hono API on Node
+description: A single-package Hono + Drizzle + Postgres REST API, compiled by `tsc` and run on Node through `@hono/node-server`, next to Postgres in Docker Compose, with an `entity` CRUDL resource wired from the table to the routes.
 technologies: [pnpm, typescript, node, hono, pino, postgres, drizzle, docker-compose, eslint, prettier, vitest]
 ---
 # Hono API on Node

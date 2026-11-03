@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Express + Pino
+description: '`pino-http` first, `req.log` per request, errors logged once by the error handler'
 connects: [express, pino]
 ---
 # Express + Pino

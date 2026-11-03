@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Node + Docker Compose
+description: the compiled service image, built then run from `dist/`; its `migrate` and `api` services
 connects: [node, docker-compose]
 realises: []
 unless: [react-router]

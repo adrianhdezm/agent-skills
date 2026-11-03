@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Drizzle + Cloudflare D1
+description: a client per request, the `sqlite` dialect, `db.batch()`, tests in workerd
 connects: [drizzle, cloudflare-d1]
 ---
 # Drizzle + Cloudflare D1

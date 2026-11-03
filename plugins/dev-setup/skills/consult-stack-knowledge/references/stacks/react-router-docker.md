@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: React Router on Node
+description: A server-rendered React Router app on Node, next to Postgres in Docker Compose, styled with Tailwind and shadcn/ui.
 technologies: [pnpm, typescript, react-router, vite, tailwind, shadcn, hono, node, docker-compose, postgres, eslint, prettier, vitest]
 optional:
   database: [drizzle]

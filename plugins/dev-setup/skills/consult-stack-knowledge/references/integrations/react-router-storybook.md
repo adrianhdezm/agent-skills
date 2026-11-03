@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Storybook
+description: '`@storybook/react-vite` over the app''s config without the React Router plugin'
 connects: [react-router, storybook]
 ---
 # React Router + Storybook

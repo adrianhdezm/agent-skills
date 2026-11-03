@@ -1,15 +1,23 @@
 ---
-kind: technology
+type: Technology
+title: Storybook
+description: a story file beside every component, one story per state, on the app's Vite builder
+resource: https://storybook.js.org
 role: tooling
 realises: [ui-components]
 detect:
   files: [.storybook/]
 aliases: [Storybook, '@storybook/', storybook@]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: storybook-releases
+    resource: https://github.com/storybookjs/storybook/releases
+    title: Storybook releases
 ---
 # Storybook
 
-Storybook 10 as the workshop where components are built and reviewed: a story file beside every component, one story per
-meaningful state, on the app's own build tool. Not a test runner.
+Storybook 10[^storybook-releases] as the workshop where components are built and reviewed: a story file beside every
+component, one story per meaningful state, on the app's own build tool. Not a test runner.
 
 **Realises:** [UI components](../architecture/ui-components.md)
 
@@ -46,3 +54,5 @@ meaningful state, on the app's own build tool. Not a test runner.
 - **Every component has a story file beside it**, one story per meaningful state, `args` for its inputs and `fn()` for
   its outputs, titled `UI/<Name>` for a primitive and `Components/<Name>` for an app component.
 - **Storybook is where components are built and reviewed, not a test**: behaviour is tested by the component's tests.
+
+[^storybook-releases]: Storybook releases

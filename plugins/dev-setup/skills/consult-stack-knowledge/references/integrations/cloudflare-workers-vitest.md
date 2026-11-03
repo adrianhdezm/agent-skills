@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Cloudflare Workers + Vitest
+description: tests in workerd through `cloudflare:workers`
 connects: [cloudflare-workers, vitest]
 ---
 # Cloudflare Workers + Vitest

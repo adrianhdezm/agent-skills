@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: shadcn
+description: the CLI, registries, `components.json` aliases and the `paths` they need
+resource: https://ui.shadcn.com
 role: library
 realises: [ui-components]
 detect:

@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Prettier
+description: import and class sorting
 connects: [react-router, prettier]
 ---
 # React Router + Prettier

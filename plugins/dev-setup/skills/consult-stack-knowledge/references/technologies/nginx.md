@@ -1,9 +1,17 @@
 ---
-kind: technology
+type: Technology
+title: Nginx
+description: static files with an SPA fallback and no proxy
+resource: https://nginx.org
 role: runtime
 detect:
   files: [nginx.conf]
 aliases: [Nginx, nginx]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: nginx-image
+    resource: https://hub.docker.com/_/nginx
+    title: The official nginx image and its tags
 ---
 # Nginx
 
@@ -20,7 +28,7 @@ Nginx as the server of a single-page app's static build: one `nginx.conf`, an SP
 
 | What         | Value                                                                                         |
 | ------------ | --------------------------------------------------------------------------------------------- |
-| image        | `nginx:1.27-alpine`                                                                           |
+| image        | `nginx:1.27-alpine`[^nginx-image]                                                             |
 | `nginx.conf` | `listen 80`, `root /usr/share/nginx/html`, `location / { try_files $uri $uri/ /index.html; }` |
 
 ## Pitfalls
@@ -30,3 +38,5 @@ Nginx as the server of a single-page app's static build: one `nginx.conf`, an SP
 ## Conventions
 
 - **Nginx serves the static build with an SPA fallback and proxies nothing**: `nginx.conf` has no `proxy_pass`.
+
+[^nginx-image]: The official nginx image and its tags

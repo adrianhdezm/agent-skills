@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: React Router on Workers
+description: A server-rendered React Router app whose server is a Hono Worker on Cloudflare's edge, styled with Tailwind and shadcn/ui.
 technologies: [pnpm, typescript, react-router, vite, tailwind, shadcn, hono, cloudflare-workers, eslint, prettier, vitest]
 optional:
   database: [cloudflare-d1, drizzle]

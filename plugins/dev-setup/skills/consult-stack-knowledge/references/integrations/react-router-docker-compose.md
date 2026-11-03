@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Docker Compose
+description: the app image running `server.ts` over the build; its `app` service
 connects: [react-router, docker-compose]
 ---
 # React Router + Docker Compose

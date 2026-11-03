@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: Node package
+description: 'A single-package TypeScript project that Node 24 runs as it is: a library, a CLI or a script.'
 technologies: [pnpm, typescript, node, eslint, prettier, vitest]
 ---
 # Node package

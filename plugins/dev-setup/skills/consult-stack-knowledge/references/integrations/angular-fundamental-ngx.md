@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Fundamental NGX
+description: the Fiori registry under `components/ui/`, its ignores, its pitfalls
 connects: [angular, fundamental-ngx]
 realises: [ui-components]
 detect:

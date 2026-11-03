@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: S3 storage
+description: the AWS SDK v3 client, the `S3_*` settings, RustFS in Compose
+resource: https://github.com/aws/aws-sdk-js-v3
 role: service
 realises: [file-storage]
 detect:

@@ -1,9 +1,17 @@
 ---
-kind: technology
+type: Technology
+title: TypeScript
+description: one project per runtime, checking without emitting, the 6.0.x pin
+resource: https://www.typescriptlang.org
 role: toolchain
 detect:
   files: ['tsconfig*.json']
 aliases: [TypeScript]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: typescript-releases
+    resource: https://github.com/microsoft/TypeScript/releases
+    title: TypeScript releases
 ---
 # TypeScript
 
@@ -27,9 +35,9 @@ How TypeScript is configured and pinned: one project per runtime, checked withou
 | ------------------ | ----------------------------- | --------- |
 | built by a bundler | `ESNext` / `bundler`          | `./thing` |
 
-- **One exact TypeScript on the 6.0 line**, pinned with `-E`, in the catalog in a monorepo. TypeScript 7 is out and
-  tools that read TypeScript cap their peer range below it, so a caret or `@latest` breaks them on the next install.
-  Move it only when every peer range allows.
+- **One exact TypeScript on the 6.0 line**, pinned with `-E`, in the catalog in a monorepo. TypeScript 7 is
+  out[^typescript-releases] and tools that read TypeScript cap their peer range below it, so a caret or `@latest` breaks
+  them on the next install. Move it only when every peer range allows.
 - **Every config file belongs to a project**, `tsconfig.node.json`'s `include`, so it is checked with types.
 
 ## Required values
@@ -85,3 +93,5 @@ pnpm add -D -E "typescript@$(pnpm view 'typescript@~6.0.0' version)"
 - **`import type` for types**, so nothing type-only reaches the output.
 - **No `enum`, `namespace`, parameter properties or `import x = require()`**: use `as const` objects and unions.
 - **Never write a type that mirrors a generated file**: infer it.
+
+[^typescript-releases]: TypeScript releases

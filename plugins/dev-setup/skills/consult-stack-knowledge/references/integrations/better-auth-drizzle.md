@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Better Auth + Drizzle
+description: the auth tables in the schema, the adapter and its provider
 connects: [better-auth, drizzle]
 ---
 # Better Auth + Drizzle
