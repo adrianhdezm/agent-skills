@@ -32,6 +32,7 @@ its own, for an API that several clients use.
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
 - [Prettier](../technologies/prettier.md)
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 
 ## Examples

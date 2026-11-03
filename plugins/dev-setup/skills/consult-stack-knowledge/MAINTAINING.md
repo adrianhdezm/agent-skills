@@ -6,7 +6,7 @@ do not read this file.
 ## The five layers
 
 An **architecture** doc says how a cross-cutting concept (code style, a database, data access, a REST API,
-authentication, file storage, UI components) is done whatever the technology. A **technology** doc says how one
+authentication, file storage, UI components, testing) is done whatever the technology. A **technology** doc says how one
 technology is used. An **integration** doc says how two connect: where code from one calls into the other. An
 **example** says what a worked case must show (its data, behaviour and tests) and which docs each part applies, so it is
 built from the docs, never copied file by file. A **stack** blueprint names the concepts, technologies, integrations and

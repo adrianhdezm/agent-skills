@@ -23,6 +23,7 @@ Worker.
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
 - [Prettier](../technologies/prettier.md)
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 - [Cloudflare Workers + Vitest](../integrations/cloudflare-workers-vitest.md)
 

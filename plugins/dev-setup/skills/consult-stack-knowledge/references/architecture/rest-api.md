@@ -31,8 +31,8 @@ it.
   `{ status: 'ok', … }` or 503.
 - **Clients mirror the API's types in the same commit** as the API change, so a client never compiles against a stale
   shape, and take the base URL from configuration.
-- **Tests at two tiers**: each handler as a function with stubbed dependencies, for every branch; and the real app over
-  HTTP, for what only the assembled stack does (body parsing, the route table, the error chain).
+- **Tests at two tiers** of [Testing](testing.md): each handler as a unit, with stubbed dependencies, for every branch;
+  and the real app over HTTP, for what only the assembled stack does (body parsing, the route table, the error chain).
 
 ## Required values
 

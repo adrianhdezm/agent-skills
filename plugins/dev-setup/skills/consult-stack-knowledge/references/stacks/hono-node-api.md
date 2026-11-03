@@ -33,6 +33,7 @@ on Node with Hono in place of Express: the same contract, layers, tests and imag
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
 - [Prettier](../technologies/prettier.md)
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 
 ## Examples
