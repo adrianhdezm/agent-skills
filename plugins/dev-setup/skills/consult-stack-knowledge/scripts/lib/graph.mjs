@@ -1,5 +1,5 @@
 // The knowledge graph behind the docs: every doc's frontmatter (its kind and edges), the catalog's order, each
-// blueprint's composition, and the files each doc claims. Scripts load it from the docs with `loadGraph`, so the docs
+// blueprint's composition and Starter parts, and the files each doc claims. Scripts load it from the docs with `loadGraph`, so the docs
 // stay the source of truth; `references/graph.json` is the same graph written out for reading and diffing.
 //
 // Frontmatter is a small YAML subset: `key: scalar`, `key: [flow, list]` (nestable), and one level of indented
@@ -8,7 +8,6 @@
 //   technology   role (toolchain | runtime | framework | service | library | tooling), realises, detect, aliases, family
 //   integration  connects (the technologies it joins; one without a doc is an external technology), realises, detect,
 //                unless (technologies whose presence means the seam is not used)
-//   example      needs (alternatives, each a list of technologies that must all be present), unless
 //   stack        technologies, optional (group → technologies), requires (group → groups), concepts (the ones its
 //                technologies do not realise but the stack is built around)
 // `detect` holds files (globs, a trailing `/` for a directory), dependencies, manifest (key paths in package.json),
@@ -20,7 +19,6 @@ export const LAYERS = {
   architecture: 'concept',
   technologies: 'technology',
   integrations: 'integration',
-  examples: 'example',
   stacks: 'stack'
 };
 const DIRS = Object.fromEntries(Object.entries(LAYERS).map(([dir, kind]) => [kind, dir]));
@@ -198,13 +196,10 @@ export function linkedIds(text) {
 /** Loads the graph from the docs under `root` (the references directory). */
 export function loadGraph(root) {
   root = resolve(root);
-  const graph = { root, concepts: {}, technologies: {}, integrations: {}, examples: {}, stacks: {}, order: {} };
-  const byKind = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, example: graph.examples, stack: graph.stacks };
+  const graph = { root, concepts: {}, technologies: {}, integrations: {}, stacks: {}, order: {} };
+  const byKind = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks };
   const problems = [];
   for (const [dir, kind] of Object.entries(LAYERS)) {
-    if (!existsSync(join(root, dir))) {
-      continue;
-    }
     for (const file of readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).sort()) {
       const id = basename(file, '.md');
       const path = join(root, dir, file);
@@ -225,17 +220,13 @@ export function loadGraph(root) {
         node.connects ??= [];
         node.unless ??= [];
       }
-      if (kind === 'example') {
-        node.needs ??= [];
-        node.unless ??= [];
-      }
       if (kind === 'stack') {
         node.technologies ??= [];
         node.optional ??= {};
         node.requires ??= {};
         node.concepts ??= [];
         node.composition = compositionOf(body, 'Composition');
-        node.examples = compositionOf(body, 'Examples');
+        node.starter = starterOf(body);
         node.owns = claimedPaths(body);
       }
       byKind[kind][id] = node;
@@ -278,6 +269,23 @@ function compositionOf(body, heading) {
   }));
 }
 
+/** A blueprint's Starter parts: each `### ` heading of its "## Starter" section, with the group it needs when the heading
+ * says `with \`<group>\``. A Starter without parts is one part, the whole section. */
+export function starterOf(body) {
+  const text = section(body, 'Starter');
+  if (text === undefined) {
+    return undefined;
+  }
+  return headings(text)
+    .filter((h) => h.level === 3)
+    .map((h) => ({ title: h.title, group: /\bwith `([a-z0-9-]+)`/i.exec(h.title)?.[1] }));
+}
+
+/** The Starter parts a project with these groups starts from. */
+export function starterParts(stack, groups) {
+  return (stack.starter ?? []).filter((part) => !part.group || groups.includes(part.group)).map((part) => part.title);
+}
+
 /** The paths a doc claims: the first column of its "Where it lives" and "Layout" tables, and the files its Required values name. */
 function claimedPaths(body) {
   const claims = [];
@@ -312,7 +320,7 @@ function claimedPaths(body) {
 }
 
 export function docOf(graph, kind, id) {
-  const table = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, example: graph.examples, stack: graph.stacks }[kind];
+  const table = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks }[kind];
   return table?.[id];
 }
 
@@ -320,7 +328,7 @@ export function docOf(graph, kind, id) {
 
 /**
  * Everything a set of technologies brings: the integrations whose every end is present and no `unless` rules out,
- * the concepts they realise (plus the always-on ones and `extraConcepts`), and the examples whose needs are met.
+ * the concepts they realise (plus the always-on ones and `extraConcepts`).
  */
 export function closure(graph, technologies, { extraConcepts = [] } = {}) {
   const techs = new Set(technologies);
@@ -342,15 +350,10 @@ export function closure(graph, technologies, { extraConcepts = [] } = {}) {
   for (const c of extraConcepts) {
     concepts.add(c);
   }
-  const examples = graph.order.example.filter((id) => {
-    const e = graph.examples[id];
-    return e.needs.some((alt) => alt.every((t) => techs.has(t))) && !e.unless.some((t) => techs.has(t));
-  });
   return {
     technologies: graph.order.technology.filter((id) => techs.has(id)),
     concepts: graph.order.concept.filter((id) => concepts.has(id)),
-    integrations,
-    examples
+    integrations
   };
 }
 

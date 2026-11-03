@@ -73,7 +73,7 @@ if (match) {
   docs = [];
   stackLine = 'none detected';
 }
-const nodeOf = (e) => ({ concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, example: graph.examples, stack: graph.stacks })[e.kind][e.id];
+const nodeOf = (e) => ({ concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks })[e.kind][e.id];
 
 // --- matching ----------------------------------------------------------------------------------------------------
 
