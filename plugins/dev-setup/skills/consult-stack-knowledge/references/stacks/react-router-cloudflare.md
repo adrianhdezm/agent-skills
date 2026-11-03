@@ -93,7 +93,7 @@ my-app/
 | What              | Value                                                                                                                                                                                                                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ports             | 5173 (`pnpm dev`, Vite), 4173 (`vite preview`), 6006 (Storybook, when picked)                                                                                                                                                                                                          |
-| scripts           | `dev` `react-router dev`; `build` `react-router build`; `preview`, `deploy`, `cf-typegen`; `typecheck` `wrangler types && react-router typegen && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                            |
+| scripts           | `dev` `react-router dev`; `build` `react-router build`; `preview`, `cf:deploy`, `cf-typegen`; `typecheck` `wrangler types && react-router typegen && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                         |
 | `allowBuilds`     | `esbuild`, `workerd`                                                                                                                                                                                                                                                                   |
 | dependencies      | the React Router set and the shadcn/ui packages from their docs; `hono`                                                                                                                                                                                                                |
 | devDependencies   | the React Router, Vite and shadcn/ui docs' dev packages; the shared tooling with `eslint@9` and `@eslint/js@9`, `globals`, the React lint plugins, the Prettier plugins, the Vitest browser packages, `playwright`; `wrangler`, `@cloudflare/vite-plugin`, and the pinned `typescript` |
@@ -346,7 +346,7 @@ export default defineConfig({
 
 ### Commands
 
-`pnpm dev` serves the app in workerd; `pnpm preview` runs the production build; `pnpm deploy` ships it.
+`pnpm dev` serves the app in workerd; `pnpm preview` runs the production build; `pnpm cf:deploy` ships it.
 `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` and `pnpm format:check` are the five required checks.
 
 ### Before you merge

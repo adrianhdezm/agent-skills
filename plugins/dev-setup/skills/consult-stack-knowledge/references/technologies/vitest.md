@@ -56,8 +56,6 @@ reaching the DAO')`, not `it('test list error')`.
 - **Import from `vitest`** (`describe`, `it`, `expect`, `vi`); no globals.
 - **Fakes are small hand-written objects; `vi.fn()` where a call or its arguments matter.** Shared mocks and fixtures
   live in the test utilities folder, not in test files.
-- **Find UI by role and accessible name**, never by CSS class or test id. Renaming a heading, label or button is a change
-  to its tests.
 
 ### What not to test
 
@@ -65,8 +63,8 @@ reaching the DAO')`, not `it('test list error')`.
   test or the compiler already catches it, do not add it.
 - **Test a behaviour once, at the cheapest tier that can see it.** Go up a tier only for what the lower one cannot see,
   and cover only that addition there.
-- **No tests for wiring without logic**: route tables, root components, layouts, a reducer with no handlers, a one-line
-  cast, an effect or handler that only forwards. The tests that run through them prove them.
+- **No tests for wiring without logic**: route tables, root components, layouts, a state handler with no logic, a
+  one-line cast, a handler that only forwards. The tests that run through them prove them.
 - **No tests for what the compiler enforces**: a union, a required input, a field naming a real column.
 - **A caller tests its own branches, not its callee's rules.** One schema rejection in a controller test, not every
   rule of the schema.

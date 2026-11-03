@@ -338,13 +338,6 @@ export function serveApp(app: Hono<AppEnv>): Promise<TestServer> {
 }
 ```
 
-## Pitfalls
-
-- **`c.req.json()` throws on a malformed body**: catch it in the handler and throw a 400 `HTTPException`, or it
-  surfaces as a 500.
-- **An error thrown from `body-limit`'s default answer** has no JSON body: give it an `onError` that throws a 413
-  `HTTPException`, so the error handler shapes it.
-
 ## Conventions
 
 - **The server entry builds the DAOs once** and hands them to `createApp(context)`; adding a resource adds its DAO

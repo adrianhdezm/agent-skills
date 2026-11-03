@@ -20,8 +20,7 @@ through the file service on the app's context.
   `pnpm wrangler r2 bucket create <name> --binding=APP_FILES --update-config` writes the binding into `wrangler.jsonc`,
   merged with what is there. The name is the user's, or the project's in hyphen case with `-files`.
 - **The binding is typed by `wrangler types`**: `APP_FILES: R2Bucket` appears in `Env` after `pnpm cf-typegen`.
-- **The file service takes the bucket from the bindings**, built inside the request handler with the request's database
-  client: `new FilesService(db, c.env.APP_FILES)`.
+- **The file service takes the bucket from the bindings** (`env.APP_FILES`), built inside the request handler.
 - **Bytes go in as an `ArrayBuffer` (or a stream or a string)**, with the content type in `httpMetadata`.
 
 ## Required values
@@ -40,6 +39,5 @@ through the file service on the app's context.
 
 ## Conventions
 
-- **The bucket is bound as `APP_FILES` under `r2_buckets`**; after a binding change, `pnpm cf-typegen` and commit
-  `worker-configuration.d.ts`.
-- **Only the file service touches the bucket**, built per request from `c.env.APP_FILES`.
+- **The bucket is bound as `APP_FILES` under `r2_buckets`.**
+- **Only the file service touches the bucket**, built per request from `env.APP_FILES`.

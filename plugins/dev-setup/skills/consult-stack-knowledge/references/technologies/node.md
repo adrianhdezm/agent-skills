@@ -16,6 +16,8 @@ Node 24 as a runtime: loading the environment, configuration that fails loudly, 
   needs it. The flag is strict, not `--env-file-if-exists`, so a missing file fails at start; an empty `.env` is
   created where nothing needs a value yet. `start` in production gets its environment from the platform, not from a
   file. `.env` is git-ignored; `.env.example` is committed.
+- **`--env-file` never overrides a variable already set**, so a test runner or a script can pass its own `PORT` to a
+  server that loads `.env`.
 - **Configuration is read once and fails loudly**: code that needs a variable throws when it is unset, with no fallback
   value, so a misconfiguration is never masked and no credential sits in source. A log level is the one exception: it
   changes only what is printed, so it may default.
@@ -28,11 +30,6 @@ Node 24 as a runtime: loading the environment, configuration that fails loudly, 
 | -------------- | ---------------- |
 | `engines.node` | `>=24`           |
 | image tag      | `node:24-alpine` |
-
-## Pitfalls
-
-- **`--env-file` never overrides a variable already set**, which is what lets a test runner or a script pass its own
-  `PORT` or `DATABASE_URL` to a server that loads `.env`.
 
 ## Conventions
 

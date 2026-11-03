@@ -14,7 +14,7 @@ Nginx as the server of a single-page app's static build: one `nginx.conf`, an SP
 - **Static files only**: the image copies the app's built files into Nginx's root and serves them; there is no
   application server behind it.
 - **An SPA fallback**: any path that is not a file serves `index.html`, so a deep link reaches the app's router.
-- **No proxy**: the app calls its API by a URL fixed at build time, so Nginx forwards nothing.
+- **No proxy**: the browser calls the API directly, so Nginx forwards nothing.
 
 ## Required values
 
@@ -29,9 +29,4 @@ Nginx as the server of a single-page app's static build: one `nginx.conf`, an SP
 
 ## Conventions
 
-- **Nginx serves the static build with an SPA fallback and proxies nothing.**
-
-## Verify it is wired
-
-- A request for an app route (not a file) answers 200 with `index.html`.
-- `nginx.conf` has no `proxy_pass`.
+- **Nginx serves the static build with an SPA fallback and proxies nothing**: `nginx.conf` has no `proxy_pass`.

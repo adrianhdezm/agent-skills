@@ -37,7 +37,7 @@ Demonstrates table names the concepts it shows, so which docs realise a concept 
 | [Prettier](technologies/prettier.md)                     | the shared config and the stacks' plugins                                                 | `.prettierrc`                           |
 | [Vitest](technologies/vitest.md)                         | one config of named projects, picking an environment, how tests are written               | `vitest.config.*`                       |
 | [Node](technologies/node.md)                             | running TypeScript as it is, `--env-file`, the dev loop                                   | `engines.node`, `node … .ts` scripts    |
-| [Docker Compose](technologies/docker-compose.md)         | the Postgres service, images with Corepack, the root `.env`                               | `docker-compose.yml`                    |
+| [Docker Compose](technologies/docker-compose.md)         | two-stage images, healthchecked services, the root `.env`                                 | `docker-compose.yml`                    |
 | [Hono](technologies/hono.md)                             | the server entry every server stack's runtime drives                                      | `hono` in dependencies                  |
 | [Cloudflare Workers](technologies/cloudflare-workers.md) | Wrangler, the compatibility date, the runtime types, secrets                              | `wrangler.jsonc`                        |
 | [React Router](technologies/react-router.md)             | framework mode, the context, routes, route tests                                          | `react-router.config.ts`                |
@@ -46,7 +46,7 @@ Demonstrates table names the concepts it shows, so which docs realise a concept 
 | [Vite](technologies/vite.md)                             | one `vite.config.ts`, plugin order, aliases from `tsconfig` `paths`, client types         | `vite.config.ts`                        |
 | [Storybook](technologies/storybook.md)                   | a story file beside every component, one story per state, on the app's Vite builder       | `.storybook/`                           |
 | [Nginx](technologies/nginx.md)                           | static files with an SPA fallback and no proxy                                            | `nginx.conf`                            |
-| [Angular](technologies/angular.md)                       | the CLI and its cleanup, signal components, the Analog tests, Storybook                   | `angular.json`                          |
+| [Angular](technologies/angular.md)                       | the CLI and its cleanup, signal components, two tiers of tests, a static build            | `angular.json`                          |
 | [NgRx](technologies/ngrx.md)                             | route-driven state and the request rules                                                  | `@ngrx/store` in dependencies           |
 | [Express](technologies/express.md)                       | the app factory, controllers, the error shape                                             | `express` in dependencies               |
 | [Pino](technologies/pino.md)                             | one JSON logger, `LOG_LEVEL`, errors as `{ err }`, `pino-pretty` as a dev pipe only       | `pino` in dependencies                  |
@@ -94,7 +94,7 @@ Each has **Use it like this** (the principles, each with its reason), **Required
 | [Cloudflare Workers + Vitest](integrations/cloudflare-workers-vitest.md)     | tests in workerd through `cloudflare:workers`                                                  | `@cloudflare/vitest-plugin`                        |
 | [Postgres + Docker Compose](integrations/postgres-docker-compose.md)         | the `db` service, its healthcheck, `init.sql`, host `db`                                       | a `db` service on a Postgres image                 |
 | [Nginx + Docker Compose](integrations/nginx-docker-compose.md)               | a static web image: a Node build, then Nginx; its Compose service                              | a `Dockerfile` ending `FROM nginx`                 |
-| [Express + Docker Compose](integrations/express-docker-compose.md)           | the API image compiled in its build stage and run from `dist/`; its `api` service              | `express` and a `Dockerfile`                       |
+| [Node + Docker Compose](integrations/node-docker-compose.md)                 | the compiled service image, built then run from `dist/`; its `migrate` and `api` services      | `engines.node` and a `Dockerfile` running `dist/`  |
 | [React Router + Docker Compose](integrations/react-router-docker-compose.md) | the app image running `server.ts` over the build; its `app` service                            | `react-router` and a `Dockerfile`                  |
 | [Drizzle + Postgres](integrations/drizzle-postgres.md)                       | the client on the pool, the `postgresql` dialect, Testcontainers                               | `drizzle-orm` and `pg`                             |
 | [Drizzle + Cloudflare D1](integrations/drizzle-d1.md)                        | a client per request, the `sqlite` dialect, `db.batch()`, tests in workerd                     | `drizzle-orm` and `d1_databases`                   |

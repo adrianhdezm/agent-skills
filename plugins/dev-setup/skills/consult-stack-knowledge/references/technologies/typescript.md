@@ -21,13 +21,11 @@ How TypeScript is configured and pinned: one project per runtime, checked withou
   `node_modules/.tmp/`. A package that compiles to `dist/` emits from its app project only.
 - **`typecheck` is `tsc -b`**, preceded by whatever generates types the code imports. A package that emits checks with
   `tsc -p <project> --noEmit` per project instead, since `tsc -b` would build it.
-- **Module resolution follows who turns the code into JavaScript**:
+- **Module resolution follows who turns the code into JavaScript.** The runtime's integration gives the other values:
 
-| The code is                                 | `module` / `moduleResolution`                 | Imports      |
-| ------------------------------------------- | --------------------------------------------- | ------------ |
-| run as it is by a runtime that strips types | `NodeNext`, with `allowImportingTsExtensions` | `./thing.ts` |
-| built by a bundler                          | `ESNext` / `bundler`                          | `./thing`    |
-| compiled by `tsc` to `dist/`                | `NodeNext`                                    | `./thing.js` |
+| The code is        | `module` / `moduleResolution` | Imports   |
+| ------------------ | ----------------------------- | --------- |
+| built by a bundler | `ESNext` / `bundler`          | `./thing` |
 
 - **One exact TypeScript on the 6.0 line**, pinned with `-E`, in the catalog in a monorepo. TypeScript 7 is out and
   tools that read TypeScript cap their peer range below it, so a caret or `@latest` breaks them on the next install.
@@ -86,4 +84,4 @@ pnpm add -D -E "typescript@$(pnpm view 'typescript@~6.0.0' version)"
 - **Type guards over type assertions** (`as`) in sources; tests may assert.
 - **`import type` for types**, so nothing type-only reaches the output.
 - **No `enum`, `namespace`, parameter properties or `import x = require()`**: use `as const` objects and unions.
-- **Never write a type that mirrors a schema or a generated file**: infer it.
+- **Never write a type that mirrors a generated file**: infer it.

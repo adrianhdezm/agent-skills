@@ -23,8 +23,8 @@ meaningful state, on the app's own build tool. Not a test runner.
 - **The preview loads the app's global stylesheet**, so components render with the real theme.
 - **Storybook builds and reviews components; behaviour is tested elsewhere.** A story is not a test, and no test imports
   a story.
-- **Scripts**: `storybook` runs it on port 6006; `build-storybook` writes `storybook-static/`, which the smoke test
-  checks through `storybook-static/index.json`.
+- **Scripts**: `storybook` runs it on port 6006; `build-storybook` writes `storybook-static/`, whose `index.json` lists
+  every story.
 
 ## Required values
 
@@ -45,4 +45,4 @@ meaningful state, on the app's own build tool. Not a test runner.
 
 - **Every component has a story file beside it**, one story per meaningful state, `args` for its inputs and `fn()` for
   its outputs, titled `UI/<Name>` for a primitive and `Components/<Name>` for an app component.
-- **Storybook is where components are built and reviewed, not a test**: behaviour is tested by browser specs.
+- **Storybook is where components are built and reviewed, not a test**: behaviour is tested by the component's tests.

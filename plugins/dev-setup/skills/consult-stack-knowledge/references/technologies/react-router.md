@@ -12,8 +12,9 @@ and generated route types.
 
 ## Use it like this
 
-- **Framework mode, `ssr: true`** (`react-router.config.ts`). Routes live in `app/routes/` and are declared in
-  `app/routes.ts`; loaders and actions are the backend. React Router 8's defaults need no `future` flags.
+- **Framework mode, `ssr: true`** (`react-router.config.ts`), because loaders and actions as the backend need a server
+  render. Routes live in `app/routes/` and are declared in `app/routes.ts`; loaders and actions are the backend. React
+  Router 8's defaults need no `future` flags.
 - **The context is typed and explicit.** `app/context.ts` exports `appContext = createContext<…>()` with everything
   loaders and actions need (the runtime's bindings or the server's configuration, later a database client); routes
   read it with `context.get(appContext)`. React Router 8's middleware context is always on: no `AppLoadContext`, no
@@ -27,20 +28,19 @@ and generated route types.
   `app/entry.server.tsx` streams the document (reference code below). `public/favicon.ico` is a placeholder.
 - **Imports inside `app/` use the `~/` alias** (`paths: { "~/*": ["./app/*"] }` in the runtime project); a route module imports its own `+types` relatively.
 - **A route component is tested through `createRoutesStub`** with stubbed `loader` and `action`, so data flows through
-  the router as in production; tests mirror `app/` in `tests/unit/` and render in a real browser.
+  the router as in production.
 
 ## Required values
 
-| Where                | Value                                                                                                                                                                                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| dependencies         | `react`, `react-dom`, `react-router`, `isbot`                                                                                                                                                                                                                                                                            |
-| devDependencies      | `@react-router/dev`, `@types/react`, `@types/react-dom`                                                                                                                                                                                                                                                                  |
-| runtime tsconfig     | `include`: `.react-router/types/**/*`, `app`, `workers` and the target's files; `lib: ["ES2024", "DOM", "DOM.Iterable"]`; `jsx: "react-jsx"`; `rootDirs: [".", "./.react-router/types"]`; `paths: { "~/*": ["./app/*"] }`; `module: "ESNext"`, `moduleResolution: "bundler"`; `types`: the target's and the build tool's |
-| `tsconfig.test.json` | extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`                                                                                                                                                                                                                                        |
-| `tsconfig.node.json` | includes `react-router.config.ts` and the build and test configs                                                                                                                                                                                                                                                         |
-| `typecheck`          | `react-router typegen && tsc -b`, after any runtime type generator                                                                                                                                                                                                                                                       |
-| `dev` / `build`      | `react-router dev`, or a custom server that runs the app / `react-router build`                                                                                                                                                                                                                                          |
-| `.gitignore`         | `build/`, `.react-router/`                                                                                                                                                                                                                                                                                               |
+| Where                | Value                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dependencies         | `react`, `react-dom`, `react-router`, `isbot`                                                                                                                                                                                                                                                                                            |
+| devDependencies      | `@react-router/dev`, `@types/react`, `@types/react-dom`                                                                                                                                                                                                                                                                                  |
+| runtime tsconfig     | `include`: `.react-router/types/**/*`, `app`, the server entry's folder and the target's files; `lib: ["ES2024", "DOM", "DOM.Iterable"]`; `jsx: "react-jsx"`; `rootDirs: [".", "./.react-router/types"]`; `paths: { "~/*": ["./app/*"] }`; `module: "ESNext"`, `moduleResolution: "bundler"`; `types`: the target's and the build tool's |
+| `tsconfig.node.json` | includes `react-router.config.ts` and the build and test configs                                                                                                                                                                                                                                                                         |
+| `typecheck`          | `react-router typegen && tsc -b`, after any runtime type generator                                                                                                                                                                                                                                                                       |
+| `dev` / `build`      | `react-router dev`, or a custom server that runs the app / `react-router build`                                                                                                                                                                                                                                                          |
+| `.gitignore`         | `build/`, `.react-router/`                                                                                                                                                                                                                                                                                                               |
 
 ## Pitfalls
 
@@ -100,16 +100,16 @@ export default async function handleRequest(
 - **Every screen has its empty, loading and error states**: an `ErrorBoundary` where the root one says too little, and
   pending UI from `useNavigation` or `useFetcher` for slow actions.
 - **Forms are `<Form>` posting to the route's action**; validation happens in the action and its errors come back
-  through `actionData`. With Conform and Zod 4, import `@conform-to/zod/v4`, not the top-level `@conform-to/zod`.
+  through `actionData`.
 - **Imports inside `app/` use `~/`.**
 
 ### Testing
 
-| Location                 | Kind | Runs in  | Tests                                            |
-| ------------------------ | ---- | -------- | ------------------------------------------------ |
-| `tests/unit/lib/`        | unit | Chromium | pure functions                                   |
-| `tests/unit/components/` | unit | Chromium | a component's render and interaction             |
-| `tests/unit/routes/`     | unit | Chromium | a route component with stubbed loader and action |
+| Location                 | Kind | Tests                                            |
+| ------------------------ | ---- | ------------------------------------------------ |
+| `tests/unit/lib/`        | unit | pure functions                                   |
+| `tests/unit/components/` | unit | a component's render and interaction             |
+| `tests/unit/routes/`     | unit | a route component with stubbed loader and action |
 
 - **Route components render through `createRoutesStub`** with `loader` and `action` stubs. To show an action's result
   without submitting (a file input, say), pass `hydrationData={{ actionData: … }}`.

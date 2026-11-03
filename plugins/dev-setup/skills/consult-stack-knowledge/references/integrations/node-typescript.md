@@ -41,6 +41,8 @@ compiled:      tsc -p tsconfig.app.json ─► dist/ ─► node dist/server.js 
   then takes `{ prefer: 'type-imports' }` alone.
 - **A dynamic import of a path that does not exist yet** (a build output before the first build) fails `tsc` when
   written as a literal; put the path in a variable.
+- **A test project that extends the compiled app project must set `composite: false`**: the tests import from `src/`,
+  which that project's `include` does not list.
 
 ## Conventions
 

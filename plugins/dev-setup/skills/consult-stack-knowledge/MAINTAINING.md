@@ -70,9 +70,10 @@ whatever required technology is missing is toolchain or tooling.
 - **Knowledge flows one way**: architecture ← technologies ← integrations ← examples ← blueprints. A concept names no
   technology; a technology doc names no other technology that has a doc, and links only up to the concepts it realises
   (tools without a doc of their own, such as Vite or Storybook, belong to the doc that uses them; `pnpm`, `node` and
-  `tsconfig` file names may appear in code as notation). Anything about two or more technologies is an integration, an
-  example or a blueprint. `node scripts/check-knowledge-flow.mjs`, from this skill's directory, checks it, recognising
-  each technology by its doc's `aliases`.
+  `tsconfig` file names may appear in code as notation; test code in Reference code may import the test runner (Vitest)
+  as notation). Anything about two or more technologies is an integration, an example or a blueprint.
+  `node scripts/check-knowledge-flow.mjs`, from this skill's directory, checks it, recognising each technology by its
+  doc's `aliases`.
 - **An example states outcomes, not files**: the data and names it depends on, the behaviour and contracts tests rely
   on, the behaviours each test tier covers, and the doc each part applies. A rule that any later code should follow
   belongs in a doc, not in an example; exact code belongs in a doc's Reference code.
