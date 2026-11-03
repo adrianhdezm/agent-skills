@@ -1,14 +1,14 @@
 ---
 name: bootstrap-project
-description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and examples the consult-stack-knowledge skill hands back for that combination (each technology, each pair that connects, the starter examples), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, when a tech plan's S0 setup slice sets up the project, or when an experiment approach needs a scaffold.
+description: Scaffolds a new TypeScript project from a combination settled in a short interview (what it ships, where it runs, which frontend), by building from the docs and the blueprint's Starter the consult-stack-knowledge skill hands back for that combination (each technology, each pair that connects, what a fresh scaffold ships), applying what exists and filling any gap with sensible defaults it reports. Eight combinations have blueprints (a Node library or CLI, a Hono API on Workers, an Express or a Hono + Postgres REST API on Node, React Router on Workers or on Node with Postgres, an Angular app, an Angular + Express + Postgres monorepo); others are composed from the docs that cover their parts. Ends with coding-conventions.md assembled and every check and smoke test passing. Use when creating, bootstrapping, scaffolding, initialising or starting a new project or app, adding the standard tooling to an existing one, when a tech plan's S0 setup slice sets up the project, or when an experiment approach needs a scaffold.
 ---
 
 # Bootstrap Project
 
 One skill for every new project. A short interview settles the combination of technologies; the
-`consult-stack-knowledge` skill turns it into the stack, the docs and examples that apply, the gaps and an assembled
-`coding-conventions.md`; this skill builds the project from that hand-off. It keeps no list of stacks or docs of its
-own: a new stack, technology, integration or example is added there, and found here through the hand-off.
+`consult-stack-knowledge` skill turns it into the stack, the docs that apply, the blueprint's Starter, the gaps and an
+assembled `coding-conventions.md`; this skill builds the project from that hand-off. It keeps no list of stacks or docs
+of its own: a new stack, technology or integration is added there, and found here through the hand-off.
 
 Apply what the docs say. Where no doc exists, build with sensible defaults and the technology's official docs, and
 record the gap.
@@ -23,7 +23,7 @@ Copy this checklist and tick it off:
 
 ```
 - [ ] 1. Combination settled
-- [ ] 2. Hand-off received, its docs and examples read, gaps named
+- [ ] 2. Hand-off received, its docs and Starter read, gaps named
 - [ ] 3. Toolchain and ports checked, target empty
 - [ ] 4. Project built
 - [ ] 5. Conventions placed, checks pass
@@ -34,11 +34,11 @@ Copy this checklist and tick it off:
    the spec or the calling skill already answers; ask the rest in one message, each with its default. When the user
    asks which stack fits, recommend one as the interview says. State the result in its one-line form.
 
-2. **Get the docs and examples** by running the `consult-stack-knowledge` skill with the combination, including each
+2. **Get the docs and the Starter** by running the `consult-stack-knowledge` skill with the combination, including each
    optional entry (database, authentication, file storage, Storybook, Fundamental NGX) the request asks for. Its
-   hand-off names the stack, the blueprint, the docs and examples (absolute paths), the gaps and the assembled
-   `coding-conventions.md`. Read the blueprint and every doc and example it lists, then quote its `Stack`, `Docs` (by
-   title), `Examples` and `Gaps` lines before writing a file. A broken doc under its `Found` goes under this run's
+   hand-off names the stack, the blueprint, the docs (absolute paths), the Starter parts, the gaps and the assembled
+   `coding-conventions.md`. Read the blueprint and every doc it lists, then quote its `Stack`, `Docs` (by title),
+   `Starter` and `Gaps` lines before writing a file. A broken doc under its `Found` goes under this run's
    **Found**.
 
    Stop and ask only when a gap is a technology the user named and the choice changes the project's shape (which
@@ -58,9 +58,10 @@ Copy this checklist and tick it off:
       says;
    5. the config files, from each doc's Required values and Reference code and the blueprint's Required values;
    6. any generated types the docs name (`wrangler types`, `react-router typegen`);
-   7. each example, built by applying the docs it names in its Demonstrates table, with its data, behaviour and tests,
-      until its Done when holds. A part the user replaced with their own (a module, routes, a resource) keeps the
-      example's shape.
+   7. each part of the blueprint's Starter the `Starter` line names, built by applying the docs, with its values,
+      behaviour and tests. A part the user replaced with their own (a module, routes, a resource) keeps the Starter's
+      shape. A composed combination has no Starter: build one small working module or route of what it ships, with
+      its test.
 
    Stop only when the toolchain is missing, a port is taken, a pitfall says to stop, or a check still fails after you
    have found its cause.
@@ -69,8 +70,8 @@ Copy this checklist and tick it off:
    project root, then run `pnpm format` and every check. Confirm what the checks miss: `private` is a boolean,
    `typescript` is exact, and nothing was emitted next to the sources.
 
-6. **Run the smoke test**: the blueprint's, or, without one, start what the project ships and exercise each example's
-   Done when against it.
+6. **Run the smoke test**: the blueprint's, with the lines for each optional group picked, or, without one, start what
+   the project ships and exercise it.
 
 Then offer to commit the scaffold on its own, so later diffs show only the feature.
 
@@ -87,18 +88,18 @@ the sources, place the conventions, then format and check.
 ## End of the run
 
 End with three headings: **Blocked on me** (a check that still fails, a port to free, a file the harness would not
-write, a gap that needs the user's choice), **Changed** (the project path, the combination, the docs and examples used,
+write, a gap that needs the user's choice), **Changed** (the project path, the combination, the docs and Starter parts used,
 and what was created) and **Found**: each gap with what was used instead, and anything that differed from a doc (a moved
 peer range, a new build script to allow), each naming the doc in `consult-stack-knowledge` to add or update. When
 another skill called this one, such as `implement-release` or `experiment-idea`, hand these back to it instead.
 
 ## Review Checklist
 
-- [ ] The combination, and the hand-off's docs, examples and gaps, were stated before the first file was written
+- [ ] The combination, and the hand-off's docs, Starter and gaps, were stated before the first file was written
 - [ ] `allowBuilds` was written before the first `pnpm add`; `typescript` is an exact 6.0.x; `private` is a boolean;
       `packageManager` is set
 - [ ] Config files follow the docs' and the blueprint's required values; reference code was written as given
-- [ ] Each example's data, behaviour and tests hold, built by applying the docs it names
+- [ ] Each Starter part's values, behaviour and tests hold, built by applying the docs
 - [ ] `coding-conventions.md` is the one `consult-stack-knowledge` assembled, not written by hand
 - [ ] `pnpm format`, then every check, pass; nothing was emitted into the tree
 - [ ] The smoke test passed
