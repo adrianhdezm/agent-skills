@@ -1475,7 +1475,7 @@
           "source": "Where it lives"
         },
         {
-          "holds": "copied from `<skill-dir>/references/assets/react-router-app.css`: Tailwind, `tw-animate-css`, the dark variant, the theme's tokens for light and dark, plus `surface`, `code` and `selection` tokens and two wide breakpoints",
+          "holds": "exactly as the Reference code below: Tailwind, `tw-animate-css`, the dark variant, the theme's tokens for light and dark, plus `surface`, `code` and `selection` tokens and two wide breakpoints",
           "source": "Required values"
         },
         {
