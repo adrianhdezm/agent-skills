@@ -11,16 +11,18 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 
 ## Architecture
 
-| Doc                                              | Covers                                                                                             | The project needs it when it has    |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [Code style](architecture/code-style.md)         | comments that explain why, named exports, small units, suppressions with reasons, absence handled  | always                              |
-| [Database](architecture/database.md)             | the engine per runtime, table design, migrations, connection, one database per environment         | a database                          |
-| [Data access](architecture/data-access.md)       | one layer touches the database, DAOs on the context, ordered lists, domain errors                  | a database                          |
-| [REST API](architecture/rest-api.md)             | resources and methods, status codes, one error body, edge validation, the list format              | JSON endpoints, or a client of them |
-| [Authentication](architecture/authentication.md) | the library that owns sessions, protected routes, ownership checks, safe redirects                 | sign-in, or per-user data           |
-| [File storage](architecture/file-storage.md)     | bytes in an object store, metadata in a table, one service keeping them in step                    | uploads or stored files             |
-| [UI components](architecture/ui-components.md)   | two tiers of components, one-way imports, theme tokens, states, labels and accessible names        | screens                             |
-| [Testing](architecture/testing.md)               | tiers by what is real, each behaviour once at the cheapest tier, behaviour-named cases, owned data | tests                               |
+| Doc                                                        | Covers                                                                                                                 | The project needs it when it has                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [Code style](architecture/code-style.md)                   | comments that explain why, named exports, small units, suppressions with reasons, absence handled                      | always                                            |
+| [Database](architecture/database.md)                       | the engine per runtime, table design, migrations, connection, one database per environment                             | a database                                        |
+| [Data access](architecture/data-access.md)                 | one layer touches the database, DAOs on the context, ordered lists, domain errors                                      | a database                                        |
+| [REST API](architecture/rest-api.md)                       | resources and methods, status codes, one error body, edge validation, the list format                                  | JSON endpoints, or a client of them               |
+| [Resource operations](architecture/resource-operations.md) | the five operations, one list contract, list state in the URL, one form, confirmed delete, copying the first resource  | records users list, read, create, edit and delete |
+| [Authentication](architecture/authentication.md)           | the library that owns sessions, protected routes, safe redirects, sign-out                                             | sign-in, or per-user data                         |
+| [Authorization](architecture/authorization.md)             | ownership by default, checked where loaded, lists filtered in the query, 404 for another's, 403 for a forbidden action | sign-in with per-user data                        |
+| [File storage](architecture/file-storage.md)               | bytes in an object store, metadata in a table, one service keeping them in step                                        | uploads or stored files                           |
+| [UI components](architecture/ui-components.md)             | two tiers of components, one-way imports, theme tokens, states, labels and accessible names                            | screens                                           |
+| [Testing](architecture/testing.md)                         | tiers by what is real, each behaviour once at the cheapest tier, behaviour-named cases, owned data                     | tests                                             |
 
 Each has **Principles** (each with its reason), **Required values** (where the concept fixes exact values),
 **Conventions** and **Verify it is wired**. A concept states only what holds whatever the technology; it

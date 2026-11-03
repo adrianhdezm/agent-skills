@@ -3,8 +3,8 @@ kind: concept
 ---
 # Authentication
 
-How users sign in and how the app decides what they may see: an established library owns sessions, the server entry
-wires it, protected requests authenticate once, and each resource checks ownership where it is loaded. These rules apply
+How users sign in: an established library owns sessions, the server entry wires it, and protected requests
+authenticate once. What a signed-in user may then see and do is [Authorization](authorization.md). These rules apply
 from the moment a project adds sign-in.
 
 ## Principles
@@ -21,9 +21,6 @@ from the moment a project adds sign-in.
 - **Authenticate once per request, in middleware that wraps the protected routes.** It reads the session, redirects an
   anonymous user to login with the path to return to, and puts the user on the context; the handlers under it read the
   user from there and do not check again. Public routes (login, signup) sit outside it.
-- **Authorize where the resource is loaded.** The handler that reads a resource id checks the user may see or change that
-  resource before touching private data, and answers for someone else's as for one that does not exist, so existence
-  does not leak.
 - **Redirects after sign-in go only to local paths**, so a crafted sign-in link cannot send a user to another site: a
   target that does not start with `/`, or starts with `//`, falls back to `/`.
 - **Credentials forms validate on the server**, because the client's checks can be skipped: the handler parses the form
@@ -42,7 +39,6 @@ from the moment a project adds sign-in.
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | auth endpoints                 | `/api/auth/*`, one catch-all                                                                                                                   |
 | anonymous on a protected route | redirect to `/login?redirectTo=<path>`                                                                                                         |
-| another user's resource        | 404                                                                                                                                            |
 | sign-out                       | POST only                                                                                                                                      |
 | secret                         | `AUTH_SECRET`, generated (`openssl rand -base64 32`), never committed, the same across environments; an empty `AUTH_SECRET=` in `.env.example` |
 
@@ -53,8 +49,6 @@ from the moment a project adds sign-in.
 - **The library's endpoints are one catch-all route under `/api/auth/*`**; nothing else answers under it.
 - **Protected routes sit under middleware that authenticates once** and puts the user on the context; the handlers under
   it read the user from there.
-- **Ownership is checked in the handler that owns the resource id**, before any private data is read; someone else's
-  resource is a 404.
 - **Redirect targets are local paths only.**
 - **Sign-out is a POST**; a signed-in user is redirected away from login and signup.
 - **`AUTH_SECRET` is never committed** and stays the same across environments; `.env.example` holds an empty
@@ -63,6 +57,5 @@ from the moment a project adds sign-in.
 ## Verify it is wired
 
 - Every route that reads private data is under the authenticating middleware.
-- Every handler taking a resource id checks ownership before reading the resource.
 - The redirect-after-login helper rejects `//host` and absolute URLs.
 - No `AUTH_SECRET` value in the repository; `.env.example` has the empty key.

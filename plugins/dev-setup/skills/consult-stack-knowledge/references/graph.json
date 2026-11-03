@@ -6,6 +6,12 @@
       "file": "architecture/authentication.md",
       "kind": "concept"
     },
+    "authorization": {
+      "id": "authorization",
+      "title": "Authorization",
+      "file": "architecture/authorization.md",
+      "kind": "concept"
+    },
     "code-style": {
       "id": "code-style",
       "title": "Code style",
@@ -29,6 +35,12 @@
       "id": "file-storage",
       "title": "File storage",
       "file": "architecture/file-storage.md",
+      "kind": "concept"
+    },
+    "resource-operations": {
+      "id": "resource-operations",
+      "title": "Resource operations",
+      "file": "architecture/resource-operations.md",
       "kind": "concept"
     },
     "rest-api": {
@@ -316,6 +328,9 @@
       "file": "technologies/ngrx.md",
       "role": "library",
       "family": "angular",
+      "realises": [
+        "resource-operations"
+      ],
       "detect": {
         "dependencies": [
           "@ngrx/store"
@@ -326,7 +341,6 @@
         "@ngrx/"
       ],
       "kind": "technology",
-      "realises": [],
       "owns": []
     },
     "node": {
@@ -639,7 +653,8 @@
         "angular"
       ],
       "realises": [
-        "rest-api"
+        "rest-api",
+        "resource-operations"
       ],
       "detect": {
         "fileContains": [
@@ -866,8 +881,10 @@
         "better-auth",
         "react-router"
       ],
+      "realises": [
+        "authorization"
+      ],
       "kind": "integration",
-      "realises": [],
       "owns": [
         {
           "holds": "`createAuth(db, …)` and `AppAuth`, Better Auth + Drizzle's code",
@@ -984,7 +1001,8 @@
         "s3-storage"
       ],
       "realises": [
-        "file-storage"
+        "file-storage",
+        "authorization"
       ],
       "kind": "integration",
       "owns": [
@@ -1026,7 +1044,8 @@
       ],
       "realises": [
         "data-access",
-        "rest-api"
+        "rest-api",
+        "resource-operations"
       ],
       "kind": "integration",
       "owns": [
@@ -1106,7 +1125,8 @@
       ],
       "realises": [
         "data-access",
-        "rest-api"
+        "rest-api",
+        "resource-operations"
       ],
       "unless": [
         "react-router"
@@ -1314,7 +1334,8 @@
         "drizzle"
       ],
       "realises": [
-        "data-access"
+        "data-access",
+        "resource-operations"
       ],
       "kind": "integration",
       "owns": [
@@ -1614,6 +1635,12 @@
         {
           "layer": "architecture",
           "kind": "concept",
+          "id": "resource-operations",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
           "id": "ui-components",
           "optional": false
         },
@@ -1888,6 +1915,12 @@
           "layer": "architecture",
           "kind": "concept",
           "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "resource-operations",
           "optional": false
         },
         {
@@ -2221,6 +2254,12 @@
           "layer": "architecture",
           "kind": "concept",
           "id": "rest-api",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "resource-operations",
           "optional": false
         },
         {
@@ -2589,6 +2628,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "resource-operations",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "node",
@@ -2932,7 +2977,20 @@
         {
           "layer": "architecture",
           "kind": "concept",
+          "id": "resource-operations",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
           "id": "authentication",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "authorization",
           "optional": true,
           "group": "authentication"
         },
@@ -3273,7 +3331,20 @@
         {
           "layer": "architecture",
           "kind": "concept",
+          "id": "resource-operations",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
           "id": "authentication",
+          "optional": true,
+          "group": "authentication"
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "authorization",
           "optional": true,
           "group": "authentication"
         },
@@ -3580,7 +3651,9 @@
       "database",
       "data-access",
       "rest-api",
+      "resource-operations",
       "authentication",
+      "authorization",
       "file-storage",
       "ui-components",
       "testing"

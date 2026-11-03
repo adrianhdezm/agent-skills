@@ -5,19 +5,20 @@ do not read this file.
 
 ## The four layers
 
-An **architecture** doc says how a cross-cutting concept (code style, a database, data access, a REST API,
-authentication, file storage, UI components, testing) is done whatever the technology. A **technology** doc says how one
-technology is used. An **integration** doc says how two connect: where code from one calls into the other. A **stack**
-blueprint names the concepts, technologies and integrations a kind of project is built from, its shape, its exact
-values, what a fresh scaffold ships and its own conventions.
+An **architecture** doc says how a cross-cutting concept (code style, a database, data access, a REST API, resource
+operations, authentication, authorization, file storage, UI components, testing) is done whatever the technology. A
+**technology** doc says how one technology is used. An **integration** doc says how two connect: where code from one
+calls into the other. A **stack** blueprint names the concepts, technologies and integrations a kind of project is built
+from, its shape, its exact values, what a fresh scaffold ships and its own conventions.
 
-A blueprint has **Composition** (its docs, in the order their conventions are assembled), **Shape** (the files), **Required values** (scripts, ports, ignores and settings only this stack
-fixes), **Reference code** (its tsconfigs, ESLint, Vite and Vitest configs exactly as a fresh scaffold writes them, and
-the files only this stack has (the Angular full stack's Playwright suite), each checked by scaffolding the stack),
-**Scaffold** (only where building it departs from the usual order), **Starter** (what a fresh scaffold ships so every
-check has code to run against: its names, values, behaviours and tests), **Conventions** (only what is specific to the
-stack) and **Smoke test** (the live proof a fresh scaffold runs, the Starter's included). The sections of the other layers are listed under
-each table in [references/catalog.md](references/catalog.md).
+A blueprint has **Composition** (its docs, in the order their conventions are assembled), **Shape** (the files),
+**Required values** (scripts, ports, ignores and settings only this stack fixes), **Reference code** (its tsconfigs,
+ESLint, Vite and Vitest configs exactly as a fresh scaffold writes them, and the files only this stack has (the Angular
+full stack's Playwright suite), each checked by scaffolding the stack), **Scaffold** (only where building it departs
+from the usual order), **Starter** (what a fresh scaffold ships so every check has code to run against: its names,
+values, behaviours and tests), **Conventions** (only what is specific to the stack) and **Smoke test** (the live proof a
+fresh scaffold runs, the Starter's included). The sections of the other layers are listed under each table in
+[references/catalog.md](references/catalog.md).
 
 **Composition** is read by `scripts/assemble-conventions.mjs`, so it holds only a bulleted list of links, one doc per
 line, with no text around it. An entry the project may leave out ends in ` — optional`, picked with
@@ -59,11 +60,11 @@ A project is scanned three levels deep, skipping build output, so a workspace's 
 
 What a set of technologies brings (its **closure**) is: the always-on concepts, the concepts its technologies and
 integrations realise, and every integration whose ends are all present and no `unless` rules out. A blueprint's
-Composition must be exactly the closure of its technologies with every
-group picked; an entry marked `— optional (<group>)` must be brought by that group and not by the stack alone; an entry
-the stack lists unconditionally though only a group brings it (the React Router stacks list Database, Data access and
-React Router + Drizzle ahead of the `database` group) is allowed, since the assembly keeps it. `resolve-stack.mjs` matches a project to a blueprint when every detected technology belongs to it and
-whatever required technology is missing is toolchain or tooling.
+Composition must be exactly the closure of its technologies with every group picked; an entry marked `— optional
+(<group>)` must be brought by that group and not by the stack alone; an entry the stack lists unconditionally though
+only a group brings it (the React Router stacks list Database, Data access and React Router + Drizzle ahead of the
+`database` group) is allowed, since the assembly keeps it. `resolve-stack.mjs` matches a project to a blueprint when
+every detected technology belongs to it and whatever required technology is missing is toolchain or tooling.
 
 ## Changing the knowledge
 

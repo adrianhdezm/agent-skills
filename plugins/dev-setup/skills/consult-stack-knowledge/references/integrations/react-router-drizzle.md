@@ -1,7 +1,7 @@
 ---
 kind: integration
 connects: [react-router, drizzle]
-realises: [data-access]
+realises: [data-access, resource-operations]
 ---
 # React Router + Drizzle
 
@@ -9,7 +9,7 @@ How a React Router app layers data access once it has a database: through Drizzl
 loaders and actions through the app's context. The React Router stacks arrive without database code; these rules apply
 from the first table.
 
-**Realises:** [Data access](../architecture/data-access.md)
+**Realises:** [Data access](../architecture/data-access.md), [Resource operations](../architecture/resource-operations.md)
 
 ## The seam
 

@@ -1,12 +1,15 @@
 ---
 kind: integration
 connects: [better-auth, react-router]
+realises: [authorization]
 ---
 # Better Auth + React Router
 
 Better Auth inside a React Router app: built by the server entry onto `appContext`, its endpoints as one splat route,
 sessions read by the protected layout's middleware, and credentials forms in Conform with Zod 4. The React Router stacks
 use it once they add sign-in.
+
+**Realises:** [Authorization](../architecture/authorization.md)
 
 ## The seam
 
@@ -136,6 +139,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 - **The protected layout's middleware reads the session once** and puts the user on `userContext`; loaders and actions
   under it read the user from there.
 - **Credentials forms parse with `@conform-to/zod/v4`**; redirect targets pass through `safeRedirectTo`.
+- **Loaders and actions pass `userContext`'s user id to the data layer** as `ownerId`, and answer a `null` from it
+  with a 404 `Response`; an action creating a row takes `ownerId` from `userContext`, never from the form.
 
 ## Verify it is wired
 

@@ -13,8 +13,8 @@ it.
   `GET /entities` lists, `POST /entities` creates, `GET /entities/:id` reads, `PATCH /entities/:id` updates part of one,
   `DELETE /entities/:id` removes it. No verbs in paths.
 - **Status codes say what happened**: 200 with the resource, 201 with the created one, 204 with no body after a delete;
-  400 for input the API rejects, 404 for a missing resource or path, 413 for a body over the limit, 503 when a
-  dependency is down, 500 for anything unexpected.
+  400 for input the API rejects, 403 for an action the user may not take ([Authorization](authorization.md)), 404 for a
+  missing resource or path, 413 for a body over the limit, 503 when a dependency is down, 500 for anything unexpected.
 - **One error body**, `{ status: 'error', message }`, for every error, from one place. A client error's message is
   shown; an unexpected error's is hidden and logged, so internals never leak. Client errors log at `warn`, server errors
   at `error`.

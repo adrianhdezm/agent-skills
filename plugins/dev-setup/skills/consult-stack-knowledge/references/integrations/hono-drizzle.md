@@ -1,7 +1,7 @@
 ---
 kind: integration
 connects: [hono, drizzle]
-realises: [data-access, rest-api]
+realises: [data-access, rest-api, resource-operations]
 unless: [react-router]
 ---
 # Hono + Drizzle
@@ -11,7 +11,7 @@ handlers reach them as `c.var.context`, decode the list query, and turn DAO resu
 `HTTPException`. Hono API on Node uses it. Under React Router, where Hono only hands requests on, the data layer is
 React Router + Drizzle's and this seam is not used.
 
-**Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md)
+**Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md), [Resource operations](../architecture/resource-operations.md)
 
 ## The seam
 
