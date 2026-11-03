@@ -53,6 +53,7 @@ shadcn/ui. No database is wired: D1, R2 and KV arrive later as bindings.
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
 - [React Router + ESLint](../integrations/react-router-eslint.md)
 - [React Router + Prettier](../integrations/react-router-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 - [React Router + Vitest](../integrations/react-router-vitest.md)
 - [Cloudflare Workers + Vitest](../integrations/cloudflare-workers-vitest.md)

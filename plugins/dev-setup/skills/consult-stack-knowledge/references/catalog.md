@@ -12,15 +12,16 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 
 ## Architecture
 
-| Doc                                              | Covers                                                                                            | The project needs it when it has    |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [Code style](architecture/code-style.md)         | comments that explain why, named exports, small units, suppressions with reasons, absence handled | always                              |
-| [Database](architecture/database.md)             | the engine per runtime, table design, migrations, connection, one database per environment        | a database                          |
-| [Data access](architecture/data-access.md)       | one layer touches the database, DAOs on the context, ordered lists, domain errors                 | a database                          |
-| [REST API](architecture/rest-api.md)             | resources and methods, status codes, one error body, edge validation, the list format             | JSON endpoints, or a client of them |
-| [Authentication](architecture/authentication.md) | the library that owns sessions, protected routes, ownership checks, safe redirects                | sign-in, or per-user data           |
-| [File storage](architecture/file-storage.md)     | bytes in an object store, metadata in a table, one service keeping them in step                   | uploads or stored files             |
-| [UI components](architecture/ui-components.md)   | two tiers of components, one-way imports, theme tokens, states, labels and accessible names       | screens                             |
+| Doc                                              | Covers                                                                                             | The project needs it when it has    |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [Code style](architecture/code-style.md)         | comments that explain why, named exports, small units, suppressions with reasons, absence handled  | always                              |
+| [Database](architecture/database.md)             | the engine per runtime, table design, migrations, connection, one database per environment         | a database                          |
+| [Data access](architecture/data-access.md)       | one layer touches the database, DAOs on the context, ordered lists, domain errors                  | a database                          |
+| [REST API](architecture/rest-api.md)             | resources and methods, status codes, one error body, edge validation, the list format              | JSON endpoints, or a client of them |
+| [Authentication](architecture/authentication.md) | the library that owns sessions, protected routes, ownership checks, safe redirects                 | sign-in, or per-user data           |
+| [File storage](architecture/file-storage.md)     | bytes in an object store, metadata in a table, one service keeping them in step                    | uploads or stored files             |
+| [UI components](architecture/ui-components.md)   | two tiers of components, one-way imports, theme tokens, states, labels and accessible names        | screens                             |
+| [Testing](architecture/testing.md)               | tiers by what is real, each behaviour once at the cheapest tier, behaviour-named cases, owned data | tests                               |
 
 Each has **Principles** (each with its reason), **Required values** (where the concept fixes exact values),
 **Conventions** and **Verify it is wired**. A concept states only what holds whatever the technology; it

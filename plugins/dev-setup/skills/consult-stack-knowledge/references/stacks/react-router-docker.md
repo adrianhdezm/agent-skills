@@ -59,6 +59,7 @@ it is layered when it arrives.
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
 - [React Router + ESLint](../integrations/react-router-eslint.md)
 - [React Router + Prettier](../integrations/react-router-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 - [React Router + Vitest](../integrations/react-router-vitest.md)
 

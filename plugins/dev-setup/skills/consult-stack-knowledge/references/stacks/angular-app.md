@@ -35,6 +35,7 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
 - [Angular + ESLint](../integrations/angular-eslint.md)
 - [Angular + Prettier](../integrations/angular-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 - [Angular + Vitest](../integrations/angular-vitest.md)
 

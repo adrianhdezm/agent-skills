@@ -37,6 +37,12 @@
       "file": "architecture/rest-api.md",
       "kind": "concept"
     },
+    "testing": {
+      "id": "testing",
+      "title": "Testing",
+      "file": "architecture/testing.md",
+      "kind": "concept"
+    },
     "ui-components": {
       "id": "ui-components",
       "title": "UI components",
@@ -598,6 +604,9 @@
       "title": "Vitest",
       "file": "technologies/vitest.md",
       "role": "tooling",
+      "realises": [
+        "testing"
+      ],
       "detect": {
         "files": [
           "vitest.config.*"
@@ -608,7 +617,6 @@
         "vitest"
       ],
       "kind": "technology",
-      "realises": [],
       "owns": []
     },
     "fundamental-ngx": {
@@ -1825,6 +1833,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "vitest",
@@ -2157,6 +2171,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "vitest",
@@ -2389,6 +2409,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "vitest",
@@ -2543,6 +2569,12 @@
           "layer": "integrations",
           "kind": "integration",
           "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
           "optional": false
         },
         {
@@ -2740,6 +2772,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "vitest",
@@ -2866,6 +2904,12 @@
           "layer": "integrations",
           "kind": "integration",
           "id": "eslint-prettier",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
           "optional": false
         },
         {
@@ -3171,6 +3215,12 @@
           "layer": "integrations",
           "kind": "integration",
           "id": "react-router-prettier",
+          "optional": false
+        },
+        {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
           "optional": false
         },
         {
@@ -3549,6 +3599,12 @@
           "optional": false
         },
         {
+          "layer": "architecture",
+          "kind": "concept",
+          "id": "testing",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "vitest",
@@ -3635,7 +3691,8 @@
       "rest-api",
       "authentication",
       "file-storage",
-      "ui-components"
+      "ui-components",
+      "testing"
     ],
     "technology": [
       "pnpm",

@@ -48,6 +48,7 @@ over the whole stack. SAP Fiori Horizon components are opt-in.
 - [ESLint + Prettier](../integrations/eslint-prettier.md)
 - [Angular + ESLint](../integrations/angular-eslint.md)
 - [Angular + Prettier](../integrations/angular-prettier.md)
+- [Testing](../architecture/testing.md)
 - [Vitest](../technologies/vitest.md)
 - [Angular + Vitest](../integrations/angular-vitest.md)
 

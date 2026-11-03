@@ -1,13 +1,16 @@
 ---
 kind: technology
 role: tooling
+realises: [testing]
 detect:
   files: ['vitest.config.*']
 aliases: [Vitest, vitest]
 ---
 # Vitest
 
-The test runner: one config of named projects, an environment per kind of test, and the rules every test follows.
+The test runner: one config of named projects, an environment per kind of test, and how a test is written in it.
+
+**Realises:** [Testing](../architecture/testing.md)
 
 ## Use it like this
 
@@ -17,8 +20,8 @@ The test runner: one config of named projects, an environment per kind of test, 
   in the one config (`unit`, `browser`, `db`, `api`, `integration`), selected by folder glob and run with
   `--project`. A second config file duplicates the shared setup and drifts. Shared options sit at the root and each
   project sets `extends: true` to inherit them.
-- **`test` runs the fast tier only** (`vitest run`, or `--project unit`): no containers, no browser download where it
-  can be helped. Slower tiers get their own scripts (`test:integration`, `test:browser`, `test:e2e`).
+- **`test` runs the fast tier only** (`vitest run`, or `--project unit`), and each slower tier gets the script Testing
+  names, selecting its project.
 - **Pick the environment by where the code runs**: the default for server code, `jsdom` for DOM code that needs no
   real browser, and browser mode for components that must render for real:
   `browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] }` from
@@ -51,22 +54,7 @@ The test runner: one config of named projects, an environment per kind of test, 
 
 - **One top-level `describe` per file, named for the module under test** (`describe('entity.controller')`,
   `describe('cn')`); nested `describe`s group functions or behaviours, and hooks sit inside the top-level one.
-- **Name a case for the behaviour, in a present-tense sentence**: `it('forwards a 400 for an unknown param without
-reaching the DAO')`, not `it('test list error')`.
-- **Arrange / Act / Assert**, with `// Arrange`, `// Act`, `// Assert` comments once a phase has more than one line.
+- **`it` takes the behaviour sentence**: `it('forwards a 400 for an unknown param without reaching the DAO')`.
+- **`// Arrange`, `// Act`, `// Assert` comments** once a phase has more than one line.
 - **Import from `vitest`** (`describe`, `it`, `expect`, `vi`); no globals.
-- **Fakes are small hand-written objects; `vi.fn()` where a call or its arguments matter.** Shared mocks and fixtures
-  live in the test utilities folder, not in test files.
-
-### What not to test
-
-- **Name the bug first.** A test earns its place by catching a failure no other test catches; if a lower tier, another
-  test or the compiler already catches it, do not add it.
-- **Test a behaviour once, at the cheapest tier that can see it.** Go up a tier only for what the lower one cannot see,
-  and cover only that addition there.
-- **No tests for wiring without logic**: route tables, root components, layouts, a state handler with no logic, a
-  one-line cast, a handler that only forwards. The tests that run through them prove them.
-- **No tests for what the compiler enforces**: a union, a required input, a field naming a real column.
-- **A caller tests its own branches, not its callee's rules.** One schema rejection in a controller test, not every
-  rule of the schema.
-- **One behaviour per case.** Cases that differ only in data are one `it.each`.
+- **`vi.fn()` only where a call or its arguments matter**; cases that differ only in data are one `it.each`.
