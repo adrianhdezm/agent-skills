@@ -4,8 +4,8 @@ connects: [node, typescript]
 ---
 # Node + TypeScript
 
-How TypeScript runs on Node: as it is, with the types stripped by Node 24, or compiled by `tsc` to `dist/`. The Node
-package and the React Router server run as they are; the Express API is compiled.
+How TypeScript runs on Node: as it is, with the types stripped by Node 24, or compiled by `tsc` to `dist/`. A program
+that needs no bundle runs as it is; a package that ships compiled output is compiled.
 
 ## The seam
 
@@ -21,24 +21,24 @@ compiled:      tsc -p tsconfig.app.json ─► dist/ ─► node dist/server.js 
   `import x = require()`). `module: "NodeNext"` with `allowImportingTsExtensions` checks exactly that.
 - **Code `tsc` compiles for Node** imports `./thing.js`, as Node's ESM resolution requires of the output, and builds
   with `tsc -p tsconfig.app.json` to `dist/`, `composite` with an `outDir`.
-- **The dev loop is `node --import=tsx --watch …`**: Node restarts, tsx loads TypeScript. Not `tsx watch`. Where Node
-  strips types itself, `tsx` is only there for `--watch` to follow imports.
+- **Where the dev loop restarts the process on change, it is `node --import=tsx --watch …`**: Node restarts, tsx loads
+  TypeScript. Not `tsx watch`. A server that reloads its app module itself (a Vite middleware server) runs
+  `node <file>.ts` with no watcher. Where Node strips types itself, `tsx` is only there for `--watch` to follow imports.
 - **`@types/node` follows the Node major**, and the project that runs on Node lists `types: ["node"]`.
 
 ## Required values
 
-| What          | Value                                                                         |
-| ------------- | ----------------------------------------------------------------------------- |
-| run as it is  | `module: "NodeNext"`, `allowImportingTsExtensions`, `types: ["node"]`         |
-| compiled      | `module`/`moduleResolution` `"NodeNext"`, `outDir: "dist"`, `types: ["node"]` |
-| `@types/node` | major 24                                                                      |
-| dev loop      | `tsx`, run as `node --import=tsx --watch`                                     |
+| What                     | Value                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| run as it is             | `module: "NodeNext"`, `allowImportingTsExtensions`, `types: ["node"]`         |
+| compiled                 | `module`/`moduleResolution` `"NodeNext"`, `outDir: "dist"`, `types: ["node"]` |
+| `@types/node`            | major 24                                                                      |
+| dev loop (compiled code) | `tsx`, run as `node --import=tsx --watch`                                     |
 
 ## Pitfalls
 
 - **`import { type X } from './x.ts'` strips to `import {} from './x.ts'`**, which still loads the module for its side
-  effects. Keep type imports in their own `import type` statement in code Node runs; the lint's `consistent-type-imports`
-  then takes `{ prefer: 'type-imports' }` alone.
+  effects. Keep type imports in their own `import type` statement in code Node runs.
 - **A dynamic import of a path that does not exist yet** (a build output before the first build) fails `tsc` when
   written as a literal; put the path in a variable.
 - **A test project that extends the compiled app project must set `composite: false`**: the tests import from `src/`,

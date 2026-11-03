@@ -5,8 +5,8 @@ connects: [postgres, docker-compose]
 # Postgres + Docker Compose
 
 Postgres as the `db` service of the root Compose file: healthchecked, its database created by an init script, its data
-bind-mounted, reached at host `db` inside Compose and at `localhost` from the host. React Router on Node and the
-Angular full stack use it.
+bind-mounted, reached at host `db` inside Compose and at `localhost` from the host. React Router on Node, REST API on
+Node, Hono API on Node and the Angular full stack use it.
 
 ## The seam
 
@@ -63,7 +63,7 @@ the host port: the host's `DATABASE_URL` uses it, while services inside Compose 
   healthy.
 - **Its data is bind-mounted under `db/data/`** (reset it with `rm -rf` on that folder); `db/scripts/init.sql` creates
   the `app` database on first start.
-- **Inside Compose, apps reach Postgres at host `db`**; on the host, at `localhost:5432`.
+- **Inside Compose, apps reach Postgres at host `db`**; on the host, at `localhost:${DB_PORT}` (5432 by default).
 
 ## Verify it is wired
 

@@ -32,8 +32,8 @@ pnpm lint          ─► code problems        pnpm format:check ─► formatti
 
 ## Conventions
 
-- **`pnpm lint` reports code problems; `pnpm format:check` reports formatting.** Never fix formatting by hand or to
-  please the linter: run `pnpm format`.
+- **Formatting problems never reach `pnpm lint`**: `eslint-config-prettier` sits between the presets and the shared
+  rules.
 
 ## Verify it is wired
 

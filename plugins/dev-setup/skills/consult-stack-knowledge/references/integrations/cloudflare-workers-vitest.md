@@ -1,13 +1,13 @@
 ---
 kind: integration
 connects: [cloudflare-workers, vitest]
-unless: [react-router]
 ---
 # Cloudflare Workers + Vitest
 
 Vitest inside workerd through Cloudflare's plugin: tests reach the Worker through its real entry and read its bindings,
 with the test runtime's types seen only by the tests. The Hono Worker uses it, and any Worker whose server code is
-tested in its own runtime.
+tested in its own runtime. Under a framework (React Router on Workers), the unit tests run in browser mode through
+React Router + Vitest, and only the `integration` project runs in workerd through `cloudflareTest`.
 
 ## The seam
 
@@ -19,11 +19,11 @@ tsconfig.test.json ─► types: ["./worker-configuration.d.ts", "@cloudflare/vi
 
 ## Required values
 
-| What                 | Value                                                                                                                 |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| devDependencies      | `@cloudflare/vitest-plugin`, on the same Vitest major                                                                 |
-| `vitest.config.ts`   | `cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`                                                    |
-| `tsconfig.test.json` | extends the Worker project, adds `tests`, `types: ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]` |
+| What                 | Value                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| devDependencies      | `@cloudflare/vitest-plugin`, on the same Vitest major                                                                    |
+| `vitest.config.ts`   | `cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })`; under a framework, in the `integration` project only |
+| `tsconfig.test.json` | extends the Worker project, adds `tests`, `types: ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]`    |
 
 Check `pnpm view @cloudflare/vitest-plugin peerDependencies` before installing `vitest`.
 
@@ -31,7 +31,6 @@ Check `pnpm view @cloudflare/vitest-plugin peerDependencies` before installing `
 
 - **`@cloudflare/vitest-pool-workers` is deprecated**: use `@cloudflare/vitest-plugin`.
 - **`SELF` and `env` from `cloudflare:test` are deprecated**: import `exports` and `env` from `cloudflare:workers`.
-- **A compatibility date later than today in UTC** fails the tests as it fails the dev server.
 
 ## Conventions
 

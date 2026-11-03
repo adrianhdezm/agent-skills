@@ -20,7 +20,7 @@ tests/unit/routes/*.test.tsx ─► createRoutesStub([{ path, Component, loader 
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | devDependencies      | `@vitejs/plugin-react`, `vitest-browser-react`, `@vitest/browser-playwright`, `playwright`                                                          |
 | `vitest.config.ts`   | one inline project `unit`: `plugins: [react()]`, `resolve.tsconfigPaths: true`, `include: ['tests/unit/**/*.test.{ts,tsx}']`, Chromium browser mode |
-| `tsconfig.test.json` | extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`                                                                   |
+| with a database      | a second inline project `integration` over `tests/integration/`, run by `test:integration` (`vitest run --project integration`)                     |
 
 ## Reference code
 
@@ -51,11 +51,11 @@ describe('Home', () => {
 ## Conventions
 
 - **Unit tests run in Chromium** through Vitest browser mode, in `tests/unit/` mirroring `app/`.
-- **Query with `page` from `vitest/browser`** (`getByRole`, `getByLabelText` with `exact: true` to tell "Password" from
-  "Confirm password", `getByText`); locators are strict, so pick one with `.first()` only on purpose.
+- **Query with `page` from `vitest/browser`** (`getByRole`, `getByLabelText` with `exact: true` where one label is a
+  prefix of another, `getByText`); locators are strict, so pick one with `.first()` only on purpose.
 - **Assert with `await expect.element(…)`**, which retries until the DOM settles; every test is `async`.
 
 ## Verify it is wired
 
-- A test of `cn` imports it through `~/`, proving the alias resolves under Vitest.
+- At least one test imports a module through `~/`, proving the alias resolves under Vitest.
 - Every route component has a test that renders it through `createRoutesStub`.

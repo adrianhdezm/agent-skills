@@ -60,6 +60,112 @@ layer, and one error shape.
 - **A response spy written as a method fails `unbound-method`** in `expect(res.json)`: make the spies plain
   properties.
 
+## Reference code
+
+`src/app.ts`: the pure factory.
+
+```ts
+import cors from 'cors';
+import express, { type Express } from 'express';
+import { getEntity, createEntity, deleteEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
+import { getHealth } from './controllers/health.controller.js';
+import { getHome } from './controllers/home.controller.js';
+import { errorHandler } from './middlewares/error.middleware.js';
+import { notFoundHandler } from './middlewares/not-found.middleware.js';
+import type { AppContext } from './models/app-context.model.js';
+
+export function createApp(context: AppContext): Express {
+  const app = express();
+  app.locals.context = context;
+
+  // the request logger, as the logger's integration says
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/', getHome);
+  app.get('/health', getHealth);
+  app.get('/entities', listEntities);
+  app.post('/entities', createEntity);
+  app.get('/entities/:id', getEntity);
+  app.patch('/entities/:id', updateEntity);
+  app.delete('/entities/:id', deleteEntity);
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+  return app;
+}
+```
+
+`src/middlewares/not-found.middleware.ts`:
+
+```ts
+import type { RequestHandler } from 'express';
+import createError from 'http-errors';
+
+export const notFoundHandler: RequestHandler = (req, _res, next) => {
+  next(createError(404, `Not Found: ${req.method} ${req.path}`, { expose: true }));
+};
+```
+
+`src/middlewares/error.middleware.ts`:
+
+```ts
+import type { ErrorRequestHandler } from 'express';
+import createError from 'http-errors';
+
+export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  const httpError = createError.isHttpError(err) ? err : undefined;
+  const status = httpError?.status ?? 500;
+  const message = httpError?.expose ? httpError.message : 'Internal Server Error';
+  // the request's child logger, as the logger's integration says
+  if (status >= 500) {
+    req.log.error({ err }, message);
+  } else {
+    req.log.warn({ err }, message);
+  }
+  res.status(status).json({ status: 'error', message });
+};
+```
+
+`tests/utils/test-server.ts`: the real app on an ephemeral port for API tests.
+
+```ts
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { Express } from 'express';
+
+export interface TestServer {
+  readonly baseUrl: string;
+  readonly close: () => Promise<void>;
+}
+
+export async function serve(app: Express): Promise<TestServer> {
+  const server = await new Promise<Server>((resolve) => {
+    const listening = app.listen(0, '127.0.0.1', () => {
+      resolve(listening);
+    });
+  });
+  const { port } = server.address() as AddressInfo;
+  return {
+    baseUrl: `http://127.0.0.1:${String(port)}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      })
+  };
+}
+```
+
 ## Conventions
 
 ### Architecture

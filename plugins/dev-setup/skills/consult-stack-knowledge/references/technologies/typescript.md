@@ -50,8 +50,8 @@ The options every project sets, under the line comments `// Environment, modules
 | `noFallthroughCasesInSwitch` | `true`                                              |                                                                                       |
 | `lib`, `target`              | `ES2024`, in every stack                            | what the server runtime and the browsers implement; add `DOM` only for browser code   |
 
-Where a blueprint's Required values give a different value for one of these, the blueprint's wins: it records an
-exception its stack needs.
+Where a blueprint's or an integration's Required values give a different value for one of these, that value wins: it
+records an exception its stack or its seam needs.
 
 Pin TypeScript after checking the peer ranges of the tools that read it:
 

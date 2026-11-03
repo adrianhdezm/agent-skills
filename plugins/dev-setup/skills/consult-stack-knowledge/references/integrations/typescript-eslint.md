@@ -28,7 +28,7 @@ eslint.config.js ─► typescript-eslint preset + parserOptions { projectServic
 ## Required values
 
 The preset is `tseslint.configs.strictTypeChecked` and `tseslint.configs.stylisticTypeChecked`, after `js.configs.recommended`
-and before `eslint-config-prettier`. The shared correctness rules typescript-eslint adds:
+and before the formatter's off-switch config. The shared correctness rules typescript-eslint adds:
 
 | Rule                                         | Setting                                                                                                                    |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -50,6 +50,9 @@ pnpm view typescript-eslint peerDependencies    # e.g. "typescript": "<6.1.0"
 - **The base `no-unused-vars` left on** beside `@typescript-eslint/no-unused-vars` reports the same variable twice, and
   flags type-only imports the typed rule accepts: keep it `off`.
 - **A caret or `@latest` TypeScript** moves past typescript-eslint's ceiling on the next install and breaks the lint.
+- **`fixStyle: 'inline-type-imports'` in code a runtime strips as it is**: `import { type X } from './x.ts'` strips to
+  `import {} from './x.ts'`, which still loads the module for its side effects. Keep a type-only import in its own
+  `import type` statement there (Node + TypeScript); the inline form is safe where the import also carries a value.
 
 ## Conventions
 
@@ -60,6 +63,6 @@ pnpm view typescript-eslint peerDependencies    # e.g. "typescript": "<6.1.0"
 
 ## Verify it is wired
 
-- `eslint.config.js` sets `projectService: true` and `tsconfigRootDir`, and uses `strictTypeChecked` and
+- `eslint.config.*` sets `projectService: true` and `tsconfigRootDir`, and uses `strictTypeChecked` and
   `stylisticTypeChecked`, or the preset its framework's ESLint integration names.
 - `pnpm exec eslint --print-config <a config file>` succeeds, so the config files are in a project.

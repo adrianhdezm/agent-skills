@@ -34,12 +34,10 @@ angular.json: storybook / build-storybook targets ─► @storybook/angular-vite
 
 - **`@angular/animations` is a required peer of `@storybook/angular-vite`**, so every install prints its deprecation
   warning; that is expected. `zone.js` is only an optional peer: do not install it.
-- **A test config named `vite.config.*`** is read by Storybook's builder too: the test config is `vitest.config.mts`.
 
 ## Conventions
 
-- **Stories are `<name>.stories.ts` beside each component**; a primitive with projected content renders through a
-  `template`.
+- **Story files are `.ts`** (`<name>.stories.ts`); a primitive with projected content renders through a `template`.
 - **Storybook runs as `angular.json` targets** (`pnpm storybook`, `pnpm build-storybook`).
 
 ## Verify it is wired

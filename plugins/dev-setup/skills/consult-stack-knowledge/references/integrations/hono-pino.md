@@ -26,7 +26,6 @@ app.onError: HTTPException ─► logger.warn (4xx) / logger.error (5xx); anythi
 | File                                        | Holds                                   |
 | ------------------------------------------- | --------------------------------------- |
 | `src/middlewares/request-log.middleware.ts` | `requestLog`                            |
-| `src/middlewares/error.middleware.ts`       | `errorHandler`, logging as above        |
 | `src/app.ts`                                | `app.use(requestLog)` after the context |
 
 ## Reference code
@@ -36,14 +35,26 @@ app.onError: HTTPException ─► logger.warn (4xx) / logger.error (5xx); anythi
 ```ts
 import type { MiddlewareHandler } from 'hono';
 import { logger } from '../logger.js';
-import type { AppEnv } from '../models/app-context.model.js';
 
 /** Logs one line per request once its response is built. */
-export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
+export const requestLog: MiddlewareHandler = async (c, next) => {
   const start = performance.now();
   await next();
   logger.info({ method: c.req.method, path: c.req.path, status: c.res.status, ms: Math.round(performance.now() - start) }, 'request');
 };
+```
+
+The logging lines of `errorHandler` in `src/middlewares/error.middleware.ts` (the Hono doc's reference code), one per
+branch:
+
+```ts
+  if (error instanceof HTTPException) {
+    const status = error.status;
+    const log = status >= 500 ? logger.error.bind(logger) : logger.warn.bind(logger);
+    log({ err: error, status, method: c.req.method, path: c.req.path }, error.message);
+    return c.json({ status: 'error', message: error.message }, status);
+  }
+  logger.error({ err: error, method: c.req.method, path: c.req.path }, 'Unhandled error');
 ```
 
 ## Conventions

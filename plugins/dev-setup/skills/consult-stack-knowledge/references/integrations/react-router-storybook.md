@@ -41,7 +41,7 @@ arrays included, so no cast on the plugin list is needed:
 import type { StorybookConfig } from '@storybook/react-vite';
 import type { PluginOption } from 'vite';
 
-/** Plugins that build or run the app's server: React Router's, and on Workers the Cloudflare plugin's. */
+/** Plugins that build or run the app's server: React Router's, and the runtime's (its integration names the plugin). */
 const APP_SERVER_PLUGINS = ['react-router', 'vite-plugin-cloudflare'];
 
 /** True for a plugin, or a nested array of plugins, that builds or runs the app's server. */
@@ -70,7 +70,7 @@ export default config;
 
 ## Conventions
 
-- **Stories are `<name>.stories.tsx` beside each component** in `app/components/` and `app/components/ui/`.
+- **Story files are `.tsx`** (`<name>.stories.tsx`), under `app/components/`.
 - **Route modules have no stories**; components do.
 
 ## Verify it is wired

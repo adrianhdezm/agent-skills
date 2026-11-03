@@ -329,8 +329,6 @@ export const schema = { entity };
 - **The translator and builders are unit tests**, with no database: the translator through the SQL the engine's
   dialect renders, the builders against an ad-hoc field config, a resource's schema test covering only its own columns
   and sort fields.
-- **Three renders the translator's tests meet**: `PgDialect.sqlToQuery` returns `{ sql, params, typings }`, each nested
-  `and` / `or` is parenthesised on its own, and an empty `not` renders as `false`.
 - **Each DAO has a suite against the real database**, in the stack's integration-test folder: one database per suite,
   rows cleared before each test and seeded through a `<resource>-seed` helper; every method's happy path and edge
   cases, and `list` for what only real rows show (pagination, sort with the tie-breaker, filters whose result depends on

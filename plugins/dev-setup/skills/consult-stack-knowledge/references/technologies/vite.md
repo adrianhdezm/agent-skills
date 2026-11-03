@@ -38,6 +38,8 @@ Vite as the dev server and the build: one `vite.config.ts`, plugins in a deliber
 - **A plugin in the wrong place** builds the wrong environment, or none: the runtime's first, the framework's last.
 - **Without `"vite/client"` in `types`**, a side-effect `*.css` import or `import.meta.env` fails the type check.
 - **The dependency pre-bundle can reload a page or a test on the first run** after a new dependency: run it again.
+- **The dev server's HMR WebSocket takes a second port (24678 by default)**: a second dev server on the same machine
+  fails on it; give each its own `server.hmr.port`.
 
 ## Conventions
 

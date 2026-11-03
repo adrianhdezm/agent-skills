@@ -30,6 +30,7 @@ Hono as the server entry: one app that whatever runs it drives through `app.fetc
 | ------------ | ---------------------------------------------------------------------------------- |
 | dependencies | `hono`                                                                             |
 | middleware   | `hono/cors`; `hono/body-limit` with an `onError` that throws a 413 `HTTPException` |
+| body limit   | 100 kB (`MAX_BODY_BYTES`); a body over it → 413                                    |
 | error body   | the REST API concept's                                                             |
 
 ## Pitfalls
@@ -38,6 +39,80 @@ Hono as the server entry: one app that whatever runs it drives through `app.fetc
   surfaces as a 500.
 - **An error thrown from `body-limit`'s default answer** has no JSON body: give it an `onError` that throws a 413
   `HTTPException`, so the error handler shapes it.
+
+## Reference code
+
+`src/app.ts`, the factory around a context:
+
+```ts
+import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
+import { createEntity, deleteEntity, getEntity, listEntities, updateEntity } from './controllers/entity.controller.js';
+import { getHealth } from './controllers/health.controller.js';
+import { getHome } from './controllers/home.controller.js';
+import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
+import type { AppContext, AppEnv } from './models/app-context.model.js';
+
+const MAX_BODY_BYTES = 100 * 1024;
+
+/** The Hono app around a context: middleware, every route, then the not-found and error handlers. It reads no environment. */
+export function createApp(context: AppContext): Hono<AppEnv> {
+  const app = new Hono<AppEnv>();
+  app.use(async (c, next) => {
+    c.set('context', context);
+    await next();
+  });
+  // the request logger, as the logger's integration says
+  app.use(cors());
+  app.use(
+    bodyLimit({
+      maxSize: MAX_BODY_BYTES,
+      onError: () => {
+        throw new HTTPException(413, { message: 'Payload Too Large' });
+      }
+    })
+  );
+
+  app.get('/', getHome);
+  app.get('/health', getHealth);
+  app.get('/entities', listEntities);
+  app.post('/entities', createEntity);
+  app.get('/entities/:id', getEntity);
+  app.patch('/entities/:id', updateEntity);
+  app.delete('/entities/:id', deleteEntity);
+
+  app.notFound(notFoundHandler);
+  app.onError(errorHandler);
+  return app;
+}
+```
+
+`src/middlewares/error.middleware.ts`:
+
+```ts
+import type { ErrorHandler, NotFoundHandler } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import type { AppEnv } from '../models/app-context.model.js';
+
+/**
+ * The one place an error becomes a response: `{ status: 'error', message }`. An HTTPException is thrown on purpose, so its
+ * message is exposed (Hono has no `expose` flag); anything else is hidden and logged.
+ */
+export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
+  // each branch logs the error once, as the logger's integration says
+  if (error instanceof HTTPException) {
+    return c.json({ status: 'error', message: error.message }, error.status);
+  }
+  return c.json({ status: 'error', message: 'Internal Server Error' }, 500);
+};
+
+/** Forwards an unmatched route to the error handler in the standard shape. */
+export const notFoundHandler: NotFoundHandler<AppEnv> = (c) => {
+  throw new HTTPException(404, { message: `Not Found: ${c.req.method} ${c.req.path}` });
+};
+```
 
 ## Conventions
 

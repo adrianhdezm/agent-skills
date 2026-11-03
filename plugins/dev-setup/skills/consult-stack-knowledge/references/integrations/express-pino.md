@@ -23,37 +23,11 @@ pnpm dev: node … src/server.ts | pino-pretty … --ignore pid,hostname,req.hea
 
 ## Required values
 
-| What           | Value                                                                                    |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| dependencies   | `pino-http`, beside Pino's own                                                           |
-| middleware     | `app.use(pinoHttp({ logger }))` before `cors()` and `express.json()`                     |
-| `dev` pipe     | Pino's, with `--ignore pid,hostname,req.headers,res.headers`                             |
-| test utilities | `mockLog()`: `req.log` as an object of `vi.fn()` spies, so a unit test asserts the level |
-
-## Reference code
-
-`src/middlewares/error.middleware.ts`'s error handler:
-
-```ts
-import type { ErrorRequestHandler } from 'express';
-import createError from 'http-errors';
-
-export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) => {
-  if (res.headersSent) {
-    next(err);
-    return;
-  }
-  const httpError = createError.isHttpError(err) ? err : undefined;
-  const status = httpError?.status ?? 500;
-  const message = httpError?.expose ? httpError.message : 'Internal Server Error';
-  if (status >= 500) {
-    req.log.error({ err }, message);
-  } else {
-    req.log.warn({ err }, message);
-  }
-  res.status(status).json({ status: 'error', message });
-};
-```
+| What         | Value                                                                |
+| ------------ | -------------------------------------------------------------------- |
+| dependencies | `pino-http`, beside Pino's own                                       |
+| middleware   | `app.use(pinoHttp({ logger }))` before `cors()` and `express.json()` |
+| `dev` pipe   | Pino's, with `--ignore pid,hostname,req.headers,res.headers`         |
 
 ## Conventions
 

@@ -27,7 +27,6 @@ runtime ─► workers/app.ts (Hono) ─► app.all('*') ─► RouterContextPro
 | ---------------- | ------------------------------------------------------------------------------------- |
 | `workers/app.ts` | the Hono app: one `app.all('*', …)` handler, `createRequestHandler`, default export   |
 | `app/context.ts` | `appContext = createContext<…>()`, the one type every loader and action reads         |
-| `app/env.d.ts`   | references `@react-router/dev/vite/env`, so `virtual:react-router/server-build` types |
 | `app/routes/*`   | `context.get(appContext)` in loaders and actions                                      |
 
 `hono` is a dependency of the app, next to `react-router`.
@@ -62,9 +61,7 @@ export default app;
   `appContext` and calls React Router's request handler. It exports the app as the default and never calls `serve()`.
 - **Capabilities are wired there and typed in `app/context.ts`**: a database client, auth, file storage. On Workers they
   are built inside the handler, because bindings exist only per request; on Node, once at module scope, because the
-  process lives on. Shared code (schema, services) lives in `app/`, never in `workers/`, and there are no helper
-  files under `workers/`.
-- **Routes read dependencies with `context.get(appContext)`**; no `AppLoadContext`.
+  process lives on. Shared code (schema, services) lives in `app/`, never in `workers/`.
 
 ## Verify it is wired
 

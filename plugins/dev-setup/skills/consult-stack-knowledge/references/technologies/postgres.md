@@ -17,7 +17,8 @@ transactions for atomic work.
 ## Use it like this
 
 - **One `pg` pool per process**, built once at module scope by the composition root, closed on shutdown after the HTTP
-  server.
+  server. A server that exits on `SIGTERM` without a shutdown handler may leave the pool to the database, which drops
+  its connections.
 - **`DATABASE_URL` is required**: the client and the migration tool throw when it is unset.
 - **The pool has an `error` listener that logs**: without one, an idle client's error (the database restarting) crashes
   the process.

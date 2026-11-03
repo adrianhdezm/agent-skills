@@ -30,6 +30,39 @@ app/db/schemas/auth.schema.ts: users, sessions, accounts, verifications, registe
 
 ## Reference code
 
+`app/lib/auth.ts` on Postgres (`provider: 'sqlite'`, and the request's origin as `baseURL`, on D1):
+
+```ts
+import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+
+import type { DbClient } from '~/db/client';
+import { schema } from '~/db/schema';
+
+/** Builds Better Auth over the app's Drizzle client; only the server entry calls it. */
+export function createAuth(db: DbClient, options: { secret: string; baseURL: string }) {
+  return betterAuth({
+    secret: options.secret,
+    baseURL: options.baseURL,
+    database: drizzleAdapter(db, {
+      provider: 'pg',
+      schema: {
+        ...schema,
+        user: schema.users,
+        session: schema.sessions,
+        account: schema.accounts,
+        verification: schema.verifications
+      }
+    }),
+    emailAndPassword: { enabled: true, autoSignIn: false },
+    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
+    advanced: { cookiePrefix: 'App', database: { generateId: 'uuid' } }
+  });
+}
+
+export type AppAuth = ReturnType<typeof createAuth>;
+```
+
 `app/db/schemas/auth.schema.ts` on Postgres, with the columns Better Auth's email and password sign-in reads and writes;
 on D1 the same columns take Drizzle + D1's types:
 

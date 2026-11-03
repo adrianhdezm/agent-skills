@@ -21,23 +21,23 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 | File                                               | Holds                                                                   |
 | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `app/lib/auth.ts`                                  | `createAuth(db, …)`: the `betterAuth` options and adapter; `AppAuth`    |
+| `app/lib/auth.ts`                                  | `createAuth(db, …)` and `AppAuth`, Better Auth + Drizzle's code         |
 | `workers/app.ts`                                   | calls `createAuth` per request on Workers, once at module scope on Node |
 | `app/context.ts`                                   | `auth: AppAuth` on `appContext`; `userContext`                          |
 | `app/routes/auth.tsx`                              | the splat route's loader and action                                     |
 | `app/routes/login.tsx`, `signup.tsx`, `logout.tsx` | the credentials forms and sign-out                                      |
 | the protected layout route                         | `export const middleware: Route.MiddlewareFunction[] = [requireUser]`   |
-| `app/lib/utils.ts`                                 | `safeRedirectTo`                                                        |
+| `app/lib/utils.ts`                                 | `safeRedirectTo`, beside the UI integration's `cn`                      |
 
 ## Required values
 
-| What         | Value                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| dependencies | `zod@4`, `@conform-to/react`, `@conform-to/zod`                                                     |
-| route        | `route('api/auth/*', 'routes/auth.tsx')`, a splat                                                   |
-| forms        | `parseWithZod` from `@conform-to/zod/v4`, `z` from `zod/v4`                                         |
-| middleware   | exported as an array, `Route.MiddlewareFunction[]`, from the layout that wraps the protected routes |
-| secret       | `.env` locally; in production, the platform's secret store (`wrangler secret put` on Workers)       |
+| What         | Value                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| dependencies | `zod@4`, `@conform-to/react`, `@conform-to/zod`                                                                       |
+| route        | `route('api/auth/*', 'routes/auth.tsx')`, a splat                                                                     |
+| forms        | `parseWithZod` from `@conform-to/zod/v4`, `z` from `zod`                                                              |
+| middleware   | exported as an array, `Route.MiddlewareFunction[]`, from the layout that wraps the protected routes                   |
+| Compose      | the `app` service sets `AUTH_SECRET: ${AUTH_SECRET}` and `BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}` |
 
 ## Pitfalls
 
@@ -55,43 +55,12 @@ login / signup actions ─► parseWithZod ─► auth.api.signInEmail / signUpE
 
 ## Reference code
 
-`app/lib/auth.ts` on Postgres (`provider: 'sqlite'`, and the request's origin as `baseURL`, on D1):
-
-```ts
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-
-import type { DbClient } from '~/db/client';
-import { schema } from '~/db/schema';
-
-/** Builds Better Auth over the app's Drizzle client; only the server entry calls it. */
-export function createAuth(db: DbClient, options: { secret: string; baseURL: string }) {
-  return betterAuth({
-    secret: options.secret,
-    baseURL: options.baseURL,
-    database: drizzleAdapter(db, {
-      provider: 'pg',
-      schema: {
-        ...schema,
-        user: schema.users,
-        session: schema.sessions,
-        account: schema.accounts,
-        verification: schema.verifications
-      }
-    }),
-    emailAndPassword: { enabled: true, autoSignIn: false },
-    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
-    advanced: { cookiePrefix: 'App', database: { generateId: 'uuid' } }
-  });
-}
-
-export type AppAuth = ReturnType<typeof createAuth>;
-```
+`createAuth` (Better Auth + Drizzle) is called from `workers/app.ts`.
 
 `app/lib/credentials.ts`, the schemas both the forms and the actions parse with:
 
 ```ts
-import { z } from 'zod/v4';
+import { z } from 'zod';
 
 export const loginSchema = z.object({
   email: z.email('Enter a valid email'),
@@ -140,7 +109,7 @@ The forms are two small components, a login form and a signup form, each with it
 casts, since the schemas' fields differ. `app/routes/login.tsx`'s server half; signup is the same with `signUpEmail` and its own schema:
 
 ```tsx
-const errorBodySchema = z.object({ message: z.string().optional() });
+import { errorBodySchema, loginSchema } from '~/lib/credentials';
 
 export async function action({ request, context }: Route.ActionArgs) {
   const submission = parseWithZod(await request.formData(), { schema: loginSchema });

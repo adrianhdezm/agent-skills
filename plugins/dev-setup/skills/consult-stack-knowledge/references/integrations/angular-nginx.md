@@ -15,16 +15,15 @@ ng build ─► dist/<name>/browser ─► image: nginx:1.27-alpine /usr/share/n
 
 ## Required values
 
-| What         | Value                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| static build | `ng build`, whose output is `dist/<name>/browser`                                                 |
-| image        | Nginx + Docker Compose's two stages, copying `dist/<name>/browser` and the package's `nginx.conf` |
+| What         | Value                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| static build | `ng build`, whose output is `dist/<name>/browser`                                                         |
+| image        | the static web image (Nginx + Docker Compose) copies `dist/<name>/browser` and the package's `nginx.conf` |
 
 ## Conventions
 
-- **The production image serves `dist/<name>/browser` from Nginx** with the SPA fallback; the API base URL is
-  build-time configuration, so Nginx proxies nothing.
+- **The production image serves `dist/<name>/browser` from Nginx** with the SPA fallback.
 
 ## Verify it is wired
 
-- The image answers 200 with the app's `<title>` for `/entities` (an app route, not a file).
+- The image answers 200 with the app's `<title>` for an app route (not a file).
