@@ -2,6 +2,7 @@
 kind: technology
 role: library
 family: angular
+realises: [resource-operations]
 detect:
   dependencies: [@ngrx/store]
 aliases: [NgRx, @ngrx/]
@@ -10,6 +11,8 @@ aliases: [NgRx, @ngrx/]
 
 NgRx 22 with `@ngrx/router-store`, used for **route-driven state**: each page route names a state, the URL enters the
 store one way, each page reads only its own slice and loads from its own lifecycle, and its requests end with it.
+
+**Realises:** [Resource operations](../architecture/resource-operations.md)
 
 ## Use it like this
 

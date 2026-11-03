@@ -16,6 +16,7 @@ on Node with Hono in place of Express: the same contract, layers, tests and imag
 - [Database](../architecture/database.md)
 - [Data access](../architecture/data-access.md)
 - [REST API](../architecture/rest-api.md)
+- [Resource operations](../architecture/resource-operations.md)
 - [Node](../technologies/node.md)
 - [Node + TypeScript](../integrations/node-typescript.md)
 - [Hono](../technologies/hono.md)
@@ -255,8 +256,7 @@ keeps its fields, routes and tests.
 | `createdAt`   | timestamp, set on insert |                          | date operators   | yes  |
 | `updatedAt`   | timestamp                |                          | date operators   | yes  |
 
-The default sort is `createdAt DESC`. An update needs at least one field besides `id`. These are Drizzle + Postgres's
-reference code.
+The default sort is `createdAt DESC`. These are Drizzle + Postgres's reference code.
 
 ### API
 
@@ -350,6 +350,9 @@ every later resource copies.
 | a change to `app.ts`               | the API test                                                                  |
 
 ### Adding a resource
+
+As the Resource operations concept says, a new resource copies `entity` layer by layer, with its tests. The files, in
+order:
 
 Copy `entity.schema.ts` (the same order, no comments) and register the table in `db/schema.ts`; copy `entity.dao.ts`;
 add the DAO to `AppContext` and build it in `server.ts`; copy `entity.controller.ts` and mount its handlers in `app.ts`;

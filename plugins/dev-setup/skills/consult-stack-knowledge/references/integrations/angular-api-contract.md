@@ -1,7 +1,7 @@
 ---
 kind: integration
 connects: [angular]
-realises: [rest-api]
+realises: [rest-api, resource-operations]
 detect:
   fileContains: ['src/environments/environment.ts=apiBaseUrl']
 ---
@@ -11,7 +11,7 @@ How the Angular web app consumes its HTTP API: a build-time base URL, models mir
 list format shared by the page URL and the request. Both Angular stacks use it: against the full stack's own Express
 API, or against an existing API that speaks the same contract.
 
-**Realises:** [REST API](../architecture/rest-api.md), as its client
+**Realises:** [REST API](../architecture/rest-api.md), as its client; [Resource operations](../architecture/resource-operations.md)
 
 ## The seam
 

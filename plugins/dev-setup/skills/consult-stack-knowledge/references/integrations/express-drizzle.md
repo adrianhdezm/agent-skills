@@ -1,7 +1,7 @@
 ---
 kind: integration
 connects: [express, drizzle]
-realises: [data-access, rest-api]
+realises: [data-access, rest-api, resource-operations]
 ---
 # Express + Drizzle
 
@@ -9,7 +9,7 @@ An Express API over the Drizzle DAO layer: the composition root builds the DAOs 
 app's context, decode the list query, and turn DAO results into HTTP answers. REST API on Node and the Angular full
 stack's `api/` use it.
 
-**Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md)
+**Realises:** [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md), [Resource operations](../architecture/resource-operations.md)
 
 ## The seam
 

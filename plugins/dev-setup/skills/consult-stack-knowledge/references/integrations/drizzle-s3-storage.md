@@ -1,7 +1,7 @@
 ---
 kind: integration
 connects: [drizzle, s3-storage]
-realises: [file-storage]
+realises: [file-storage, authorization]
 ---
 # Drizzle + S3 storage
 
@@ -9,7 +9,7 @@ The file service on Node: object bytes in an S3-compatible store through the AWS
 through Drizzle, one `FilesService` keeping the two in step, scoped to the file's owner. React Router on Node uses it
 once file storage is picked.
 
-**Realises:** [File storage](../architecture/file-storage.md)
+**Realises:** [File storage](../architecture/file-storage.md), [Authorization](../architecture/authorization.md)
 
 ## The seam
 

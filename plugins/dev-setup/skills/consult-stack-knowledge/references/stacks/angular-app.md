@@ -16,6 +16,7 @@ root, without the API, the database or the end-to-end suite. SAP Fiori Horizon c
 - [pnpm](../technologies/pnpm.md)
 - [TypeScript](../technologies/typescript.md)
 - [REST API](../architecture/rest-api.md)
+- [Resource operations](../architecture/resource-operations.md)
 - [UI components](../architecture/ui-components.md)
 - [Angular](../technologies/angular.md)
 - [NgRx](../technologies/ngrx.md)
@@ -322,8 +323,8 @@ keeps its fields, routes and tests. It works against any API that speaks the API
 | `createdAt`   | timestamp, set on insert |                          | date operators   | yes  |
 | `updatedAt`   | timestamp                |                          | date operators   | yes  |
 
-The default sort is `createdAt DESC`. An update needs at least one field besides `id`. The web mirrors them by hand in
-`models/entity.model.ts` (dates as ISO strings), as the API's contract has them.
+The default sort is `createdAt DESC`. The web mirrors them by hand in `models/entity.model.ts` (dates as ISO strings),
+as the API's contract has them.
 
 ### Web
 
@@ -333,11 +334,11 @@ and has no handlers and no spec.
 
 **Model, service, helpers.**
 
-| Piece                          | Contract                                                                                                                                                                                                                                                                                                              |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EntityService`                | `list`, `get`, `create` (POST), `update` (PATCH), `delete`, each an `Observable`                                                                                                                                                                                                                                      |
-| `entity-list-params.helper.ts` | `DEFAULT_PAGE` 1, `DEFAULT_PAGE_SIZE` 20; `parseListInput` never throws (bad filter, unknown sort field or page below 1 fall back; no `sortField` means the default sort, `createdAt DESC`, and with a field any direction but `DESC` is `ASC`); `toParams` maps absent and default values to `null`; `sameListInput` |
-| `entity-filter-form.helper.ts` | `FilterForm` (`name`, `description`, `createdFrom`, `createdBefore`) ⇄ `EntityFilterInput` (trimmed `contains`, `createdAt.ge` / `.lt`, a day as local midnight in ISO-8601); reads back only what the strip can express; `formatRange` → `0 of 0` or `first–last of total · page X of Y`                             |
+| Piece                          | Contract                                                                                                                                                                                                                                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EntityService`                | `list`, `get`, `create` (POST), `update` (PATCH), `delete`, each an `Observable`                                                                                                                                                                                                                                |
+| `entity-list-params.helper.ts` | `DEFAULT_PAGE` 1, `DEFAULT_PAGE_SIZE` 20; `parseListInput` (a bad filter, an unknown sort field or a page below 1 fall back; no `sortField` means the default sort, `createdAt DESC`, and with a field any direction but `DESC` is `ASC`); `toParams` maps absent and default values to `null`; `sameListInput` |
+| `entity-filter-form.helper.ts` | `FilterForm` (`name`, `description`, `createdFrom`, `createdBefore`) ⇄ `EntityFilterInput` (trimmed `contains`, `createdAt.ge` / `.lt`, a day as local midnight in ISO-8601); reads back only what the strip can express; `formatRange` → `0 of 0` or `first–last of total · page X of Y`                       |
 
 **Slices.** One per page: the list, form and detail slices are the NgRx reference code.
 
@@ -361,20 +362,15 @@ Stories: `UI/Dialog` (`Default`, through a template filling the slots), `UI/Sele
 | detail | `/entities/:id`, `entity-detail`                                 | the entity's name as heading; _Edit_; _← Back to entities_                                                                                                                                                                 |
 | form   | `/entities/new` `entity-new`, `/entities/:id/edit` `entity-edit` | heading _New entity_ / _Edit entity_; _Name_, _Description_; _Save_; _← Cancel_                                                                                                                                            |
 
-- **List.** Every control (filter strip, sort, page size, pagination) navigates with the next list input in the URL and
-  never fetches. Sort options, in order: _Newest first_ (`createdAt:DESC`, default), _Oldest first_, _Name A–Z_, _Name
-  Z–A_, _Recently updated_ (`updatedAt:DESC`); page sizes 10, 20, 50, 100. Changing the filter, sort or page size goes to
-  page 1. The filter strip keeps local edits until _Apply_ and resyncs whenever the URL's input changes; _Clear_ drops
-  the filter and keeps sort and page size. Rows show the name, the description and `createdAt` (`medium`). The empty
-  row reads _Loading…_, _No entities match the filter._ or _No entities yet._; an error shows in a banner. Delete opens
-  `DeleteDialog`, which stays open and busy until the refetched page arrives, and on failure stays open, not busy, over
-  the banner. A page past the end after a delete steps back with `replaceUrl`.
-- **Detail.** Shows the description (`—` for `null`) and both dates; a link to another entity reuses the page and loads
-  the new id.
-- **Form.** One page for both states; fills itself when the edited entity arrives. Validation mirrors the API: name
-  required and at most 200, description at most 2000; values are sent trimmed, an empty description as `null`. _Save_
-  is disabled while loading or saving, labelled _Loading…_ / _Saving…_ / _Save_. After a save, the slice navigates to the
-  detail page only if this visit of the form is still open; _← Cancel_ works mid-save.
+The pages behave as Resource operations says; the entity's values:
+
+- **List.** Sort options, in order: _Newest first_ (`createdAt:DESC`, default), _Oldest first_, _Name A–Z_, _Name Z–A_,
+  _Recently updated_ (`updatedAt:DESC`); page sizes 10, 20, 50, 100. Rows show the name, the description and
+  `createdAt` (`medium`). The empty row reads _Loading…_, _No entities match the filter._ or _No entities yet._; an
+  error shows in a banner, and a failed delete leaves `DeleteDialog` over it.
+- **Detail.** Shows the description (`—` for `null`) and both dates.
+- **Form.** The API's rules: name required and at most 200, description at most 2000; an empty description is sent as
+  `null`. _Save_ reads _Loading…_ / _Saving…_ / _Save_.
 
 ### Web tests
 
@@ -437,6 +433,9 @@ differences:
 `build`, `typecheck`, `test`, `lint` and `format:check` are the five required checks.
 
 ### Adding a resource
+
+As the Resource operations concept says, a new resource copies `entity` layer by layer, with its tests. The files, in
+order:
 
 1. `models/<resource>.model.ts`, mirroring the API's types; `services/<resource>.service.ts`;
    `helpers/<resource>-list-params.helper.ts` (and a filter-form helper if the list has one).
