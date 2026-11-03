@@ -41,7 +41,7 @@ it).
 - `docs/<slug>/01-brainstorm.md`: the **Stack constraints** and the user's own words.
 - **The conventions file is the source of truth for the stack**: `coding-conventions.md` (written by
   `bootstrap-project` for every stack), `CLAUDE.md` or `AGENTS.md`, whichever the project has. Follow its architecture, its recipe
-  for adding a resource, its naming and its test tiers. Before S0 has run, use the conventions and starter examples
+  for adding a resource, its naming and its test tiers. Before S0 has run, use the conventions and the blueprint's Starter
   `consult-stack-knowledge` hands back for the stack (step 3). Where there is no such file, follow the patterns in the
   code and record each one you relied on under **Conventions used**. For how two technologies of the stack connect,
   or the reason behind a rule, use the `consult-stack-knowledge` skill's docs for that stack (its
@@ -57,7 +57,7 @@ it).
 ```
 - [ ] 1. Inputs read, release picked
 - [ ] 2. Repo settled, docs in it
-- [ ] 3. Stack settled, its conventions and examples read
+- [ ] 3. Stack settled, its conventions and Starter read
 - [ ] 4. Setup task (S0) planned, if the project needs one
 - [ ] 5. Behaviours mapped to building blocks, modules drawn
 - [ ] 6. Forks found, each with a default
@@ -101,8 +101,8 @@ it).
    approach already names the combination, ask them to confirm it. Something else is fine if the user names it.
 
    Then run the `consult-stack-knowledge` skill with that combination. Its hand-off names the blueprint, the docs, the
-   starter examples and the assembled conventions. Read them, and plan against them: where the blueprint ships an
-   example resource (the Angular stacks' `entity`), it shows exactly where each building block goes; where it ships
+   blueprint's Starter and the assembled conventions. Read them, and plan against them: where the Starter ships a
+   resource (the `entity` of the API and Angular stacks), it shows exactly where each building block goes; where it ships
    none, its conventions do. Write each path as the blueprint lays it out, marked _(after S0)_, until S0 makes it real.
    The scaffold itself is a task (step 4), not something this phase runs.
 
