@@ -6,16 +6,18 @@
 //   node assemble-conventions.mjs --compose "<project kind>" [--out <file>] [--list] <doc>...
 //
 // The blueprint's "## Composition" section lists the architecture, technology and integration docs as a bulleted list
-// of links, in the order their conventions appear. An entry ending in " — optional" is included only when its file's
-// base name is passed with --with (`--with angular-fundamental-ngx`); one ending in " — optional (<group>)" when its
-// group is, so `--with authentication` brings in every entry of that group. Its "## Starter" section is what a fresh
-// scaffold ships, a `### ` part whose heading says "with `<group>`" only when that group is picked, and the "ports" row
-// of its "## Required values" the ports it binds.
-// The conventions hold the stack's own "## Conventions" section first (none in --compose mode, where the project kind is
-// a noun phrase such as "Hono API on Node"), then each doc's "## Conventions" section under the doc's title. Without
+// of links, one per line and no other text, in the order their conventions appear. An entry ending in " — optional" is
+// included only when its file's base name is passed with --with (`--with angular-fundamental-ngx`); one ending in
+// " — optional (<group>)" when its group is, so `--with authentication` brings in every entry of that group. Its
+// "## Starter" section is what a fresh scaffold ships, a `### ` part whose heading says "with `<group>`" only when that
+// group is picked, and the "ports" row of its "## Required values" the ports it binds.
+//
+// The conventions hold the stack's own "## Conventions" section first (none in --compose mode, where the project kind
+// is a noun phrase such as "Hono API on Node"), then each doc's "## Conventions" section under the doc's title. Without
 // --out they go to stdout. With --out they are written to that file, and stdout gets the hand-off block the skill
 // returns: Stack, Blueprint, Docs (absolute paths, in composition order), Starter, Ports and Conventions; the caller
 // adds Gaps and Found. --list prints the same block without assembling anything.
+//
 // It exits non-zero when a section is missing, when --with names no optional entry, or when the conventions would carry
 // a relative link to a file (they live in the project, not beside the skill) or an anchor that does not resolve.
 import { readFileSync, writeFileSync } from 'node:fs';

@@ -11,7 +11,8 @@ and the scripts that ask it. For a project, or a combination of technologies, it
 docs apply and what `coding-conventions.md` they assemble into, and hands that to the skill that asked; for a file or a
 topic in a project, it answers which docs govern it and what they say. Which docs apply is computed from the graph, not
 recalled. It does not build or change the project: the caller reads the docs and does the work.
-[references/catalog.md](references/catalog.md) lists every doc.
+[references/catalog.md](references/catalog.md) lists every doc and says where a new fact belongs; after changing the
+docs, `node <skill-dir>/scripts/check.mjs` reports what else has to change.
 
 The two tables below are the one list of stacks. Other skills (`bootstrap-project`'s interview, `experiment-idea`,
 `plan-release`) link here rather than keep their own.

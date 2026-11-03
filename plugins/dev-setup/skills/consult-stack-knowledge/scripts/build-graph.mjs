@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// Builds references/graph.json from the docs' frontmatter and checks that the prose agrees with it.
+// Builds references/graph.json from the docs' frontmatter and checks that the prose agrees with it. check.mjs runs it
+// with the other checks.
 //
 //   node build-graph.mjs [--check] [<references dir>]
 //
 // Without --check it writes graph.json and then runs the checks; with --check it only checks, and also fails when the
-// committed graph.json is out of date. The checks: every doc has a row in catalog.md and every catalog row a doc;
-// every edge names a doc that exists; a doc's Realises line lists exactly the concepts its frontmatter does; each
-// blueprint's Composition is exactly what its technologies and optional groups bring, with every optional mark on the
-// right group; each blueprint has a Starter whose parts name only its own groups; and the Stacks table of SKILL.md names each blueprint and its groups. It prints
-// each violation and exits non-zero when there is one.
+// committed graph.json is out of date. The checks: every frontmatter parses; every doc has a row in catalog.md and
+// every catalog row a doc; every edge names a doc that exists; a doc's Realises line lists exactly the concepts its
+// frontmatter does; each blueprint's Composition is exactly what its technologies and optional groups bring (an entry
+// marked `— optional (<group>)` is brought by that group and not by the stack alone, while an entry listed
+// unconditionally though only a group brings it is allowed, since the assembly keeps it: the React Router stacks list
+// Database and Data access ahead of the `database` group); each blueprint has a Starter whose parts name only its own
+// groups; and the Stacks table of SKILL.md names each blueprint and its groups. It prints each violation with the fix,
+// and exits non-zero when there is one.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,7 +82,7 @@ for (const kind of ['concept', 'technology', 'integration']) {
   const listed = catalog.filter((l) => l.layer === layer).map((l) => l.id);
   for (const id of graph.order[kind]) {
     if (!graph[`${kind === 'technology' ? 'technologies' : `${kind}s`}`][id].external && !listed.includes(id)) {
-      problems.push(`catalog.md: no row for ${layer}/${id}.md`);
+      problems.push(`catalog.md: no row for ${layer}/${id}.md: add one to its layer's table`);
     }
   }
   for (const id of listed) {
@@ -102,7 +106,7 @@ for (const stack of Object.values(graph.stacks)) {
   const listed = new Set(stack.composition.map(key));
   for (const k of expected) {
     if (!listed.has(k)) {
-      problems.push(`${stack.file}: Composition lacks ${k}, which its technologies bring`);
+      problems.push(`${stack.file}: Composition lacks ${k}, which its technologies bring: add its link, marked optional when only a group brings it`);
     }
   }
   for (const k of listed) {

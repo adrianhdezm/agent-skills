@@ -66,6 +66,17 @@ function lines(text) {
 
 const problems = [];
 
+/** Where the fact belongs instead, by the layer it was found in. */
+const remedy = {
+  technologies:
+    'a technology doc names no other technology: move what is about two technologies to their integration doc, and what one stack alone needs to its blueprint',
+  architecture: 'a concept names no technology: move what is about one technology to its technology doc, and what is about two to their integration doc'
+};
+const linkRemedy = {
+  technologies: 'a technology doc links only up to the concepts it realises',
+  architecture: 'a concept links only to other concepts'
+};
+
 function check(layer, allowedLinks) {
   for (const file of readdirSync(join(root, layer)).filter((f) => f.endsWith('.md'))) {
     const doc = basename(file, '.md');
@@ -73,7 +84,7 @@ function check(layer, allowedLinks) {
     for (const { n, line, prose } of lines(readFileSync(path, 'utf8'))) {
       for (const [, target] of line.matchAll(/\]\(\.\.\/([a-z]+)\/[^)]+\)/g)) {
         if (!allowedLinks.includes(target)) {
-          problems.push(`${layer}/${file}:${n}: links to ${target}/`);
+          problems.push(`${layer}/${file}:${n}: links to ${target}/ (${linkRemedy[layer]})`);
         }
       }
       for (const [tech, patterns] of Object.entries(names)) {
@@ -83,7 +94,7 @@ function check(layer, allowedLinks) {
         const text = notation.has(tech) ? prose : line;
         const hit = patterns.find((p) => p.test(text));
         if (hit) {
-          problems.push(`${layer}/${file}:${n}: names ${tech} (${hit.source})`);
+          problems.push(`${layer}/${file}:${n}: names ${tech} (${hit.source}); ${remedy[layer]}`);
         }
       }
     }

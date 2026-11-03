@@ -1,17 +1,33 @@
 // The knowledge graph behind the docs: every doc's frontmatter (its kind and edges), the catalog's order, each
-// blueprint's composition and Starter parts, and the files each doc claims. Scripts load it from the docs with `loadGraph`, so the docs
-// stay the source of truth; `references/graph.json` is the same graph written out for reading and diffing.
+// blueprint's composition and Starter parts, and the files each doc claims. Scripts load it from the docs with
+// `loadGraph`, so the docs stay the source of truth; `references/graph.json` is the same graph written out for reading
+// and diffing. The prose repeats some edges for readers (a Realises line, a catalog row, a Composition, the Stacks
+// table of SKILL.md); build-graph.mjs fails when the two disagree.
 //
-// Frontmatter is a small YAML subset: `key: scalar`, `key: [flow, list]` (nestable), and one level of indented
-// `key:` maps. Fields by kind:
-//   concept      always (true for the one every project has)
-//   technology   role (toolchain | runtime | framework | service | library | tooling), realises, detect, aliases, family
-//   integration  connects (the technologies it joins; one without a doc is an external technology), realises, detect,
-//                unless (technologies whose presence means the seam is not used)
-//   stack        technologies, optional (group → technologies), requires (group → groups), concepts (the ones its
-//                technologies do not realise but the stack is built around)
-// `detect` holds files (globs, a trailing `/` for a directory), dependencies, manifest (key paths in package.json),
-// scripts (regexes over script values) and fileContains (`<file>=<needle>`).
+// Frontmatter is a small YAML subset: `key: scalar`, `key: [flow, list]` (nestable), and one level of indented `key:`
+// maps. A value starting with a YAML indicator (`@`, a backtick, `!`, `&`, `*`, `%`, `|`, `>`, a bracket or `#`) is
+// quoted, `'@angular/'`, since YAML (and GitHub's rendering) rejects it bare; the parser refuses it unquoted. Fields by
+// kind:
+//   concept      always: true on the one every project has (code style)
+//   technology   role (toolchain | runtime | framework | service | library | tooling: the composition order), realises
+//                (concept ids, the same as its Realises line), detect (below), aliases (how its name appears in prose,
+//                for the knowledge-flow check: a word, or a literal such as '@angular/'), family (a technology whose
+//                vocabulary this doc may use: the Cloudflare products name Workers and Wrangler, NgRx names Angular)
+//   integration  connects (the technologies it joins; a name with no doc is an external technology, known by name and
+//                detected through this doc, which then needs its own detect), realises, detect (otherwise both ends
+//                present means the seam is), unless (technologies whose presence means the seam is not used: Hono +
+//                Drizzle once React Router owns the data)
+//   stack        technologies (the required ones), optional (group → the technologies it adds; a group is a row's
+//                `Optional (--with)` entry in SKILL.md), requires (group → the groups it needs), concepts (concepts the
+//                stack is built around that none of its technologies realises: REST API for the Hono Worker)
+// `detect` holds files (globs over paths, a trailing `/` for a directory), dependencies (any package.json's
+// dependencies or devDependencies), manifest (key paths in package.json such as `engines.node`), scripts (regexes over
+// script values) and fileContains (`<file>=<needle>`). A project is scanned three levels deep, skipping build output,
+// so a workspace's packages count.
+//
+// The closure of a set of technologies is the always-on concepts, the concepts its technologies and integrations
+// realise, and every integration whose ends are all present and no `unless` rules out; a blueprint's Composition is the
+// closure of its technologies with every group picked (build-graph.mjs says how optional marks are checked).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 

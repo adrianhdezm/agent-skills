@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Resolves a project, or a combination of technologies, into its stack and the docs that apply, and prints the
-// assembly command.
+// Resolves a project, or a combination of technologies, into its stack and the docs that apply, and prints the assembly
+// command.
 //
 //   node resolve-stack.mjs <project dir> [--with <group>]... [--kind "<what it is>"]
 //   node resolve-stack.mjs --technologies <name>... [--concepts <concept>...] [--with <group>]... [--kind "<what it is>"]
@@ -12,9 +12,10 @@
 // concepts the technologies realise (plus each --concepts) and every integration whose both ends are present, in
 // composition order; it has no Starter. A name that is no technology is a gap.
 //
-// It prints a block the skill's hand-off is built from: Stack, Blueprint, Technologies (with evidence from a
-// project), Concepts, Docs, Starter (the blueprint's Starter parts for the groups picked), Gaps, Found, and the Assemble command to run next (`<out>` is where the
-// conventions go). It writes nothing. A combination no doc covers at all exits non-zero.
+// It prints a block the skill's hand-off is built from: Stack, Blueprint, Technologies (with evidence from a project),
+// Concepts, Docs, Starter (the blueprint's Starter parts for the groups picked), Gaps, Found, and the Assemble command
+// to run next (`<out>` is where the conventions go). It writes nothing. A combination no doc covers at all exits
+// non-zero.
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
