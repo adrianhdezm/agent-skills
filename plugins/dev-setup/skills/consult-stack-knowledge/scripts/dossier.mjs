@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-// The rules that govern a file, or a topic, in a project: resolves the project's stack, keeps the docs that apply,
-// and prints the sections of the ones that claim the file or mention the topic.
+// The rules that govern a file, or a topic, in a project: resolves the project's stack, keeps the docs that apply, and
+// prints the sections of the ones that claim the file or mention the topic.
 //
 //   node dossier.mjs <project dir> <file>... [--sections <name>,...] [--with <group>]...
 //   node dossier.mjs <project dir> --topic <word>... [--sections <name>,...] [--with <group>]...
 //
 // A file is claimed by a doc when its "Where it lives" or "Layout" table, or a file its Required values names, matches
 // the path (`<resource>` and `*` match one path segment, a trailing `/` a directory, a bare file name any file of that
-// name). A doc mentions a topic when a bullet or table row of its sections holds every word. The sections printed
-// default to Conventions and Pitfalls; `--sections all` prints the whole doc. Paths are relative to the project.
-// Nothing claiming a file, or nothing mentioning a topic, is said so and exits non-zero.
+// name). A doc that owns a file names it in one of those, and drops it when it stops owning it. A doc mentions a topic
+// when a bullet or table row of its sections holds every word. The sections printed default to Conventions and
+// Pitfalls; `--sections all` prints the whole doc. Paths are relative to the project. Nothing claiming a file, or
+// nothing mentioning a topic, is said so and exits non-zero.
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

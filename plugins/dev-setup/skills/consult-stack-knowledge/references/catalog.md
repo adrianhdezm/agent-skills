@@ -1,13 +1,24 @@
 # Catalog
 
-Every concept, technology and integration, with what it covers and how a project shows it has one. Read it to
-find the doc a task needs, or to name the parts of a project no stack covers.
+Every concept, technology and integration, with what it covers and how a project shows it has one. Read it to find the
+doc a task needs, to name the parts of a project no stack covers, or to find where a new fact belongs:
+
+- **A rule that holds whatever the technology** goes in its architecture doc.
+- **A fact about one technology** goes in its technology doc.
+- **A fact about where code from one technology calls into another** goes in that pair's integration doc, and nowhere
+  else.
+- **A fact only one stack needs** goes in its blueprint.
+
+Knowledge flows one way, architecture ← technologies ← integrations ← blueprints: a doc names nothing from a layer to
+its right. After any change, `node scripts/check.mjs` from the skill's directory reports what else has to change (a
+catalog row, a Composition line, a Realises line, a quoted frontmatter value); run it with `--check` before committing.
 
 ## Contents
 
 - [Architecture](#architecture)
 - [Technologies](#technologies)
 - [Integrations](#integrations)
+- [Blueprints](#blueprints)
 
 ## Architecture
 
@@ -26,8 +37,8 @@ find the doc a task needs, or to name the parts of a project no stack covers.
 
 Each has **Principles** (each with its reason), **Required values** (where the concept fixes exact values),
 **Conventions** and **Verify it is wired**. A concept states only what holds whatever the technology; it
-names no stack. The docs that carry it out say so in a **Realises** line under their title, so which docs realise a
-concept is found by searching for its name.
+names no stack. The docs that carry it out say so in a **Realises** line under their title, and a concept never lists
+them back, so which docs realise a concept is found by searching for its name.
 
 ## Technologies
 
@@ -109,3 +120,20 @@ Each has **Use it like this** (the principles, each with its reason), **Required
 Each has **The seam** (what calls what, as a diagram), **Where it lives** (the files to open), **Required values**,
 **Pitfalls**, **Reference code**, **Conventions** and **Verify it is wired** (what a check confirms), each only where it
 has something.
+
+## Blueprints
+
+The blueprints are listed in the Stacks tables of `SKILL.md`, the one list of stacks. Each has **Composition** (its
+docs as a bulleted list of links, one per line and nothing else, in the order their conventions are assembled; an entry
+a project may leave out ends in ` — optional` or ` — optional (<group>)`), **Shape** (the files), **Required values**
+(scripts, ports, ignores and settings only this stack fixes), **Reference code** (its configs exactly as a fresh
+scaffold writes them, and the files only this stack has, each checked by scaffolding the stack), **Scaffold** (only
+where building it departs from the usual order), **Starter**, **Conventions** (only what is specific to the stack) and
+**Smoke test** (the live proof a fresh scaffold runs, the Starter's included).
+
+The **Starter** is what a fresh scaffold ships so every check has code to run against, built by applying the docs,
+never copied file by file. It states outcomes, not files: the names and values it depends on, the behaviour and
+contracts its tests rely on, and what each test tier covers. A rule later code should follow belongs in a doc, and
+exact code in a doc's Reference code. A part only an optional group ships has a `### ` heading that names the group,
+``### Sign in, with `authentication` ``. A Starter several stacks share is written in each, with only that stack's
+values.
