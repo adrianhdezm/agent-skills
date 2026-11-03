@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Storybook
+description: '`@storybook/angular-vite` through Analog, `angular.json` targets, zoneless'
 connects: [angular, storybook]
 ---
 # Angular + Storybook

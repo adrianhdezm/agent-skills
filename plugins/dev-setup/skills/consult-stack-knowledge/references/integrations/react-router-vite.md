@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Vite
+description: '`reactRouter()` last, the `~/` alias, `vite/client`, `app/env.d.ts`'
 connects: [react-router, vite]
 ---
 # React Router + Vite

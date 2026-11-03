@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Better Auth + React Router
+description: auth on `appContext`, the splat route, the protected layout, Conform forms
 connects: [better-auth, react-router]
 realises: [authorization]
 ---

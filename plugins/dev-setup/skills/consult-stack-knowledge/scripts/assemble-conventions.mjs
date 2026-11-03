@@ -18,10 +18,14 @@
 // returns: Stack, Blueprint, Docs (absolute paths, in composition order), Starter, Ports and Conventions; the caller
 // adds Gaps and Found. --list prints the same block without assembling anything.
 //
+// A `[^id]` footnote in a section becomes a link to the source the doc's frontmatter names, since the footnote's
+// definition stays behind in the doc.
+//
 // It exits non-zero when a section is missing, when --with names no optional entry, or when the conventions would carry
 // a relative link to a file (they live in the project, not beside the skill) or an anchor that does not resolve.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { citeSources, parseFrontmatter } from './lib/graph.mjs';
 
 const args = process.argv.slice(2);
 const usage = [
@@ -95,6 +99,11 @@ function title(text, file) {
   return match[1].trim();
 }
 
+/** A doc's "## Conventions" section, each `[^id]` footnote turned into a link to the source it cites. */
+function conventionsOf(text, file) {
+  return citeSources(section(text, 'Conventions', file), parseFrontmatter(text, file).data.sources);
+}
+
 /** GitHub's heading anchor. */
 function slug(heading) {
   return heading
@@ -133,7 +142,7 @@ function fromStack(stackPath) {
     blueprint: resolve(stackPath),
     ports: ports ? ports[1] : 'none',
     source: "skill's blueprint for that stack",
-    head: [{ title: stackTitle, body: section(stackText, 'Conventions', stackPath) }],
+    head: [{ title: stackTitle, body: conventionsOf(stackText, stackPath) }],
     docs: entries.filter((e) => !e.optional || opted.has(e.name)).map((e) => resolve(dirname(stackPath), e.link)),
     starter: `the blueprint's Starter${starter.length > 0 ? `: ${starter.join('; ')}` : ''}`
   };
@@ -180,7 +189,7 @@ if (listing && !outFile) {
 const parts = [...head];
 for (const docPath of docs) {
   const text = readFileSync(docPath, 'utf8');
-  parts.push({ title: title(text, docPath), body: section(text, 'Conventions', docPath) });
+  parts.push({ title: title(text, docPath), body: conventionsOf(text, docPath) });
 }
 
 const out = [

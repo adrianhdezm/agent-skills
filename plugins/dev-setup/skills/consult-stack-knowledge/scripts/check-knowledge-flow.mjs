@@ -11,12 +11,12 @@
 // `@angular/`); a doc whose `family` names another technology may use that technology's vocabulary (the Cloudflare
 // products are bound to a Worker and created by Wrangler, NgRx exists only inside Angular). The shared toolchain
 // (`pnpm …`, `node …`, `tsconfig*.json`) and the test runner (`vitest`) are allowed inside code spans, as notation.
-// Frontmatter is not prose and is not checked. It prints each violation as file:line and exits non-zero when there is
-// one.
-import { readdirSync, readFileSync } from 'node:fs';
+// Frontmatter is not prose and is not checked, nor are the generated index.md files. It prints each violation as
+// file:line and exits non-zero when there is one.
+import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadGraph } from './lib/graph.mjs';
+import { docFiles, loadGraph } from './lib/graph.mjs';
 
 const root = resolve(process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'references'));
 const graph = loadGraph(root);
@@ -78,7 +78,7 @@ const linkRemedy = {
 };
 
 function check(layer, allowedLinks) {
-  for (const file of readdirSync(join(root, layer)).filter((f) => f.endsWith('.md'))) {
+  for (const file of docFiles(join(root, layer))) {
     const doc = basename(file, '.md');
     const path = join(root, layer, file);
     for (const { n, line, prose } of lines(readFileSync(path, 'utf8'))) {

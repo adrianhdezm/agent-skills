@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Testing
+description: tiers by what is real, each behaviour once at the cheapest tier, behaviour-named cases, owned data
 ---
 # Testing
 

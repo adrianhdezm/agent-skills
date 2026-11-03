@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Drizzle + Postgres
+description: the client on the pool, the `postgresql` dialect, Testcontainers
 connects: [drizzle, postgres]
 ---
 # Drizzle + Postgres

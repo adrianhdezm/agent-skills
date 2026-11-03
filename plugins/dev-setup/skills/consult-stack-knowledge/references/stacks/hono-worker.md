@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: Hono Worker
+description: A Hono API or small site on Cloudflare Workers, built by Vite, with its tests running inside workerd against the real Worker.
 technologies: [pnpm, typescript, hono, cloudflare-workers, vite, eslint, prettier, vitest]
 concepts: [rest-api]
 ---

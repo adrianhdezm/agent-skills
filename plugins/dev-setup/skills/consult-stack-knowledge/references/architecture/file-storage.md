@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: File storage
+description: bytes in an object store, metadata in a table, one service keeping them in step
 ---
 # File storage
 

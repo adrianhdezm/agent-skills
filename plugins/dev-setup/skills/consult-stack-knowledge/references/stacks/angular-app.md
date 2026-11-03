@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: Angular app
+description: 'A single Angular 22 project: an SPA with NgRx route-driven state, Tailwind, Storybook and two test layers, calling an API it does not own, and served as static files by Nginx.'
 technologies: [pnpm, typescript, angular, ngrx, tailwind, storybook, nginx, docker-compose, eslint, prettier, vitest]
 optional:
   angular-fundamental-ngx: [fundamental-ngx]

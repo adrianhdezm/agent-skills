@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Drizzle + S3 storage
+description: '`FilesService`: object first and undone on failure, owner-scoped reads, delete row then object'
 connects: [drizzle, s3-storage]
 realises: [file-storage, authorization]
 ---

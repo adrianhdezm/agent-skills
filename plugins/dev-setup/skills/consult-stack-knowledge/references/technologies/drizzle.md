@@ -1,11 +1,19 @@
 ---
-kind: technology
+type: Technology
+title: Drizzle
+description: the client, migrations, the DAO layer and its typed list queries
+resource: https://orm.drizzle.team
 role: library
 realises: [database, data-access]
 detect:
   dependencies: [drizzle-orm]
   files: [drizzle.config.ts]
 aliases: [Drizzle, drizzle]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: zod-releases
+    resource: https://github.com/colinhacks/zod/releases
+    title: Zod releases
 ---
 # Drizzle
 
@@ -16,8 +24,8 @@ its client is built and tested there, belong to that engine's integration.
 
 ## Use it like this
 
-- **Drizzle with `drizzle-zod` and zod 4.** Row inputs come from `createInsertSchema` / `createUpdateSchema` /
-  `createSelectSchema`; every type is a `z.infer` of a schema, including the row type
+- **Drizzle with `drizzle-zod` and zod 4[^zod-releases].** Row inputs come from `createInsertSchema` /
+  `createUpdateSchema` / `createSelectSchema`; every type is a `z.infer` of a schema, including the row type
   (`type Entity = z.infer<typeof selectEntitySchema>`), so types and validation cannot drift.
 - **The client is the engine's**: the engine's integration says how it is built; `drizzle.config.ts` reads the same
   connection setting and throws when it is unset.
@@ -335,3 +343,5 @@ export const schema = { entity };
   the engine, `and` / `or` / `not`, LIKE metacharacters and hostile input treated as data).
 - **A new operator** gets a translator case and a builder rejection case; a DAO case only when its result depends on
   the engine.
+
+[^zod-releases]: Zod releases

@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Vite
+description: one `vite.config.ts`, plugin order, aliases from `tsconfig` `paths`, client types
+resource: https://vite.dev
 role: tooling
 detect:
   files: [vite.config.ts]

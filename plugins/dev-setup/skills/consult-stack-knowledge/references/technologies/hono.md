@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Hono
+description: the server entry every server stack's runtime drives
+resource: https://hono.dev
 role: framework
 detect:
   dependencies: [hono]

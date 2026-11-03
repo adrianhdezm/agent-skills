@@ -1,11 +1,19 @@
 ---
-kind: technology
+type: Technology
+title: Postgres
+description: the pool, `DATABASE_URL`, column types, transactions, test containers
+resource: https://www.postgresql.org
 role: service
 realises: [database]
 detect:
   dependencies: [pg]
   fileContains: ['docker-compose.yml=postgres:']
 aliases: [Postgres, PostgreSQL, 'postgres:', '`pg`']
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: postgres-versioning
+    resource: https://www.postgresql.org/support/versioning/
+    title: PostgreSQL versioning policy
 ---
 # Postgres
 
@@ -26,7 +34,8 @@ transactions for atomic work.
   times, defaulting to `now()`; `text` rather than `varchar(n)`, with lengths enforced by the validation schemas.
 - **Concurrency and atomicity**: independent queries run concurrently on the pool; a write across tables is one
   transaction.
-- **Tests run on a throwaway `postgres:17-alpine`**, one per suite, migrated by the project's migrations.
+- **Tests run on a throwaway `postgres:17-alpine`**[^postgres-versioning], one per suite, migrated by the project's
+  migrations.
 
 ## Required values
 
@@ -50,3 +59,5 @@ transactions for atomic work.
 - **`DATABASE_URL` is required**, with no fallback.
 - **Ids are `uuid` with a database default; times are `timestamp with time zone`.**
 - **Independent queries run concurrently; atomic writes are one transaction.**
+
+[^postgres-versioning]: PostgreSQL versioning policy

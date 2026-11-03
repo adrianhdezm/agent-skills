@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Resource operations
+description: the five operations, one list contract, list state in the URL, one form, confirmed delete, copying the first resource
 ---
 # Resource operations
 

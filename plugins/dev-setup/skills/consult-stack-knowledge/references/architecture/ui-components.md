@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: UI components
+description: two tiers of components, one-way imports, theme tokens, states, labels and accessible names
 ---
 # UI components
 

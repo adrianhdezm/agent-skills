@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: REST API on Node
+description: A single-package Express 5 + Drizzle + Postgres REST API, compiled by `tsc` and run on Node, next to Postgres in Docker Compose, with an `entity` CRUDL resource wired from the table to the routes.
 technologies: [pnpm, typescript, node, express, pino, postgres, drizzle, docker-compose, eslint, prettier, vitest]
 ---
 # REST API on Node

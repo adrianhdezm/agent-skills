@@ -1,11 +1,18 @@
 ---
-kind: integration
+type: Integration
+title: S3 storage + Docker Compose
+description: RustFS as a Compose service
 connects: [s3-storage, docker-compose]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: rustfs-releases
+    resource: https://github.com/rustfs/rustfs/releases
+    title: RustFS releases
 ---
 # S3 storage + Docker Compose
 
-RustFS, an S3-compatible store, as a service of the root Compose file, so file storage runs locally the way it runs in
-production. React Router on Node uses it once it stores files.
+RustFS[^rustfs-releases], an S3-compatible store, as a service of the root Compose file, so file storage runs locally
+the way it runs in production. React Router on Node uses it once it stores files.
 
 ## The seam
 
@@ -54,3 +61,5 @@ rustfs:
 
 - `docker compose up -d --wait rustfs` brings the service up, `docker compose ps rustfs` shows it running (not
   restarting), and the bucket in `S3_BUCKET` exists.
+
+[^rustfs-releases]: RustFS releases

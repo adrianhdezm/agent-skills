@@ -1,12 +1,21 @@
-// The knowledge graph behind the docs: every doc's frontmatter (its kind and edges), the catalog's order, each
+// The knowledge graph behind the docs: every doc's frontmatter (its type and edges), the catalog's order, each
 // blueprint's composition and Starter parts, and the files each doc claims. Scripts load it from the docs with
 // `loadGraph`, so the docs stay the source of truth; `references/graph.json` is the same graph written out for reading
 // and diffing. The prose repeats some edges for readers (a Realises line, a catalog row, a Composition, the Stacks
 // table of SKILL.md); build-graph.mjs fails when the two disagree.
 //
-// Frontmatter is a small YAML subset: `key: scalar`, `key: [flow, list]` (nestable), and one level of indented `key:`
-// maps. A value starting with a YAML indicator (`@`, a backtick, `!`, `&`, `*`, `%`, `|`, `>`, a bracket or `#`) is
-// quoted, `'@angular/'`, since YAML (and GitHub's rendering) rejects it bare; the parser refuses it unquoted. Fields by
+// The references directory is an Open Knowledge Format (OKF v0.2) bundle: every doc is a concept with YAML frontmatter
+// whose `type` names its layer (TYPES below), `title` is its H1 and `description` its catalog row; `index.md` and
+// `log.md` are reserved and never docs. OKF's own optional fields are read here and checked by build-graph.mjs:
+// `resource` (the upstream project), `sources` (each `{ id, resource, title }`, cited in the body by `[^id]`
+// footnotes), `stale_after` (when to re-check the doc against its sources), `status` (draft | stable | deprecated), and
+// `generated` / `verified` (`{ by, at }` with an OKF actor: `human:<id>`, `process:<id>` or `<producer>/<version>`).
+//
+// Frontmatter is a small YAML subset: `key: scalar`, `key: [flow, list]` and `key: { flow: map }` (nestable), one
+// level of indented `key:` maps, and one level of `- ` lists whose items are scalars, flow values or `key: value` maps.
+// A value starting with a YAML indicator (`@`, a backtick, `!`, `&`, `*`, `%`, `|`, `>`, a bracket or `#`), or holding
+// `: ` or ` #`, is quoted, `'@angular/'`, since YAML (and GitHub's rendering) rejects or misreads it bare; the parser
+// refuses it unquoted. Fields by
 // kind:
 //   concept      always: true on the one every project has (code style)
 //   technology   role (toolchain | runtime | framework | service | library | tooling: the composition order), realises
@@ -38,6 +47,16 @@ export const LAYERS = {
   stacks: 'stack'
 };
 const DIRS = Object.fromEntries(Object.entries(LAYERS).map(([dir, kind]) => [kind, dir]));
+/** The OKF `type` each kind's docs carry. */
+export const TYPES = {
+  concept: 'Architecture Concept',
+  technology: 'Technology',
+  integration: 'Integration',
+  stack: 'Stack Blueprint'
+};
+/** Filenames OKF reserves at every level: never docs. */
+export const RESERVED = new Set(['index.md', 'log.md']);
+export const STATUSES = ['draft', 'stable', 'deprecated'];
 export const ROLE_ORDER = ['toolchain', 'runtime', 'framework', 'service', 'library', 'tooling'];
 
 // --- frontmatter -------------------------------------------------------------------------------------------------
@@ -46,12 +65,26 @@ function parseFlow(text) {
   let i = 0;
   function value() {
     skip();
-    if (text[i] === '[') {
+    if (text[i] === '[' || text[i] === '{') {
+      const map = text[i] === '{';
+      const close = map ? '}' : ']';
       i++;
-      const items = [];
+      const out = map ? {} : [];
       skip();
-      while (text[i] !== ']') {
-        items.push(value());
+      while (text[i] !== close) {
+        if (i >= text.length) {
+          throw new Error(`unterminated "${close}" in ${text}`);
+        }
+        if (map) {
+          const key = /^([A-Za-z][\w-]*): /.exec(text.slice(i));
+          if (!key) {
+            throw new Error(`cannot read a key at "${text.slice(i)}" in ${text}`);
+          }
+          i += key[0].length;
+          out[key[1]] = value();
+        } else {
+          out.push(value());
+        }
         skip();
         if (text[i] === ',') {
           i++;
@@ -59,7 +92,7 @@ function parseFlow(text) {
         }
       }
       i++;
-      return items;
+      return out;
     }
     if (text[i] === "'" || text[i] === '"') {
       const quote = text[i++];
@@ -72,14 +105,17 @@ function parseFlow(text) {
             continue;
           }
           i++;
-          break;
+          return out;
+        }
+        if (quote === '"' && text[i] === '\\') {
+          i++;
         }
         out += text[i++];
       }
-      return out;
+      throw new Error(`unterminated quote in ${text}`);
     }
     let out = '';
-    while (i < text.length && !',]'.includes(text[i])) {
+    while (i < text.length && !',]}'.includes(text[i])) {
       out += text[i++];
     }
     return scalar(plain(out.trim()));
@@ -97,10 +133,16 @@ function parseFlow(text) {
   return result;
 }
 
-/** YAML's indicator characters cannot start an unquoted value: GitHub, and any YAML parser, rejects the frontmatter. */
+/** A value YAML would reject or misread bare: GitHub, and any YAML parser, would not read it as written. */
 function plain(raw) {
-  if (/^[@`!&*%|>{}[\]#]/.test(raw)) {
+  if (/^[@`!&*%|>{}[\]#'"]/.test(raw)) {
     throw new Error(`"${raw}" must be quoted ('${raw}'): YAML cannot start an unquoted value with "${raw[0]}"`);
+  }
+  if (/: |:$/.test(raw)) {
+    throw new Error(`"${raw}" must be quoted ('${raw}'): YAML reads ": " in an unquoted value as a key`);
+  }
+  if (/ #/.test(raw)) {
+    throw new Error(`"${raw}" must be quoted ('${raw}'): YAML reads " #" in an unquoted value as a comment`);
   }
   return raw;
 }
@@ -115,6 +157,23 @@ function scalar(raw) {
   return raw;
 }
 
+/** A frontmatter value: a flow list or map, a quoted string, or a plain scalar. */
+function readValue(raw) {
+  return /^[[{'"]/.test(raw) ? parseFlow(raw) : scalar(plain(raw));
+}
+
+/** Writes a string as a YAML scalar, quoted only when it has to be. */
+export function yamlString(value) {
+  try {
+    if (readValue(value) === value) {
+      return value;
+    }
+  } catch {
+    // quoted below
+  }
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 /** Splits a doc into its frontmatter data and body. */
 export function parseFrontmatter(text, file = '') {
   if (!text.startsWith('---\n')) {
@@ -125,37 +184,106 @@ export function parseFrontmatter(text, file = '') {
     throw new Error(`${file}: unterminated frontmatter`);
   }
   const data = {};
-  let current = data;
+  const fail = (message) => {
+    throw new Error(`${file}: ${message}`);
+  };
+  const read = (raw) => {
+    try {
+      return readValue(raw);
+    } catch (error) {
+      return fail(error.message);
+    }
+  };
+  let block; // the top-level key whose indented lines follow
+  let item; // the map of the current `- key: value` list item, and the indent of its keys
+  let itemIndent;
   for (const line of text.slice(4, end).split('\n')) {
     if (line.trim() === '' || line.trimStart().startsWith('#')) {
       continue;
     }
-    const match = /^( *)([A-Za-z][\w-]*):(?: (.*))?$/.exec(line);
-    if (!match) {
-      throw new Error(`${file}: cannot read frontmatter line "${line}"`);
+    const top = /^([A-Za-z][\w-]*):(?: (.*))?$/.exec(line);
+    if (top) {
+      block = top[2] === undefined ? top[1] : undefined;
+      item = undefined;
+      data[top[1]] = top[2] === undefined ? undefined : read(top[2]);
+      continue;
     }
-    const [, indent, key, raw] = match;
-    const read = (value) => {
-      try {
-        return value.startsWith('[') ? parseFlow(value) : /^'.*'$/.test(value) ? value.slice(1, -1) : scalar(plain(value));
-      } catch (error) {
-        throw new Error(`${file}: ${error.message}`);
-      }
-    };
-    if (indent === '') {
-      if (raw === undefined) {
-        current = data[key] = {};
-      } else {
-        current = data;
-        data[key] = read(raw);
-      }
-    } else if (current === data || raw === undefined) {
-      throw new Error(`${file}: unexpected nesting at "${line}"`);
-    } else {
-      current[key] = read(raw);
+    if (block === undefined) {
+      fail(`unexpected nesting at "${line}"`);
     }
+    const dash = /^( +)- (.+)$/.exec(line);
+    if (dash) {
+      data[block] ??= [];
+      if (!Array.isArray(data[block])) {
+        fail(`a list item under the map "${block}": "${line}"`);
+      }
+      const pair = /^([A-Za-z][\w-]*): (.+)$/.exec(dash[2]);
+      item = pair ? { [pair[1]]: read(pair[2]) } : undefined;
+      itemIndent = dash[1].length + 2;
+      data[block].push(item ?? read(dash[2]));
+      continue;
+    }
+    const nested = /^( +)([A-Za-z][\w-]*): (.+)$/.exec(line);
+    if (!nested) {
+      fail(`cannot read frontmatter line "${line}"`);
+    }
+    if (item && nested[1].length === itemIndent) {
+      item[nested[2]] = read(nested[3]);
+      continue;
+    }
+    data[block] ??= {};
+    if (Array.isArray(data[block])) {
+      fail(`unexpected "${line}" in the list "${block}"`);
+    }
+    data[block][nested[2]] = read(nested[3]);
+  }
+  for (const key of Object.keys(data)) {
+    data[key] ??= {};
   }
   return { data, body: text.slice(end + 5) };
+}
+
+// --- sources and lifecycle -----------------------------------------------------------------------------------------
+
+const FOOTNOTE_DEFINITION = /^\[\^([\w-]+)\]: (.*)$/;
+
+/** The labels of the `[^id]` markers in a body, and of its footnote definitions. */
+export function footnotes(body) {
+  const lines = proseLines(body);
+  const definitions = lines.map((l) => FOOTNOTE_DEFINITION.exec(l)?.[1]).filter(Boolean);
+  const markers = lines.filter((l) => !FOOTNOTE_DEFINITION.test(l)).flatMap((l) => [...l.matchAll(/\[\^([\w-]+)\]/g)].map((m) => m[1]));
+  return { markers, definitions };
+}
+
+/** A body for reading outside the knowledge base: each `[^id]` becomes the source it names, as a link, and the footnote
+ * definitions go. */
+export function citeSources(text, sources = []) {
+  const byId = new Map(sources.filter((s) => s.id).map((s) => [s.id, s]));
+  return text
+    .split('\n')
+    .filter((l) => !FOOTNOTE_DEFINITION.test(l))
+    .join('\n')
+    .replace(/\[\^([\w-]+)\]/g, (marker, id) => {
+      const source = byId.get(id);
+      if (!source) {
+        return marker;
+      }
+      const label = source.title ?? source.resource;
+      return /^https?:/.test(source.resource) ? ` ([${label}](${source.resource}))` : ` (${label})`;
+    })
+    .trimEnd();
+}
+
+/** What a reader should know before relying on a doc: that it is deprecated, a draft, or past its `stale_after`. */
+export function lifecycleNotes(node, now = new Date()) {
+  const notes = [];
+  if (node.status === 'deprecated' || node.status === 'draft') {
+    notes.push(`${node.file} is ${node.status === 'draft' ? 'a draft' : 'deprecated'}`);
+  }
+  if (node.stale_after && now >= new Date(node.stale_after)) {
+    notes.push(`${node.file} is past its stale_after (${node.stale_after}): re-check it against its sources`);
+  }
+  return notes;
 }
 
 // --- markdown helpers ----------------------------------------------------------------------------------------------
@@ -231,7 +359,7 @@ export function loadGraph(root) {
   const byKind = { concept: graph.concepts, technology: graph.technologies, integration: graph.integrations, stack: graph.stacks };
   const problems = [];
   for (const [dir, kind] of Object.entries(LAYERS)) {
-    for (const file of readdirSync(join(root, dir)).filter((f) => f.endsWith('.md')).sort()) {
+    for (const file of docFiles(join(root, dir))) {
       const id = basename(file, '.md');
       const path = join(root, dir, file);
       const text = readFileSync(path, 'utf8');
@@ -243,13 +371,20 @@ export function loadGraph(root) {
         continue;
       }
       const { data, body } = parsed;
-      if (data.kind !== kind) {
-        problems.push(`${dir}/${file}: frontmatter kind is "${data.kind ?? 'missing'}", expected "${kind}"`);
+      if (data.type !== TYPES[kind]) {
+        problems.push(`${dir}/${file}: frontmatter type is "${data.type ?? 'missing'}", expected "${TYPES[kind]}"`);
       }
-      const title = /^# (.+)$/m.exec(body)?.[1]?.trim() ?? id;
-      const node = { id, kind, title, file: `${dir}/${file}`, path, ...data };
-      delete node.kind;
+      const heading = /^# (.+)$/m.exec(body)?.[1]?.trim();
+      if (data.title !== heading) {
+        problems.push(`${dir}/${file}: frontmatter title is "${data.title ?? 'missing'}" but the H1 is "${heading ?? 'missing'}": make them the same`);
+      }
+      const node = { id, kind, title: heading ?? id, file: `${dir}/${file}`, path, ...data };
+      delete node.type;
       node.kind = kind;
+      // OKF: a bare `verified` mapping is a one-element list.
+      if (node.verified && !Array.isArray(node.verified)) {
+        node.verified = [node.verified];
+      }
       if (kind === 'technology' || kind === 'integration') {
         node.realises ??= [];
         node.owns = claimedPaths(body);
@@ -294,6 +429,13 @@ export function loadGraph(root) {
   graph.order.stack = Object.keys(graph.stacks);
   graph.problems = problems;
   return graph;
+}
+
+/** The docs of a layer directory: its markdown files but the reserved ones, sorted. */
+export function docFiles(dir) {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.md') && !RESERVED.has(f))
+    .sort();
 }
 
 function compositionOf(body, heading) {
@@ -585,8 +727,8 @@ export function detectTechnologies(graph, scan) {
 export function matchStack(graph, technologies) {
   const techs = new Set(technologies);
   const candidates = [];
-  for (const stack of Object.values(graph.stacks)) {
-    const universe = stackTechnologies(stack, Object.keys(stack.optional));
+  for (const stack of Object.values(graph.stacks).filter((s) => s.status !== 'deprecated')) {
+    const universe =stackTechnologies(stack, Object.keys(stack.optional));
     if (![...techs].every((t) => universe.has(t))) {
       continue;
     }

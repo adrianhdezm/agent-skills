@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Better Auth
+description: email and password over the Drizzle adapter, the splat route, sessions, secret
+resource: https://www.better-auth.com
 role: library
 realises: [authentication]
 detect:

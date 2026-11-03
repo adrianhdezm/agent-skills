@@ -1,3 +1,8 @@
+---
+type: Catalog
+title: Catalog
+description: Every concept, technology and integration, with what it covers and how a project shows it has one, and where a new fact belongs
+---
 # Catalog
 
 Every concept, technology and integration, with what it covers and how a project shows it has one. Read it to find the
@@ -11,7 +16,8 @@ doc a task needs, to name the parts of a project no stack covers, or to find whe
 
 Knowledge flows one way, architecture ← technologies ← integrations ← blueprints: a doc names nothing from a layer to
 its right. After any change, `node scripts/check.mjs` from the skill's directory reports what else has to change (a
-catalog row, a Composition line, a Realises line, a quoted frontmatter value); run it with `--check` before committing.
+catalog row, a Composition line, a Realises line, a description, a quoted frontmatter value); run it with `--check`
+before committing.
 
 ## Contents
 
@@ -19,6 +25,7 @@ catalog row, a Composition line, a Realises line, a quoted frontmatter value); r
 - [Technologies](#technologies)
 - [Integrations](#integrations)
 - [Blueprints](#blueprints)
+- [Frontmatter](#frontmatter)
 
 ## Architecture
 
@@ -137,3 +144,28 @@ contracts its tests rely on, and what each test tier covers. A rule later code s
 exact code in a doc's Reference code. A part only an optional group ships has a `### ` heading that names the group,
 ``### Sign in, with `authentication` ``. A Starter several stacks share is written in each, with only that stack's
 values.
+
+## Frontmatter
+
+`references/` is an Open Knowledge Format (OKF v0.2) bundle, so any OKF reader can browse it
+([the spec](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)). Every doc opens with:
+
+- **`type`**: its layer's, `Architecture Concept`, `Technology`, `Integration` or `Stack Blueprint`.
+- **`title`**: its H1, word for word.
+- **`description`**: its row's summary in this catalog, word for word; a blueprint's is its first sentence.
+- **The graph's own keys** (`realises`, `connects`, `detect`, …), listed in `scripts/lib/graph.mjs`.
+
+Freshness is recorded with OKF's own fields:
+
+- **A technology doc names its upstream project** in `resource`.
+- **A doc that pins a version cites where to check it**: a `sources` entry (`{ id, resource, title }`, a release page
+  rather than a blog post), a `[^id]` footnote on the pinned claim with its `[^id]: <title>` definition at the end of
+  the doc, and `stale_after`, the datetime to re-check it by. Past that date `resolve-stack.mjs` reports the doc under
+  Found and `dossier.mjs` above its rules. After re-checking, move `stale_after` forward; a review may also be recorded
+  as `verified: { by: human:<id>, at: <datetime> }`. Assembled conventions and the dossier print a footnote as a link
+  to its source.
+- **A doc being retired gets `status: deprecated`** rather than being deleted, so links into it keep working: a
+  deprecated blueprint is never matched, and a deprecated doc that still applies is reported under Found.
+
+`index.md` (in `references/` and each layer's folder) and `graph.json` are written by `scripts/build-graph.mjs` from the
+frontmatter; edit the docs, never them. `index.md` and `log.md` are reserved names, never docs.

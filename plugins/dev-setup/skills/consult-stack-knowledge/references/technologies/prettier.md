@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Prettier
+description: the shared config and the stacks' plugins
+resource: https://prettier.io
 role: tooling
 detect:
   files: [.prettierrc]

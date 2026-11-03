@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Hono + Node
+description: '`server.ts`: Vite middleware in development, `serveStatic` over the build'
 connects: [hono, node]
 ---
 # Hono + Node

@@ -1,9 +1,17 @@
 ---
-kind: technology
+type: Technology
+title: Cloudflare Workers
+description: Wrangler, the compatibility date, the runtime types, secrets
+resource: https://developers.cloudflare.com/workers/
 role: runtime
 detect:
   files: [wrangler.jsonc, wrangler.toml]
 aliases: [Worker, Workers, workerd, Wrangler, wrangler, Cloudflare]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: compatibility-dates
+    resource: https://developers.cloudflare.com/workers/configuration/compatibility-dates/
+    title: Workers compatibility dates
 ---
 # Cloudflare Workers
 
@@ -65,5 +73,8 @@ What every Worker shares: Wrangler's config, the compatibility date, the runtime
 - **`pnpm typecheck` regenerates the runtime types before checking.**
 - **Secrets go in the git-ignored `.env` locally** and `wrangler secret put` in production, never in `wrangler.jsonc`
   and never in a `.dev.vars`.
-- **`compatibility_date` moves forward on purpose**, in its own change, after reading what the new date changes.
+- **`compatibility_date` moves forward on purpose**, in its own change, after reading what the new date
+  changes.[^compatibility-dates]
 - **`pnpm cf:deploy` builds and ships the Worker.**
+
+[^compatibility-dates]: Workers compatibility dates

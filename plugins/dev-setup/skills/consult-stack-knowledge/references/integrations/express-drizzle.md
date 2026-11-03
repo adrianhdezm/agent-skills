@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Express + Drizzle
+description: DAOs on the `AppContext`, list decoding, `NotFoundError` → 404
 connects: [express, drizzle]
 realises: [data-access, rest-api, resource-operations]
 ---

@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: REST API
+description: resources and methods, status codes, one error body, edge validation, the list format
 ---
 # REST API
 

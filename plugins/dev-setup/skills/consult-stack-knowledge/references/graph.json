@@ -2,71 +2,84 @@
   "concepts": {
     "authentication": {
       "id": "authentication",
+      "kind": "concept",
       "title": "Authentication",
       "file": "architecture/authentication.md",
-      "kind": "concept"
+      "description": "the library that owns sessions, protected routes, safe redirects, sign-out"
     },
     "authorization": {
       "id": "authorization",
+      "kind": "concept",
       "title": "Authorization",
       "file": "architecture/authorization.md",
-      "kind": "concept"
+      "description": "ownership by default, checked where loaded, lists filtered in the query, 404 for another's, 403 for a forbidden action"
     },
     "code-style": {
       "id": "code-style",
+      "kind": "concept",
       "title": "Code style",
       "file": "architecture/code-style.md",
-      "always": true,
-      "kind": "concept"
+      "description": "comments that explain why, named exports, small units, suppressions with reasons, absence handled",
+      "always": true
     },
     "data-access": {
       "id": "data-access",
+      "kind": "concept",
       "title": "Data access",
       "file": "architecture/data-access.md",
-      "kind": "concept"
+      "description": "one layer touches the database, DAOs on the context, ordered lists, domain errors"
     },
     "database": {
       "id": "database",
+      "kind": "concept",
       "title": "Database",
       "file": "architecture/database.md",
-      "kind": "concept"
+      "description": "the engine per runtime, table design, migrations, connection, one database per environment"
     },
     "file-storage": {
       "id": "file-storage",
+      "kind": "concept",
       "title": "File storage",
       "file": "architecture/file-storage.md",
-      "kind": "concept"
+      "description": "bytes in an object store, metadata in a table, one service keeping them in step"
     },
     "resource-operations": {
       "id": "resource-operations",
+      "kind": "concept",
       "title": "Resource operations",
       "file": "architecture/resource-operations.md",
-      "kind": "concept"
+      "description": "the five operations, one list contract, list state in the URL, one form, confirmed delete, copying the first resource"
     },
     "rest-api": {
       "id": "rest-api",
+      "kind": "concept",
       "title": "REST API",
       "file": "architecture/rest-api.md",
-      "kind": "concept"
+      "description": "resources and methods, status codes, one error body, edge validation, the list format"
     },
     "testing": {
       "id": "testing",
+      "kind": "concept",
       "title": "Testing",
       "file": "architecture/testing.md",
-      "kind": "concept"
+      "description": "tiers by what is real, each behaviour once at the cheapest tier, behaviour-named cases, owned data"
     },
     "ui-components": {
       "id": "ui-components",
+      "kind": "concept",
       "title": "UI components",
       "file": "architecture/ui-components.md",
-      "kind": "concept"
+      "description": "two tiers of components, one-way imports, theme tokens, states, labels and accessible names"
     }
   },
   "technologies": {
     "angular": {
       "id": "angular",
+      "kind": "technology",
       "title": "Angular",
       "file": "technologies/angular.md",
+      "description": "the CLI and its cleanup, signal components, two tiers of tests, a static build",
+      "resource": "https://angular.dev",
       "role": "framework",
       "detect": {
         "files": [
@@ -80,7 +93,14 @@
         "Angular",
         "@angular/"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "angular-releases",
+          "resource": "https://github.com/angular/angular/releases",
+          "title": "Angular releases"
+        }
+      ],
       "owns": [
         {
           "holds": "`schematics[\"@schematics/angular:component\"].style: \"css\"`; `styles: [\"src/styles.css\"]`, `inlineStyleLanguage: \"css\"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts`",
@@ -90,8 +110,11 @@
     },
     "better-auth": {
       "id": "better-auth",
+      "kind": "technology",
       "title": "Better Auth",
       "file": "technologies/better-auth.md",
+      "description": "email and password over the Drizzle adapter, the splat route, sessions, secret",
+      "resource": "https://www.better-auth.com",
       "role": "library",
       "realises": [
         "authentication"
@@ -106,13 +129,15 @@
         "better-auth",
         "betterAuth"
       ],
-      "kind": "technology",
       "owns": []
     },
     "cloudflare-d1": {
       "id": "cloudflare-d1",
+      "kind": "technology",
       "title": "Cloudflare D1",
       "file": "technologies/cloudflare-d1.md",
+      "description": "the binding, a client per request, SQLite column types, `db.batch()`, Wrangler migrations",
+      "resource": "https://developers.cloudflare.com/d1/",
       "role": "service",
       "family": "cloudflare-workers",
       "realises": [
@@ -126,7 +151,6 @@
       "aliases": [
         "D1"
       ],
-      "kind": "technology",
       "owns": [
         {
           "holds": "`\"d1_databases\": [{ \"binding\": \"APP_DB\", \"database_name\": \"<name>\", \"database_id\": \"<id>\", \"migrations_table\": \"__migrations__\", \"migrations_dir\": \"db/migrations\" }]`",
@@ -136,8 +160,11 @@
     },
     "cloudflare-r2": {
       "id": "cloudflare-r2",
+      "kind": "technology",
       "title": "Cloudflare R2",
       "file": "technologies/cloudflare-r2.md",
+      "description": "the bucket binding, its generated type, what `put()` takes",
+      "resource": "https://developers.cloudflare.com/r2/",
       "role": "service",
       "family": "cloudflare-workers",
       "realises": [
@@ -151,7 +178,6 @@
       "aliases": [
         "R2"
       ],
-      "kind": "technology",
       "owns": [
         {
           "holds": "`\"r2_buckets\": [{ \"binding\": \"APP_FILES\", \"bucket_name\": \"<name>\" }]`",
@@ -161,8 +187,11 @@
     },
     "cloudflare-workers": {
       "id": "cloudflare-workers",
+      "kind": "technology",
       "title": "Cloudflare Workers",
       "file": "technologies/cloudflare-workers.md",
+      "description": "Wrangler, the compatibility date, the runtime types, secrets",
+      "resource": "https://developers.cloudflare.com/workers/",
       "role": "runtime",
       "detect": {
         "files": [
@@ -178,7 +207,14 @@
         "wrangler",
         "Cloudflare"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "compatibility-dates",
+          "resource": "https://developers.cloudflare.com/workers/configuration/compatibility-dates/",
+          "title": "Workers compatibility dates"
+        }
+      ],
       "realises": [],
       "owns": [
         {
@@ -189,8 +225,11 @@
     },
     "docker-compose": {
       "id": "docker-compose",
+      "kind": "technology",
       "title": "Docker Compose",
       "file": "technologies/docker-compose.md",
+      "description": "two-stage images, healthchecked services, the root `.env`",
+      "resource": "https://docs.docker.com/compose/",
       "role": "runtime",
       "detect": {
         "files": [
@@ -204,14 +243,16 @@
         "docker-compose",
         "docker compose"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": []
     },
     "drizzle": {
       "id": "drizzle",
+      "kind": "technology",
       "title": "Drizzle",
       "file": "technologies/drizzle.md",
+      "description": "the client, migrations, the DAO layer and its typed list queries",
+      "resource": "https://orm.drizzle.team",
       "role": "library",
       "realises": [
         "database",
@@ -229,7 +270,14 @@
         "Drizzle",
         "drizzle"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "zod-releases",
+          "resource": "https://github.com/colinhacks/zod/releases",
+          "title": "Zod releases"
+        }
+      ],
       "owns": [
         {
           "holds": "`out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__' }`",
@@ -239,8 +287,11 @@
     },
     "eslint": {
       "id": "eslint",
+      "kind": "technology",
       "title": "ESLint",
       "file": "technologies/eslint.md",
+      "description": "flat config, type-checked rules, the shared rules, framework presets",
+      "resource": "https://eslint.org",
       "role": "tooling",
       "detect": {
         "files": [
@@ -251,14 +302,16 @@
         "ESLint",
         "eslint"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": []
     },
     "express": {
       "id": "express",
+      "kind": "technology",
       "title": "Express",
       "file": "technologies/express.md",
+      "description": "the app factory, controllers, the error shape",
+      "resource": "https://expressjs.com",
       "role": "framework",
       "realises": [
         "rest-api"
@@ -273,7 +326,14 @@
         "express()",
         "`express`"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "express-releases",
+          "resource": "https://github.com/expressjs/express/releases",
+          "title": "Express releases"
+        }
+      ],
       "owns": [
         {
           "holds": "`include: [\"src/**/*.ts\"]`, which picks up `src/express.d.ts`",
@@ -283,8 +343,11 @@
     },
     "hono": {
       "id": "hono",
+      "kind": "technology",
       "title": "Hono",
       "file": "technologies/hono.md",
+      "description": "the server entry every server stack's runtime drives",
+      "resource": "https://hono.dev",
       "role": "framework",
       "detect": {
         "dependencies": [
@@ -295,14 +358,16 @@
         "Hono",
         "hono"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": []
     },
     "nginx": {
       "id": "nginx",
+      "kind": "technology",
       "title": "Nginx",
       "file": "technologies/nginx.md",
+      "description": "static files with an SPA fallback and no proxy",
+      "resource": "https://nginx.org",
       "role": "runtime",
       "detect": {
         "files": [
@@ -313,7 +378,14 @@
         "Nginx",
         "nginx"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "nginx-image",
+          "resource": "https://hub.docker.com/_/nginx",
+          "title": "The official nginx image and its tags"
+        }
+      ],
       "realises": [],
       "owns": [
         {
@@ -324,8 +396,11 @@
     },
     "ngrx": {
       "id": "ngrx",
+      "kind": "technology",
       "title": "NgRx",
       "file": "technologies/ngrx.md",
+      "description": "route-driven state and the request rules",
+      "resource": "https://ngrx.io",
       "role": "library",
       "family": "angular",
       "realises": [
@@ -340,13 +415,23 @@
         "NgRx",
         "@ngrx/"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "ngrx-releases",
+          "resource": "https://github.com/ngrx/platform/releases",
+          "title": "NgRx releases"
+        }
+      ],
       "owns": []
     },
     "node": {
       "id": "node",
+      "kind": "technology",
       "title": "Node",
       "file": "technologies/node.md",
+      "description": "running TypeScript as it is, `--env-file`, the dev loop",
+      "resource": "https://nodejs.org",
       "role": "runtime",
       "detect": {
         "manifest": [
@@ -359,7 +444,14 @@
       "aliases": [
         "Node"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "node-schedule",
+          "resource": "https://github.com/nodejs/release#release-schedule",
+          "title": "Node.js release schedule"
+        }
+      ],
       "realises": [],
       "owns": [
         {
@@ -370,8 +462,11 @@
     },
     "pino": {
       "id": "pino",
+      "kind": "technology",
       "title": "Pino",
       "file": "technologies/pino.md",
+      "description": "one JSON logger, `LOG_LEVEL`, errors as `{ err }`, `pino-pretty` as a dev pipe only",
+      "resource": "https://getpino.io",
       "role": "library",
       "detect": {
         "dependencies": [
@@ -382,7 +477,6 @@
         "Pino",
         "pino"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": [
         {
@@ -393,8 +487,11 @@
     },
     "pnpm": {
       "id": "pnpm",
+      "kind": "technology",
       "title": "pnpm",
       "file": "technologies/pnpm.md",
+      "description": "the manifest, `allowBuilds`, workspaces and the catalog, held-back versions",
+      "resource": "https://pnpm.io",
       "role": "toolchain",
       "detect": {
         "files": [
@@ -407,7 +504,14 @@
       "aliases": [
         "pnpm"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "pnpm-releases",
+          "resource": "https://github.com/pnpm/pnpm/releases",
+          "title": "pnpm releases"
+        }
+      ],
       "realises": [],
       "owns": [
         {
@@ -418,8 +522,11 @@
     },
     "postgres": {
       "id": "postgres",
+      "kind": "technology",
       "title": "Postgres",
       "file": "technologies/postgres.md",
+      "description": "the pool, `DATABASE_URL`, column types, transactions, test containers",
+      "resource": "https://www.postgresql.org",
       "role": "service",
       "realises": [
         "database"
@@ -438,7 +545,14 @@
         "postgres:",
         "`pg`"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "postgres-versioning",
+          "resource": "https://www.postgresql.org/support/versioning/",
+          "title": "PostgreSQL versioning policy"
+        }
+      ],
       "owns": [
         {
           "holds": "`DATABASE_URL`, the full URL (user, password, host, port, `app`)",
@@ -448,8 +562,11 @@
     },
     "prettier": {
       "id": "prettier",
+      "kind": "technology",
       "title": "Prettier",
       "file": "technologies/prettier.md",
+      "description": "the shared config and the stacks' plugins",
+      "resource": "https://prettier.io",
       "role": "tooling",
       "detect": {
         "files": [
@@ -460,14 +577,16 @@
         "Prettier",
         "prettier"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": []
     },
     "react-router": {
       "id": "react-router",
+      "kind": "technology",
       "title": "React Router",
       "file": "technologies/react-router.md",
+      "description": "framework mode, the context, routes, route tests",
+      "resource": "https://reactrouter.com",
       "role": "framework",
       "detect": {
         "files": [
@@ -479,7 +598,14 @@
         "react-router",
         "reactRouter("
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "react-router-releases",
+          "resource": "https://github.com/remix-run/react-router/releases",
+          "title": "React Router releases"
+        }
+      ],
       "realises": [],
       "owns": [
         {
@@ -490,8 +616,11 @@
     },
     "s3-storage": {
       "id": "s3-storage",
+      "kind": "technology",
       "title": "S3 storage",
       "file": "technologies/s3-storage.md",
+      "description": "the AWS SDK v3 client, the `S3_*` settings, RustFS in Compose",
+      "resource": "https://github.com/aws/aws-sdk-js-v3",
       "role": "service",
       "realises": [
         "file-storage"
@@ -505,13 +634,15 @@
         "RustFS",
         "S3"
       ],
-      "kind": "technology",
       "owns": []
     },
     "shadcn": {
       "id": "shadcn",
+      "kind": "technology",
       "title": "shadcn",
       "file": "technologies/shadcn.md",
+      "description": "the CLI, registries, `components.json` aliases and the `paths` they need",
+      "resource": "https://ui.shadcn.com",
       "role": "library",
       "realises": [
         "ui-components"
@@ -524,7 +655,6 @@
       "aliases": [
         "shadcn"
       ],
-      "kind": "technology",
       "owns": [
         {
           "holds": "`paths` matching the aliases in `components.json` (`~/*` or `@/*`)",
@@ -534,8 +664,11 @@
     },
     "storybook": {
       "id": "storybook",
+      "kind": "technology",
       "title": "Storybook",
       "file": "technologies/storybook.md",
+      "description": "a story file beside every component, one story per state, on the app's Vite builder",
+      "resource": "https://storybook.js.org",
       "role": "tooling",
       "realises": [
         "ui-components"
@@ -550,13 +683,23 @@
         "@storybook/",
         "storybook@"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "storybook-releases",
+          "resource": "https://github.com/storybookjs/storybook/releases",
+          "title": "Storybook releases"
+        }
+      ],
       "owns": []
     },
     "tailwind": {
       "id": "tailwind",
+      "kind": "technology",
       "title": "Tailwind",
       "file": "technologies/tailwind.md",
+      "description": "utilities only, one global stylesheet with the theme, the build wiring per framework",
+      "resource": "https://tailwindcss.com",
       "role": "library",
       "realises": [
         "ui-components"
@@ -570,13 +713,23 @@
         "Tailwind",
         "tailwindcss"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "tailwind-releases",
+          "resource": "https://github.com/tailwindlabs/tailwindcss/releases",
+          "title": "Tailwind CSS releases"
+        }
+      ],
       "owns": []
     },
     "typescript": {
       "id": "typescript",
+      "kind": "technology",
       "title": "TypeScript",
       "file": "technologies/typescript.md",
+      "description": "one project per runtime, checking without emitting, the 6.0.x pin",
+      "resource": "https://www.typescriptlang.org",
       "role": "toolchain",
       "detect": {
         "files": [
@@ -586,14 +739,24 @@
       "aliases": [
         "TypeScript"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "typescript-releases",
+          "resource": "https://github.com/microsoft/TypeScript/releases",
+          "title": "TypeScript releases"
+        }
+      ],
       "realises": [],
       "owns": []
     },
     "vite": {
       "id": "vite",
+      "kind": "technology",
       "title": "Vite",
       "file": "technologies/vite.md",
+      "description": "one `vite.config.ts`, plugin order, aliases from `tsconfig` `paths`, client types",
+      "resource": "https://vite.dev",
       "role": "tooling",
       "detect": {
         "files": [
@@ -604,7 +767,6 @@
         "Vite",
         "vite"
       ],
-      "kind": "technology",
       "realises": [],
       "owns": [
         {
@@ -615,8 +777,11 @@
     },
     "vitest": {
       "id": "vitest",
+      "kind": "technology",
       "title": "Vitest",
       "file": "technologies/vitest.md",
+      "description": "one config of named projects, picking an environment, how tests are written",
+      "resource": "https://vitest.dev",
       "role": "tooling",
       "realises": [
         "testing"
@@ -630,7 +795,14 @@
         "Vitest",
         "vitest"
       ],
-      "kind": "technology",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "vitest-releases",
+          "resource": "https://github.com/vitest-dev/vitest/releases",
+          "title": "Vitest releases"
+        }
+      ],
       "owns": []
     },
     "fundamental-ngx": {
@@ -647,8 +819,10 @@
   "integrations": {
     "angular-api-contract": {
       "id": "angular-api-contract",
+      "kind": "integration",
       "title": "Angular + the API contract",
       "file": "integrations/angular-api-contract.md",
+      "description": "build-time base URL, mirrored models, one list format, one error body",
       "connects": [
         "angular"
       ],
@@ -661,7 +835,6 @@
           "src/environments/environment.ts=apiBaseUrl"
         ]
       },
-      "kind": "integration",
       "owns": [
         {
           "holds": "`apiBaseUrl` per build",
@@ -688,21 +861,24 @@
     },
     "angular-eslint": {
       "id": "angular-eslint",
+      "kind": "integration",
       "title": "Angular + ESLint",
       "file": "integrations/angular-eslint.md",
+      "description": "angular-eslint presets, inline templates, selector prefixes",
       "connects": [
         "angular",
         "eslint"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "angular-fundamental-ngx": {
       "id": "angular-fundamental-ngx",
+      "kind": "integration",
       "title": "Angular + Fundamental NGX",
       "file": "integrations/angular-fundamental-ngx.md",
+      "description": "the Fiori registry under `components/ui/`, its ignores, its pitfalls",
       "connects": [
         "angular",
         "fundamental-ngx"
@@ -715,7 +891,6 @@
           "src/index.html=data-sap-theme"
         ]
       },
-      "kind": "integration",
       "owns": [
         {
           "holds": "the registry's style, the stylesheet, the `@/app/…` aliases",
@@ -758,39 +933,42 @@
     },
     "angular-nginx": {
       "id": "angular-nginx",
+      "kind": "integration",
       "title": "Angular + Nginx",
       "file": "integrations/angular-nginx.md",
+      "description": "`dist/<name>/browser` in the Nginx image, the router behind the SPA fallback",
       "connects": [
         "angular",
         "nginx"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "angular-prettier": {
       "id": "angular-prettier",
+      "kind": "integration",
       "title": "Angular + Prettier",
       "file": "integrations/angular-prettier.md",
+      "description": "the Angular parser for HTML",
       "connects": [
         "angular",
         "prettier"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "angular-storybook": {
       "id": "angular-storybook",
+      "kind": "integration",
       "title": "Angular + Storybook",
       "file": "integrations/angular-storybook.md",
+      "description": "`@storybook/angular-vite` through Analog, `angular.json` targets, zoneless",
       "connects": [
         "angular",
         "storybook"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -814,13 +992,14 @@
     },
     "angular-tailwind": {
       "id": "angular-tailwind",
+      "kind": "integration",
       "title": "Angular + Tailwind",
       "file": "integrations/angular-tailwind.md",
+      "description": "PostCSS wiring, the layer imports, utilities plus a `host` class",
       "connects": [
         "angular",
         "tailwind"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -836,13 +1015,14 @@
     },
     "angular-vitest": {
       "id": "angular-vitest",
+      "kind": "integration",
       "title": "Angular + Vitest",
       "file": "integrations/angular-vitest.md",
+      "description": "Analog's builder, the `unit` and `browser` projects, `tsconfig.spec.json`",
       "connects": [
         "angular",
         "vitest"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -862,21 +1042,24 @@
     },
     "better-auth-drizzle": {
       "id": "better-auth-drizzle",
+      "kind": "integration",
       "title": "Better Auth + Drizzle",
       "file": "integrations/better-auth-drizzle.md",
+      "description": "the auth tables in the schema, the adapter and its provider",
       "connects": [
         "better-auth",
         "drizzle"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "better-auth-react-router": {
       "id": "better-auth-react-router",
+      "kind": "integration",
       "title": "Better Auth + React Router",
       "file": "integrations/better-auth-react-router.md",
+      "description": "auth on `appContext`, the splat route, the protected layout, Conform forms",
       "connects": [
         "better-auth",
         "react-router"
@@ -884,7 +1067,6 @@
       "realises": [
         "authorization"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "`createAuth(db, …)` and `AppAuth`, Better Auth + Drizzle's code",
@@ -923,26 +1105,28 @@
     },
     "cloudflare-workers-vite": {
       "id": "cloudflare-workers-vite",
+      "kind": "integration",
       "title": "Cloudflare Workers + Vite",
       "file": "integrations/cloudflare-workers-vite.md",
+      "description": "the Cloudflare Vite plugin: dev server and build in workerd, `vite preview`",
       "connects": [
         "cloudflare-workers",
         "vite"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "cloudflare-workers-vitest": {
       "id": "cloudflare-workers-vitest",
+      "kind": "integration",
       "title": "Cloudflare Workers + Vitest",
       "file": "integrations/cloudflare-workers-vitest.md",
+      "description": "tests in workerd through `cloudflare:workers`",
       "connects": [
         "cloudflare-workers",
         "vitest"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -958,13 +1142,14 @@
     },
     "drizzle-d1": {
       "id": "drizzle-d1",
+      "kind": "integration",
       "title": "Drizzle + Cloudflare D1",
       "file": "integrations/drizzle-d1.md",
+      "description": "a client per request, the `sqlite` dialect, `db.batch()`, tests in workerd",
       "connects": [
         "drizzle",
         "cloudflare-d1"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -976,13 +1161,14 @@
     },
     "drizzle-postgres": {
       "id": "drizzle-postgres",
+      "kind": "integration",
       "title": "Drizzle + Postgres",
       "file": "integrations/drizzle-postgres.md",
+      "description": "the client on the pool, the `postgresql` dialect, Testcontainers",
       "connects": [
         "drizzle",
         "postgres"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -994,8 +1180,10 @@
     },
     "drizzle-s3-storage": {
       "id": "drizzle-s3-storage",
+      "kind": "integration",
       "title": "Drizzle + S3 storage",
       "file": "integrations/drizzle-s3-storage.md",
+      "description": "`FilesService`: object first and undone on failure, owner-scoped reads, delete row then object",
       "connects": [
         "drizzle",
         "s3-storage"
@@ -1004,7 +1192,6 @@
         "file-storage",
         "authorization"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "the `files` table with its indexed `ownerId`, and its list input schemas",
@@ -1023,21 +1210,24 @@
     },
     "eslint-prettier": {
       "id": "eslint-prettier",
+      "kind": "integration",
       "title": "ESLint + Prettier",
       "file": "integrations/eslint-prettier.md",
+      "description": "`eslint-config-prettier` and its placement; lint versus format checks",
       "connects": [
         "eslint",
         "prettier"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "express-drizzle": {
       "id": "express-drizzle",
+      "kind": "integration",
       "title": "Express + Drizzle",
       "file": "integrations/express-drizzle.md",
+      "description": "DAOs on the `AppContext`, list decoding, `NotFoundError` → 404",
       "connects": [
         "express",
         "drizzle"
@@ -1047,7 +1237,6 @@
         "rest-api",
         "resource-operations"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "the database client, every DAO, the `AppContext`, shutdown",
@@ -1082,26 +1271,28 @@
     },
     "express-pino": {
       "id": "express-pino",
+      "kind": "integration",
       "title": "Express + Pino",
       "file": "integrations/express-pino.md",
+      "description": "`pino-http` first, `req.log` per request, errors logged once by the error handler",
       "connects": [
         "express",
         "pino"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "hono-cloudflare-workers": {
       "id": "hono-cloudflare-workers",
+      "kind": "integration",
       "title": "Hono + Cloudflare Workers",
       "file": "integrations/hono-cloudflare-workers.md",
+      "description": "the Hono app as the Worker, typed bindings, tests through `cloudflare:workers`",
       "connects": [
         "hono",
         "cloudflare-workers"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1117,8 +1308,10 @@
     },
     "hono-drizzle": {
       "id": "hono-drizzle",
+      "kind": "integration",
       "title": "Hono + Drizzle",
       "file": "integrations/hono-drizzle.md",
+      "description": "DAOs on `c.var.context`, list decoding, `NotFoundError` → a 404 `HTTPException`, one `onError`",
       "connects": [
         "hono",
         "drizzle"
@@ -1131,7 +1324,6 @@
       "unless": [
         "react-router"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "the database client, every DAO, `createApp(context)`, `serve`, shutdown",
@@ -1165,13 +1357,14 @@
     },
     "hono-node": {
       "id": "hono-node",
+      "kind": "integration",
       "title": "Hono + Node",
       "file": "integrations/hono-node.md",
+      "description": "`server.ts`: Vite middleware in development, `serveStatic` over the build",
       "connects": [
         "hono",
         "node"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1191,13 +1384,14 @@
     },
     "hono-pino": {
       "id": "hono-pino",
+      "kind": "integration",
       "title": "Hono + Pino",
       "file": "integrations/hono-pino.md",
+      "description": "a `requestLog` middleware on the shared logger, errors logged once by `onError`",
       "connects": [
         "hono",
         "pino"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1213,13 +1407,14 @@
     },
     "hono-react-router": {
       "id": "hono-react-router",
+      "kind": "integration",
       "title": "Hono + React Router",
       "file": "integrations/hono-react-router.md",
+      "description": "one Hono handler builds the typed `appContext` and calls React Router",
       "connects": [
         "hono",
         "react-router"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1239,21 +1434,24 @@
     },
     "nginx-docker-compose": {
       "id": "nginx-docker-compose",
+      "kind": "integration",
       "title": "Nginx + Docker Compose",
       "file": "integrations/nginx-docker-compose.md",
+      "description": "a static web image: a Node build, then Nginx; its Compose service",
       "connects": [
         "nginx",
         "docker-compose"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "node-docker-compose": {
       "id": "node-docker-compose",
+      "kind": "integration",
       "title": "Node + Docker Compose",
       "file": "integrations/node-docker-compose.md",
+      "description": "the compiled service image, built then run from `dist/`; its `migrate` and `api` services",
       "connects": [
         "node",
         "docker-compose"
@@ -1262,31 +1460,32 @@
       "unless": [
         "react-router"
       ],
-      "kind": "integration",
       "owns": []
     },
     "node-typescript": {
       "id": "node-typescript",
+      "kind": "integration",
       "title": "Node + TypeScript",
       "file": "integrations/node-typescript.md",
+      "description": "TypeScript run as it is by Node, or compiled by `tsc`; `.ts` versus `.js` imports",
       "connects": [
         "node",
         "typescript"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "postgres-docker-compose": {
       "id": "postgres-docker-compose",
+      "kind": "integration",
       "title": "Postgres + Docker Compose",
       "file": "integrations/postgres-docker-compose.md",
+      "description": "the `db` service, its healthcheck, `init.sql`, host `db`",
       "connects": [
         "postgres",
         "docker-compose"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1314,21 +1513,24 @@
     },
     "react-router-docker-compose": {
       "id": "react-router-docker-compose",
+      "kind": "integration",
       "title": "React Router + Docker Compose",
       "file": "integrations/react-router-docker-compose.md",
+      "description": "the app image running `server.ts` over the build; its `app` service",
       "connects": [
         "react-router",
         "docker-compose"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "react-router-drizzle": {
       "id": "react-router-drizzle",
+      "kind": "integration",
       "title": "React Router + Drizzle",
       "file": "integrations/react-router-drizzle.md",
+      "description": "routes → services → queries → DAOs, the client on `appContext`",
       "connects": [
         "react-router",
         "drizzle"
@@ -1337,7 +1539,6 @@
         "data-access",
         "resource-operations"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "the tables, both sides of every `relations()`, the exported `schema`",
@@ -1384,34 +1585,38 @@
     },
     "react-router-eslint": {
       "id": "react-router-eslint",
+      "kind": "integration",
       "title": "React Router + ESLint",
       "file": "integrations/react-router-eslint.md",
+      "description": "the React and accessibility presets, the routes and tests overrides, ESLint 9",
       "connects": [
         "react-router",
         "eslint"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "react-router-prettier": {
       "id": "react-router-prettier",
+      "kind": "integration",
       "title": "React Router + Prettier",
       "file": "integrations/react-router-prettier.md",
+      "description": "import and class sorting",
       "connects": [
         "react-router",
         "prettier"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
     },
     "react-router-shadcn": {
       "id": "react-router-shadcn",
+      "kind": "integration",
       "title": "React Router + shadcn/ui",
       "file": "integrations/react-router-shadcn.md",
+      "description": "`components.json`, the aliases, the shadcn primitives, `cn`",
       "connects": [
         "react-router",
         "shadcn"
@@ -1419,7 +1624,6 @@
       "realises": [
         "ui-components"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "the shadcn style, the stylesheet, the aliases",
@@ -1454,13 +1658,14 @@
     },
     "react-router-storybook": {
       "id": "react-router-storybook",
+      "kind": "integration",
       "title": "React Router + Storybook",
       "file": "integrations/react-router-storybook.md",
+      "description": "`@storybook/react-vite` over the app's config without the React Router plugin",
       "connects": [
         "react-router",
         "storybook"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1476,8 +1681,10 @@
     },
     "react-router-tailwind": {
       "id": "react-router-tailwind",
+      "kind": "integration",
       "title": "React Router + Tailwind",
       "file": "integrations/react-router-tailwind.md",
+      "description": "Tailwind's Vite plugin and its order, `app/app.css` with the theme tokens, the test setup",
       "connects": [
         "react-router",
         "tailwind"
@@ -1485,7 +1692,6 @@
       "realises": [
         "ui-components"
       ],
-      "kind": "integration",
       "owns": [
         {
           "holds": "`tailwindcss()` from `@tailwindcss/vite`, before `reactRouter()`",
@@ -1516,13 +1722,14 @@
     },
     "react-router-vite": {
       "id": "react-router-vite",
+      "kind": "integration",
       "title": "React Router + Vite",
       "file": "integrations/react-router-vite.md",
+      "description": "`reactRouter()` last, the `~/` alias, `vite/client`, `app/env.d.ts`",
       "connects": [
         "react-router",
         "vite"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1538,13 +1745,14 @@
     },
     "react-router-vitest": {
       "id": "react-router-vitest",
+      "kind": "integration",
       "title": "React Router + Vitest",
       "file": "integrations/react-router-vitest.md",
+      "description": "route tests in browser mode through `createRoutesStub`",
       "connects": [
         "react-router",
         "vitest"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [
         {
@@ -1556,26 +1764,36 @@
     },
     "s3-storage-docker-compose": {
       "id": "s3-storage-docker-compose",
+      "kind": "integration",
       "title": "S3 storage + Docker Compose",
       "file": "integrations/s3-storage-docker-compose.md",
+      "description": "RustFS as a Compose service",
       "connects": [
         "s3-storage",
         "docker-compose"
       ],
-      "kind": "integration",
+      "stale_after": "2027-05-01T00:00:00Z",
+      "sources": [
+        {
+          "id": "rustfs-releases",
+          "resource": "https://github.com/rustfs/rustfs/releases",
+          "title": "RustFS releases"
+        }
+      ],
       "realises": [],
       "owns": [],
       "unless": []
     },
     "typescript-eslint": {
       "id": "typescript-eslint",
+      "kind": "integration",
       "title": "TypeScript + ESLint",
       "file": "integrations/typescript-eslint.md",
+      "description": "typed linting through the project service, the shared typed rules, the TypeScript ceiling",
       "connects": [
         "typescript",
         "eslint"
       ],
-      "kind": "integration",
       "realises": [],
       "owns": [],
       "unless": []
@@ -1584,8 +1802,10 @@
   "stacks": {
     "angular-app": {
       "id": "angular-app",
+      "kind": "stack",
       "title": "Angular app",
       "file": "stacks/angular-app.md",
+      "description": "A single Angular 22 project: an SPA with NgRx route-driven state, Tailwind, Storybook and two test layers, calling an API it does not own, and served as static files by Nginx.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -1604,7 +1824,6 @@
           "fundamental-ngx"
         ]
       },
-      "kind": "stack",
       "requires": {},
       "concepts": [],
       "composition": [
@@ -1852,8 +2071,10 @@
     },
     "angular-fullstack": {
       "id": "angular-fullstack",
+      "kind": "stack",
       "title": "Angular full stack",
       "file": "stacks/angular-fullstack.md",
+      "description": "A pnpm-workspace monorepo: an Express 5 + Drizzle + Postgres API in `api/` and the Angular web package in `web/`, run by Docker Compose, with an `entity` CRUDL resource wired end to end from the database to the pages, and a Playwright suite over the whole stack.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -1877,7 +2098,6 @@
           "fundamental-ngx"
         ]
       },
-      "kind": "stack",
       "requires": {},
       "concepts": [],
       "composition": [
@@ -2200,8 +2420,10 @@
     },
     "hono-node-api": {
       "id": "hono-node-api",
+      "kind": "stack",
       "title": "Hono API on Node",
       "file": "stacks/hono-node-api.md",
+      "description": "A single-package Hono + Drizzle + Postgres REST API, compiled by `tsc` and run on Node through `@hono/node-server`, next to Postgres in Docker Compose, with an `entity` CRUDL resource wired from the table to the routes.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -2215,7 +2437,6 @@
         "prettier",
         "vitest"
       ],
-      "kind": "stack",
       "optional": {},
       "requires": {},
       "concepts": [],
@@ -2433,8 +2654,10 @@
     },
     "hono-worker": {
       "id": "hono-worker",
+      "kind": "stack",
       "title": "Hono Worker",
       "file": "stacks/hono-worker.md",
+      "description": "A Hono API or small site on Cloudflare Workers, built by Vite, with its tests running inside workerd against the real Worker.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -2448,7 +2671,6 @@
       "concepts": [
         "rest-api"
       ],
-      "kind": "stack",
       "optional": {},
       "requires": {},
       "composition": [
@@ -2571,8 +2793,10 @@
     },
     "node-api": {
       "id": "node-api",
+      "kind": "stack",
       "title": "REST API on Node",
       "file": "stacks/node-api.md",
+      "description": "A single-package Express 5 + Drizzle + Postgres REST API, compiled by `tsc` and run on Node, next to Postgres in Docker Compose, with an `entity` CRUDL resource wired from the table to the routes.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -2586,7 +2810,6 @@
         "prettier",
         "vitest"
       ],
-      "kind": "stack",
       "optional": {},
       "requires": {},
       "concepts": [],
@@ -2798,8 +3021,10 @@
     },
     "node-package": {
       "id": "node-package",
+      "kind": "stack",
       "title": "Node package",
       "file": "stacks/node-package.md",
+      "description": "A single-package TypeScript project that Node 24 runs as it is: a library, a CLI or a script.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -2808,7 +3033,6 @@
         "prettier",
         "vitest"
       ],
-      "kind": "stack",
       "optional": {},
       "requires": {},
       "concepts": [],
@@ -2902,8 +3126,10 @@
     },
     "react-router-cloudflare": {
       "id": "react-router-cloudflare",
+      "kind": "stack",
       "title": "React Router on Workers",
       "file": "stacks/react-router-cloudflare.md",
+      "description": "A server-rendered React Router app whose server is a Hono Worker on Cloudflare's edge, styled with Tailwind and shadcn/ui.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -2941,7 +3167,6 @@
           "authentication"
         ]
       },
-      "kind": "stack",
       "concepts": [],
       "composition": [
         {
@@ -3255,8 +3480,10 @@
     },
     "react-router-docker": {
       "id": "react-router-docker",
+      "kind": "stack",
       "title": "React Router on Node",
       "file": "stacks/react-router-docker.md",
+      "description": "A server-rendered React Router app on Node, next to Postgres in Docker Compose, styled with Tailwind and shadcn/ui.",
       "technologies": [
         "pnpm",
         "typescript",
@@ -3295,7 +3522,6 @@
           "authentication"
         ]
       },
-      "kind": "stack",
       "concepts": [],
       "composition": [
         {

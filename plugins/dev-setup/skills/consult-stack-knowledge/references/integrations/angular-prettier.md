@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Prettier
+description: the Angular parser for HTML
 connects: [angular, prettier]
 ---
 # Angular + Prettier

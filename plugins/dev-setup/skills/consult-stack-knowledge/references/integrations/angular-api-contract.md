@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + the API contract
+description: build-time base URL, mirrored models, one list format, one error body
 connects: [angular]
 realises: [rest-api, resource-operations]
 detect:

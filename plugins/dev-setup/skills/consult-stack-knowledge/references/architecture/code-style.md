@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Code style
+description: comments that explain why, named exports, small units, suppressions with reasons, absence handled
 always: true
 ---
 # Code style

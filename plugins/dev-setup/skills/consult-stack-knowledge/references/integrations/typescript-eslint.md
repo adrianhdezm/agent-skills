@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: TypeScript + ESLint
+description: typed linting through the project service, the shared typed rules, the TypeScript ceiling
 connects: [typescript, eslint]
 ---
 # TypeScript + ESLint

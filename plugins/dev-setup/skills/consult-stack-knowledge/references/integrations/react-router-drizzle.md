@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: React Router + Drizzle
+description: routes → services → queries → DAOs, the client on `appContext`
 connects: [react-router, drizzle]
 realises: [data-access, resource-operations]
 ---

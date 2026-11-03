@@ -12,7 +12,9 @@ docs apply and what `coding-conventions.md` they assemble into, and hands that t
 topic in a project, it answers which docs govern it and what they say. Which docs apply is computed from the graph, not
 recalled. It does not build or change the project: the caller reads the docs and does the work.
 [references/catalog.md](references/catalog.md) lists every doc and says where a new fact belongs; after changing the
-docs, `node <skill-dir>/scripts/check.mjs` reports what else has to change.
+docs, `node <skill-dir>/scripts/check.mjs` reports what else has to change. `references/` is an Open Knowledge Format
+(OKF v0.2) bundle: its `index.md` files list the docs with their descriptions, and a doc that pins a version cites where
+to check it and says when it goes stale.
 
 The two tables below are the one list of stacks. Other skills (`bootstrap-project`'s interview, `experiment-idea`,
 `plan-release`) link here rather than keep their own.
@@ -94,7 +96,7 @@ language is out of scope: every doc here is TypeScript.
    Ports: Postgres 5432 (moved with `DB_PORT`), the app's `PORT` …   (the blueprint's ports row)
    Conventions: <scratchpad>/coding-conventions.md
    Gaps: no doc for <technology>                                     (or: none)
-   Found: <a broken doc, a group added because another requires it, a drift from the project's coding-conventions.md>   (or: none)
+   Found: <a broken doc, a group added because another requires it, a doc past its stale_after or deprecated, a drift from the project's coding-conventions.md>   (or: none)
    ```
 
    Run without a calling skill, end with the same block.
@@ -114,7 +116,7 @@ node <skill-dir>/scripts/dossier.mjs <project dir> --topic <word>... [--sections
 It resolves the project's stack as step 1 does, keeps the docs that apply, and prints, for a file, each doc whose
 "Where it lives", "Layout" or Required values names it, with what that file holds and the sections asked for; for a
 topic, each matching bullet with its doc and section. Answer from what it printed, naming the doc each rule comes from,
-and quote the reason the doc gives. When no doc claims the file, say so and offer the blueprint's Layout as the nearest
+and quote the reason the doc gives; when it flags a doc as deprecated or past its `stale_after`, say so with the answer. When no doc claims the file, say so and offer the blueprint's Layout as the nearest
 guide; when no doc mentions the topic, say so rather than inferring a rule. A rule the docs lack is a gap to report to
 the maintainer, not a rule to make up.
 

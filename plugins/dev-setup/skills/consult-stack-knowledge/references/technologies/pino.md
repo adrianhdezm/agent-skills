@@ -1,5 +1,8 @@
 ---
-kind: technology
+type: Technology
+title: Pino
+description: one JSON logger, `LOG_LEVEL`, errors as `{ err }`, `pino-pretty` as a dev pipe only
+resource: https://getpino.io
 role: library
 detect:
   dependencies: [pino]

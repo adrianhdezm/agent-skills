@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Hono + Cloudflare Workers
+description: the Hono app as the Worker, typed bindings, tests through `cloudflare:workers`
 connects: [hono, cloudflare-workers]
 ---
 # Hono + Cloudflare Workers

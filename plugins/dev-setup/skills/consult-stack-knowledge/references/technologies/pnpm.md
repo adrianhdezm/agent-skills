@@ -1,10 +1,18 @@
 ---
-kind: technology
+type: Technology
+title: pnpm
+description: the manifest, `allowBuilds`, workspaces and the catalog, held-back versions
+resource: https://pnpm.io
 role: toolchain
 detect:
   files: [pnpm-workspace.yaml]
   manifest: [packageManager]
 aliases: [pnpm]
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: pnpm-releases
+    resource: https://github.com/pnpm/pnpm/releases
+    title: pnpm releases
 ---
 # pnpm
 
@@ -13,7 +21,7 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 ## Use it like this
 
 - **pnpm for everything**, never npm, npx or yarn, so there is one lockfile and one store: `pnpm add`, `pnpm exec` for
-  a local binary, `pnpm dlx` for a one-off CLI. pnpm 11 or newer (`allowBuilds` is a pnpm 11 setting).
+  a local binary, `pnpm dlx` for a one-off CLI. pnpm 11 or newer[^pnpm-releases] (`allowBuilds` is a pnpm 11 setting).
 - **The tools create the manifest.** `pnpm init --bare --no-init-package-manager`, then `pnpm pkg set` for the fields
   and scripts, and `pnpm add` for the dependencies, so versions are current at scaffold time and nothing is
   hand-typed. A monorepo's package manifests are the exception: a framework's CLI writes one, and a package's
@@ -77,3 +85,5 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 - **Held-back versions stay held until their reason goes**, each where its own doc says why.
 - **Script names are the same everywhere**: `dev`, `build`, `typecheck`, `lint`, `test`, `format`, `format:check`.
   Never name a script after a pnpm command (`up`, `update`, `add`, `install`, `deploy`).
+
+[^pnpm-releases]: pnpm releases

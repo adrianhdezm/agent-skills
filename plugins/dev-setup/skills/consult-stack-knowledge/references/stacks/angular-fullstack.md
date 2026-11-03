@@ -1,5 +1,7 @@
 ---
-kind: stack
+type: Stack Blueprint
+title: Angular full stack
+description: 'A pnpm-workspace monorepo: an Express 5 + Drizzle + Postgres API in `api/` and the Angular web package in `web/`, run by Docker Compose, with an `entity` CRUDL resource wired end to end from the database to the pages, and a Playwright suite over the whole stack.'
 technologies: [pnpm, typescript, node, express, pino, postgres, drizzle, angular, ngrx, tailwind, storybook, nginx, docker-compose, eslint, prettier, vitest]
 optional:
   angular-fundamental-ngx: [fundamental-ngx]

@@ -1,5 +1,7 @@
 ---
-kind: concept
+type: Architecture Concept
+title: Authentication
+description: the library that owns sessions, protected routes, safe redirects, sign-out
 ---
 # Authentication
 

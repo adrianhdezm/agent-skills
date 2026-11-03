@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Hono + Drizzle
+description: DAOs on `c.var.context`, list decoding, `NotFoundError` → a 404 `HTTPException`, one `onError`
 connects: [hono, drizzle]
 realises: [data-access, rest-api, resource-operations]
 unless: [react-router]

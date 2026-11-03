@@ -1,16 +1,25 @@
 ---
-kind: technology
+type: Technology
+title: NgRx
+description: route-driven state and the request rules
+resource: https://ngrx.io
 role: library
 family: angular
 realises: [resource-operations]
 detect:
   dependencies: ['@ngrx/store']
 aliases: [NgRx, '@ngrx/']
+stale_after: 2027-05-01T00:00:00Z
+sources:
+  - id: ngrx-releases
+    resource: https://github.com/ngrx/platform/releases
+    title: NgRx releases
 ---
 # NgRx
 
-NgRx 22 with `@ngrx/router-store`, used for **route-driven state**: each page route names a state, the URL enters the
-store one way, each page reads only its own slice and loads from its own lifecycle, and its requests end with it.
+NgRx 22[^ngrx-releases] with `@ngrx/router-store`, used for **route-driven state**: each page route names a state, the
+URL enters the store one way, each page reads only its own slice and loads from its own lifecycle, and its requests end
+with it.
 
 **Realises:** [Resource operations](../architecture/resource-operations.md)
 
@@ -897,3 +906,5 @@ Derive UI state that must follow the store with `linkedSignal`, not an `effect()
   read lazily: `await fixture.whenStable()` after each one.
 - **No spec for selectors that only pick a field**, nor for the route table: a test that opens the page by URL proves
   the path, the state and the slice registered on the route.
+
+[^ngrx-releases]: NgRx releases

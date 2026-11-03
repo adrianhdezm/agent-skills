@@ -7,10 +7,11 @@
 //
 // From a project it detects the technologies from the manifests and config files (three levels deep). It then matches
 // them to a blueprint: every technology must belong to the stack, and a required technology that is missing is only
-// tolerated when it is toolchain or tooling (reported under Found). The groups picked are the ones whose technologies
-// are present, plus each --with, plus the groups those require. Without a blueprint the combination is composed: the
-// concepts the technologies realise (plus each --concepts) and every integration whose both ends are present, in
-// composition order; it has no Starter. A name that is no technology is a gap.
+// tolerated when it is toolchain or tooling (reported under Found); a deprecated blueprint is never matched. The groups
+// picked are the ones whose technologies are present, plus each --with, plus the groups those require. Without a
+// blueprint the combination is composed: the concepts the technologies realise (plus each --concepts) and every
+// integration whose both ends are present, in composition order; it has no Starter. A name that is no technology is a
+// gap. A doc that applies and is deprecated, a draft or past its `stale_after` is reported under Found.
 //
 // It prints a block the skill's hand-off is built from: Stack, Blueprint, Technologies (with evidence from a project),
 // Concepts, Docs, Starter (the blueprint's Starter parts for the groups picked), Gaps, Found, and the Assemble command
@@ -19,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closure, detectTechnologies, expandGroups, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, scanProject, section, starterParts } from './lib/graph.mjs';
+import { closure, detectTechnologies, docOf, expandGroups, lifecycleNotes, loadGraph, matchStack, orderDocs, parseFrontmatter, pathOf, scanProject, section, starterParts } from './lib/graph.mjs';
 
 const usage = [
   'usage: resolve-stack.mjs <project dir> [--with <group>]... [--kind "<what it is>"]',
@@ -120,6 +121,7 @@ if (match) {
   }
   const groups = expanded.groups;
   const docs = stack.composition.filter((e) => !e.optional || groups.includes(e.group));
+  found.push(...lifecycleOf([{ kind: 'stack', id: stack.id }, ...docs]));
   const ports = /^\| ports +\| (.+?) *\|$/m.exec(section(parseFrontmatter(readFileSync(stack.path, 'utf8')).body, 'Required values') ?? '');
   const outName = '<out>';
   lines.push(
@@ -140,6 +142,7 @@ if (match) {
   }
   const cl = closure(graph, technologies, { extraConcepts: concepts.filter((c) => graph.concepts[c]) });
   const docs = orderDocs(graph, cl);
+  found.push(...lifecycleOf(docs));
   const title = (id) => graph.technologies[id].title;
   const shaping = cl.technologies.filter((t) => !['toolchain', 'tooling'].includes(graph.technologies[t].role));
   const what = kind ?? (shaping.length > 0 ? shaping : cl.technologies).map(title).join(' + ');
@@ -162,6 +165,11 @@ if (match) {
 }
 process.stdout.write(`${lines.join('\n')}\n`);
 
+/** What to know before relying on the docs: each one that is deprecated, a draft or past its `stale_after`. */
+function lifecycleOf(entries) {
+  return entries.flatMap((e) => lifecycleNotes(docOf(graph, e.kind, e.id)));
+}
+
 /** The Starter line: the blueprint's "## Starter", and its parts when it has several. */
 function starterLine(parts) {
   return `the blueprint's Starter${parts.length > 0 ? `: ${parts.join('; ')}` : ''}`;
@@ -170,7 +178,7 @@ function starterLine(parts) {
 /** The blueprint sharing the most technologies with a composed combination. */
 function nearestBlueprint(technologies) {
   let best;
-  for (const stack of Object.values(graph.stacks)) {
+  for (const stack of Object.values(graph.stacks).filter((s) => s.status !== 'deprecated')) {
     const all = new Set([...stack.technologies, ...Object.values(stack.optional).flat()]);
     const shared = technologies.filter((t) => all.has(t)).length;
     const extra = technologies.filter((t) => !all.has(t));

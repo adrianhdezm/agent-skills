@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + Tailwind
+description: PostCSS wiring, the layer imports, utilities plus a `host` class
 connects: [angular, tailwind]
 ---
 # Angular + Tailwind

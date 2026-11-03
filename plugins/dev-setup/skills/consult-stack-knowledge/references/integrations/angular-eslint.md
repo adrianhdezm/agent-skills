@@ -1,5 +1,7 @@
 ---
-kind: integration
+type: Integration
+title: Angular + ESLint
+description: angular-eslint presets, inline templates, selector prefixes
 connects: [angular, eslint]
 ---
 # Angular + ESLint
