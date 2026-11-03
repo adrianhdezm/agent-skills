@@ -18,7 +18,7 @@ leave open: names, values, behaviours and tests.
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | the whole resource, API side                   | [Database](../architecture/database.md), [Data access](../architecture/data-access.md), [REST API](../architecture/rest-api.md) (serving)   |
 | the whole resource, web side                   | [REST API](../architecture/rest-api.md) (consuming)                                                                                         |
-| the table, schemas and DAO                     | Drizzle (its reference code: `entity.schema.ts`, `schema.ts`, `entity.dao.ts`)                                                              |
+| the table, schemas and DAO                     | Drizzle (its reference code: `schema.ts`), Drizzle + Postgres (its reference code: `entity.schema.ts`, `entity.dao.ts`)                     |
 | the API's shell, controllers and error handler | Express, Express + Drizzle, Express + Pino; on Hono API on Node, Hono, Hono + Drizzle, Hono + Pino (see its variant)                        |
 | the wire between web and API                   | Angular + the API contract                                                                                                                  |
 | the shell, slices and pages                    | Angular, NgRx (its reference code: the router, the list, form and detail slices)                                                            |
@@ -37,8 +37,8 @@ leave open: names, values, behaviours and tests.
 | `createdAt`   | timestamp, set on insert |                          | date operators   | yes  |
 | `updatedAt`   | timestamp                |                          | date operators   | yes  |
 
-The default sort is `createdAt DESC`. An update needs at least one field besides `id`. On the API these are the Drizzle
-reference code; the web mirrors them by hand in `models/entity.model.ts` (dates as ISO strings).
+The default sort is `createdAt DESC`. An update needs at least one field besides `id`. On the API these are Drizzle +
+Postgres's reference code; the web mirrors them by hand in `models/entity.model.ts` (dates as ISO strings).
 
 ## Behaviour
 
@@ -126,9 +126,9 @@ Stories: `UI/Dialog` (`Default`, through a template filling the slots), `UI/Sele
 The tests are written from these tables; the utilities and the code under test are reference code.
 
 **Test utilities** (`tests/utils/`): `http-mocks.ts`, `test-server.ts` and `pg-container.ts` are the integration's and
-Drizzle's reference code; `entity-seed.ts` (`day(n)`, a fixed UTC day in 2026; `seedEntities(db, rows)` inserting
-directly so tests control timestamps; `seedCanonical(db)`: `alpha` to `echo` on consecutive days, `charlie` with a
-`null` description).
+Drizzle + Postgres's reference code; `entity-seed.ts` (`day(n)`, a fixed UTC day in 2026; `seedEntities(db, rows)`
+inserting directly so tests control timestamps; `seedCanonical(db)`: `alpha` to `echo` on consecutive days, `charlie`
+with a `null` description).
 
 | Tier | Files                                                                   | Covers                                                                                                                                                             |
 | ---- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

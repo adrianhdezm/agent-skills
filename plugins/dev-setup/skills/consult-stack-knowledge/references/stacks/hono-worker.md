@@ -54,7 +54,7 @@ my-worker/
 | What              | Value                                                                                                                                                                                                                                                                                                                              |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ports             | 5173 (`pnpm dev`, Vite), 4173 (`vite preview`, the smoke test)                                                                                                                                                                                                                                                                     |
-| scripts           | `dev` `vite dev`; `build` `vite build`; `preview`, `deploy`, `cf-typegen` as the Cloudflare Workers doc says; `typecheck` `wrangler types && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                                                                             |
+| scripts           | `dev` `vite dev`; `build` `vite build`; `preview`, `cf:deploy`, `cf-typegen` as the Cloudflare Workers doc says; `typecheck` `wrangler types && tsc -b`; `lint` `eslint .`; `test` `vitest run`; `format`, `format:check`                                                                                                          |
 | `allowBuilds`     | `esbuild`, `workerd`                                                                                                                                                                                                                                                                                                               |
 | dependencies      | `hono`                                                                                                                                                                                                                                                                                                                             |
 | devDependencies   | `@types/node@24`, `wrangler`, `vite`, `@cloudflare/vite-plugin`, `vitest@5`, `@cloudflare/vitest-plugin`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, `prettier`, the pinned `typescript`                                                                                                               |
@@ -264,7 +264,7 @@ export default defineConfig({
 
 ### Commands
 
-`pnpm dev` runs the Worker in workerd; `pnpm preview` runs the build; `pnpm deploy` ships it. `pnpm typecheck`,
+`pnpm dev` runs the Worker in workerd; `pnpm preview` runs the build; `pnpm cf:deploy` ships it. `pnpm typecheck`,
 `pnpm lint`, `pnpm test`, `pnpm build` and `pnpm format:check` are the five required checks.
 
 ## Smoke test

@@ -3,6 +3,7 @@ kind: technology
 role: framework
 detect:
   files: [angular.json]
+realises: [ui-components]
 aliases: [Angular, @angular/]
 ---
 # Angular
@@ -10,20 +11,22 @@ aliases: [Angular, @angular/]
 Angular 22 as a single-page app: the CLI scaffold and its cleanup, standalone signal components with inline templates,
 two tiers of tests, and a static build.
 
+**Realises:** [UI components](../architecture/ui-components.md)
+
 ## Use it like this
 
 - **The Angular CLI creates the package**, pinned to the major the stack targets, never `@latest`:
 
   ```sh
   pnpm dlx @angular/cli@22 new <name> --directory=<dir> --package-manager=pnpm --skip-install --skip-git \
-    --style=scss --routing=true --ssr=false --defaults
+    --style=css --routing=true --ssr=false --defaults
   ```
 
   then the cleanup, at once: delete `.editorconfig` (the formatter owns indentation), `README.md` (the docs live at the
   repo root), the CLI's root component (`app.ts`, `app.html`, `app.scss`, `app.spec.ts`: the root component is wiring,
-  and has no spec) and every `.scss` file; in a workspace package also delete `packageManager` (the root's) and the
-  shared tools' entries (the root catalog adds them back), its `.gitignore` (the root's covers it) and its `.prettierrc`
-  (the shared one replaces it). The new root component is `app.component.ts` (class `App`), so `src/main.ts` imports
+  and has no spec); in a workspace package also delete `packageManager` (the root's) and the shared tools' entries
+  (the root catalog adds them back), its `.gitignore` (the root's covers it) and its `.prettierrc` (rewritten with the
+  shared config). The new root component is `app.component.ts` (class `App`), so `src/main.ts` imports
   it from `./app/app.component` instead of `./app/app`. The CLI's `.vscode/` and `public/favicon.ico` stay; `<title>`
   in `src/index.html` becomes the app name.
 
@@ -37,10 +40,8 @@ two tiers of tests, and a static build.
 - **Templates use the control flow blocks**: the status-driven body is an `@switch (status())`, the error banner over it
   an `@if (status() === 'error')`. A host binds every signal input with property syntax, literals included
   (`[itemKind]="'entity'"`), so all bindings read alike.
-- **Forms are `new FormGroup` / `new FormControl`**, never an injected `FormBuilder`.
 - **Configuration is build-time.** `src/environments/environment.ts` (production) and `environment.development.ts`
-  hold `appName` and `apiBaseUrl`, swapped by `fileReplacements`; one place in the app reads them, the app-context
-  state.
+  hold `appName` and `apiBaseUrl`, swapped by `fileReplacements`; one place in the app reads them.
 - **Two tiers of tests**: `unit` for services, state and helpers (the required `test` check), `browser` for components
   and pages in a real browser (`test:browser`). The test runner's integration says how they are wired.
 - **A static build**: the production build is static files in `dist/<name>/browser`, served by a static server with an
@@ -58,12 +59,10 @@ two tiers of tests, and a static build.
 ## Pitfalls
 
 - **The CLI's manifest is not `"type": "module"`**, and stays that way: a config file that uses `import` ends in `.mjs`
-  or `.mts`, and Playwright loads `playwright.config.ts` and `e2e/**` as CommonJS, where `import.meta` throws ("Cannot
-  use 'import.meta' outside a module"): use `__dirname` there.
+  or `.mts`.
 - **A component with `input.required()` cannot be mounted by a helper that starts change detection at once**
   (`NG0950`): mount it by hand, `TestBed.createComponent` → `setInput` for each required input → append to
   `document.body` → `autoDetectChanges()`.
-- **A library listing `zone.js` as an optional peer** does not need it: never install it.
 - **A `[value]` on a native `<select>` is applied before `@for` renders the options**, so it does not take: reflect the
   value with `[selected]` on each `<option>`. A wrapping `<label>` folds the option text into the select's name: use
   `<label for>` and an `id`.
@@ -79,8 +78,7 @@ two tiers of tests, and a static build.
 - **Bind signal inputs with property syntax**, literals included (`[itemKind]="'entity'"`).
 - **The status-driven body is an `@switch (status())`**; the error banner over it is an `@if (status() === 'error')`.
 - **A native select gets its own `<label for>` and `id`**, and each `<option>` reflects the value with `[selected]`.
-- **Dates** shown with `date: 'medium'`; a date filter is a day in the viewer's time zone, sent as local midnight in
-  ISO-8601.
+- **Dates** shown with `date: 'medium'`.
 - **Forms are `new FormGroup` / `new FormControl`**, validated like the API's schemas.
 
 ### Files and names
@@ -97,13 +95,12 @@ Selector prefixes follow the folder: `ui` under `components/ui/`, `app` everywhe
 
 ### Testing the web app
 
-| Tier    | Answers                                                          | Real                                       | Stubbed                        | Lives in                            | Run                 |
-| ------- | ---------------------------------------------------------------- | ------------------------------------------ | ------------------------------ | ----------------------------------- | ------------------- |
-| unit    | is this service, slice, effect or helper right?                  | the unit, `TestBed`                        | HTTP, store, actions, services | `*.spec.ts` beside the file         | `pnpm test`         |
-| browser | does this component or page render and behave in a real browser? | the component, a real browser, real styles | the store (mock), the router   | `*.browser.spec.ts` beside the file | `pnpm test:browser` |
+| Tier    | Answers                                                          | Real                                       | Stubbed        | Lives in                            | Run                 |
+| ------- | ---------------------------------------------------------------- | ------------------------------------------ | -------------- | ----------------------------------- | ------------------- |
+| unit    | is this service or helper right?                                 | the unit, `TestBed`                        | HTTP, services | `*.spec.ts` beside the file         | `pnpm test`         |
+| browser | does this component or page render and behave in a real browser? | the component, a real browser, real styles | the router     | `*.browser.spec.ts` beside the file | `pnpm test:browser` |
 
 - **Services** run against `provideHttpClient()` + `provideHttpClientTesting()` and assert method, URL, params and body.
 - **Helpers** get a happy case and an edge case each.
 - **Components** are mounted by hand (`createComponent`, `setInput`, append to `document.body`,
   `autoDetectChanges()`), driven through locators by role and name, with a spy on each output.
-- **Pages** mount over a mock store and assert each UI state of the status union and what each control dispatches.

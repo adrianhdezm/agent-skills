@@ -61,7 +61,7 @@ export function createS3Client(config: S3Config): S3Client {
 }
 ```
 
-`scripts/create-bucket.ts`:
+`scripts/create-bucket.ts`, importing the factory from the app's source folder (`app/` or `src/`):
 
 ```ts
 import { BucketAlreadyOwnedByYou, CreateBucketCommand } from '@aws-sdk/client-s3';

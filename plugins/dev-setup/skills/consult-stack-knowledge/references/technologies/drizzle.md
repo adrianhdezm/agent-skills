@@ -27,7 +27,7 @@ its client is built and tested there, belong to that engine's integration.
   `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs …`, where `<root .env>` is `.env` in a single package
   and `../.env` in a workspace package.
 - **drizzle-kit reads the resource schema files** (`src/db/schemas/*.schema.ts`), because it finds tables from module
-  exports; `db/schema.ts` only groups them in the object handed to `drizzle(pool, { schema })`.
+  exports; `db/schema.ts` only groups them in the object handed to the engine's `drizzle(…, { schema })` call.
 - **DAOs are the only code that touches Drizzle.** One class per table, `<Resource>Dao implements Dao<…>`, created once
   in the composition root and put on the app's context. "Dao", not "Repository": a class per table returning rows is
   DAO-shaped, and a repository promises a domain layer that does not exist.
@@ -40,28 +40,28 @@ its client is built and tested there, belong to that engine's integration.
 - **One translator for every scalar kind**: the schemas already reject operators a kind does not support.
 - **Every resource declares a default sort, and `sortToSql` appends an `id` tie-breaker**: without `ORDER BY`, pages
   repeat or skip rows.
-- **`list` runs its page query and then its count, one after the other**: one pool connection per request. Neither form
-  is a snapshot; wrap both in a transaction when `total` must match exactly. `count(*) over ()` was rejected because a
-  page past the end returns no rows and so no total.
+- **`list` runs its page query and then its count.** Whether the two read one snapshot (a transaction, or the engine's
+  batch) is the engine's integration's. `count(*) over ()` was rejected because a page past the end returns no rows and
+  so no total.
 - **Everything resource-specific lives in its schema file**, so the DAO holds no configuration: the table, the input
   schemas, the list pieces, the default sort, then the inferred types.
 - **URL decoding is the HTTP layer's job.** The list input schema validates the structured
   `{ filter, sort, page, pageSize }` and knows nothing about query strings, so the DAO takes plain objects from
   anywhere; `normalizeQuery` only keeps the first value of a repeated param and drops empty ones.
-- **Tests at three tiers.** The translator is unit-tested through the SQL it renders with `PgDialect`, and the
+- **Tests at three tiers.** The translator is unit-tested through the SQL the engine's dialect renders, and the
   builders against an ad-hoc field config, with no database. Each DAO runs against a throwaway database, migrated with
   the Drizzle migrator, one per suite; the engine's integration says how it is started. API tests use the same database
   under the real app.
 
 ## Required values
 
-| What                | Value                                                                                                                                                                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| dependencies        | `drizzle-orm`, `drizzle-zod`, `zod`, and the engine's driver                                                                                                                                                                                                                               |
-| devDependencies     | `drizzle-kit`                                                                                                                                                                                                                                                                              |
-| `drizzle.config.ts` | `out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__', schema: 'public' }` |
-| scripts             | `db:generate` and `db:migrate`, each `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                                                                                                   |
-| limits              | the contract's, in `list-input.helper.ts` and the scalar schemas                                                                                                                                                                                                                           |
+| What                | Value                                                                                                                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| dependencies        | `drizzle-orm`, `drizzle-zod`, `zod`, and the engine's driver                                                                                                                                                                                                             |
+| devDependencies     | `drizzle-kit`                                                                                                                                                                                                                                                            |
+| `drizzle.config.ts` | `out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__' }` |
+| scripts             | `db:generate` and `db:migrate`, each `node --env-file=<root .env> node_modules/drizzle-kit/bin.cjs generate` / `migrate`                                                                                                                                                 |
+| limits              | the contract's, in `list-input.helper.ts` and the scalar schemas                                                                                                                                                                                                         |
 
 The filter operators and their semantics are the contract's; `contains`, `notContains` and `beginsWith` escape LIKE
 metacharacters, so user input is matched literally.
@@ -69,15 +69,13 @@ metacharacters, so user input is matched literally.
 ## Pitfalls
 
 - **Integration tests need an existing `db/migrations/`**: they run after the first `db:generate`.
-- **drizzle-kit does not load `.env`**: run its bin under `node --env-file`.
 - **drizzle-zod's object schemas strip unknown keys** rather than rejecting them, so a body with an extra field would
   pass: end every row input schema in `.strict()` (before any `.refine`), as the reference code does.
-- **A migration copied from a doc** carries another project's clock and diverges from the schema on the first edit:
-  generate it.
 
 ## Reference code
 
-These files are the DAO layer; write them as given. Only the last three name a resource: copy them for each new one.
+These files are the DAO layer; write them as given. `entity.schema.ts` and `entity.dao.ts`, in the engine's
+integration's reference code, name a resource: copy them for each new one and register the table in `schema.ts`.
 
 **`src/models/dao.model.ts`**
 
@@ -252,96 +250,6 @@ export class NotFoundError extends Error {
 }
 ```
 
-**`src/helpers/dao.helper.ts`**
-
-```ts
-import { and, asc, between, desc, eq, gt, gte, ilike, inArray, lt, lte, ne, not, notIlike, or, type SQL, sql } from 'drizzle-orm';
-import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import type { PaginatedResult } from '../models/dao.model.js';
-import type { FieldFilterInput, FilterField, LogicalFilterInput, SortInput } from '../models/list-input.model.js';
-
-export type FilterTable<FilterInput> = Readonly<Record<FilterField<FilterInput>, AnyPgColumn>>;
-export type SortTable<SortField extends string> = Readonly<Record<SortField | 'id', AnyPgColumn>>;
-
-const LOGICAL_KEYS: ReadonlySet<string> = new Set(['and', 'or', 'not'] satisfies (keyof LogicalFilterInput<unknown>)[]);
-const MATCHES_NOTHING = sql`false`;
-
-export function filterToSql<Filter extends LogicalFilterInput<Filter>>(filter: Filter, table: FilterTable<Filter>): SQL | undefined {
-  return and(
-    ...filterFields(filter).map((field) => fieldToSql(table[field], filter[field] as FieldFilterInput | undefined)),
-    filter.and && and(...filter.and.map((branch) => filterToSql(branch, table))),
-    filter.or && orToSql(filter.or.map((branch) => filterToSql(branch, table))),
-    filter.not && notToSql(filterToSql(filter.not, table))
-  );
-}
-
-export function sortToSql<SortField extends string>(sort: SortInput<SortField>, table: SortTable<SortField>): SQL[] {
-  const column = table[sort.field];
-  return [sort.direction === 'DESC' ? desc(column) : asc(column), asc(table.id)];
-}
-
-export function toPaginatedResult<T>(
-  items: readonly T[],
-  total: number,
-  { page, pageSize }: { page: number; pageSize: number }
-): PaginatedResult<T> {
-  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
-}
-
-export function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
-function filterFields<Filter>(filter: Filter & object): FilterField<Filter>[] {
-  return Object.keys(filter).filter((key) => !LOGICAL_KEYS.has(key)) as FilterField<Filter>[];
-}
-
-function fieldToSql(column: AnyPgColumn, input: FieldFilterInput | undefined): SQL | undefined {
-  return input && and(...comparisonsToSql(column, input), ...textMatchesToSql(column, input));
-}
-
-function comparisonsToSql(column: AnyPgColumn, input: FieldFilterInput): (SQL | undefined)[] {
-  return [
-    input.eq !== undefined ? eq(column, input.eq) : undefined,
-    input.ne !== undefined ? ne(column, input.ne) : undefined,
-    input.lt !== undefined ? lt(column, input.lt) : undefined,
-    input.le !== undefined ? lte(column, input.le) : undefined,
-    input.gt !== undefined ? gt(column, input.gt) : undefined,
-    input.ge !== undefined ? gte(column, input.ge) : undefined,
-    input.between !== undefined ? between(column, input.between[0], input.between[1]) : undefined,
-    input.in !== undefined ? inToSql(column, input.in) : undefined
-  ];
-}
-
-function textMatchesToSql(column: AnyPgColumn, input: FieldFilterInput): (SQL | undefined)[] {
-  return [
-    input.contains !== undefined ? ilike(column, containsPattern(input.contains)) : undefined,
-    input.notContains !== undefined ? notIlike(column, containsPattern(input.notContains)) : undefined,
-    input.beginsWith !== undefined ? ilike(column, prefixPattern(input.beginsWith)) : undefined
-  ];
-}
-
-function inToSql(column: AnyPgColumn, values: readonly unknown[]): SQL {
-  return values.length > 0 ? inArray(column, [...values]) : MATCHES_NOTHING;
-}
-
-function orToSql(branches: readonly (SQL | undefined)[]): SQL | undefined {
-  return branches.includes(undefined) ? undefined : or(...branches);
-}
-
-function notToSql(condition: SQL | undefined): SQL {
-  return condition ? not(condition) : MATCHES_NOTHING;
-}
-
-function containsPattern(value: string): string {
-  return `%${escapeLike(value)}%`;
-}
-
-function prefixPattern(value: string): string {
-  return `${escapeLike(value)}%`;
-}
-```
-
 **`src/helpers/query-parser.helper.ts`**
 
 ```ts
@@ -368,214 +276,36 @@ export function normalizeQuery(params: unknown): Record<string, unknown> {
 The resource schema file has no comments, and keeps this order: the table; the schemas (select, id, create,
 update, filter, sort, list); the default sort; then the inferred types in the same order.
 
-**`src/db/schemas/entity.schema.ts`**
-
-```ts
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-zod';
-import { z } from 'zod';
-import { createFilterInputSchema, createListInputSchema, createSortInputSchema } from '../../helpers/list-input.helper.js';
-import { dateFilterInputSchema, idFilterInputSchema, stringFilterInputSchema } from '../../models/list-input.model.js';
-
-export const entity = pgTable('entity', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  description: text('description'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
-});
-
-export const selectEntitySchema = createSelectSchema(entity);
-
-export const entityIdInputSchema = z.object({
-  id: z.uuid('id must be a valid UUID')
-});
-
-export const createEntityInputSchema = createInsertSchema(entity, {
-  name: (schema) => schema.min(1, 'name is required').max(200),
-  description: (schema) => schema.max(2000).nullish()
-})
-  .pick({ name: true, description: true })
-  .strict();
-
-export const updateEntityInputSchema = createUpdateSchema(entity, {
-  name: (schema) => schema.min(1).max(200),
-  description: (schema) => schema.max(2000).nullish()
-})
-  .pick({ name: true, description: true })
-  .extend({ id: z.uuid('id must be a valid UUID') })
-  .strict()
-  .refine((input) => Object.keys(input).some((key) => key !== 'id'), { message: 'at least one field is required' });
-
-export const entityFilterInputSchema = createFilterInputSchema({
-  id: idFilterInputSchema,
-  name: stringFilterInputSchema,
-  description: stringFilterInputSchema,
-  createdAt: dateFilterInputSchema,
-  updatedAt: dateFilterInputSchema
-});
-
-export const entitySortInputSchema = createSortInputSchema(['name', 'createdAt', 'updatedAt']);
-
-export const listEntityInputSchema = createListInputSchema({
-  filter: entityFilterInputSchema,
-  sort: entitySortInputSchema
-});
-
-export const entityDefaultSort: EntitySortInput = { field: 'createdAt', direction: 'DESC' };
-
-export type Entity = z.infer<typeof selectEntitySchema>;
-export type CreateEntityInput = z.infer<typeof createEntityInputSchema>;
-export type UpdateEntityInput = z.infer<typeof updateEntityInputSchema>;
-export type EntityFilterInput = z.infer<typeof entityFilterInputSchema>;
-export type EntitySortInput = z.infer<typeof entitySortInputSchema>;
-export type EntitySortField = EntitySortInput['field'];
-export type ListEntityInput = z.infer<typeof listEntityInputSchema>;
-```
-
 **`src/db/schema.ts`**
 
 ```ts
 import { entity } from './schemas/entity.schema.js';
 
 /**
- * Every drizzle table, passed to `drizzle(pool, { schema })`. Each table is
- * defined with its zod inputs in `schemas/<resource>.schema.ts`; register new
- * tables here.
+ * Every drizzle table, passed to the engine's `drizzle(…, { schema })` call.
+ * Each table is defined with its zod inputs in `schemas/<resource>.schema.ts`;
+ * register new tables here.
  */
 export const schema = { entity };
-```
-
-**`src/daos/entity.dao.ts`**
-
-```ts
-import { count, eq } from 'drizzle-orm';
-import type { DbClient } from '../db/client.js';
-import {
-  type CreateEntityInput,
-  type Entity,
-  entity,
-  entityDefaultSort,
-  type ListEntityInput,
-  type UpdateEntityInput
-} from '../db/schemas/entity.schema.js';
-import { filterToSql, sortToSql, toPaginatedResult } from '../helpers/dao.helper.js';
-import type { Dao, IdInput, PaginatedResult } from '../models/dao.model.js';
-import { NotFoundError } from '../models/error.model.js';
-
-export class EntityDao implements Dao<Entity, ListEntityInput, CreateEntityInput, UpdateEntityInput> {
-  private readonly db: DbClient;
-
-  constructor(db: DbClient) {
-    this.db = db;
-  }
-
-  async get({ id }: IdInput): Promise<Entity | null> {
-    const [row] = await this.db.select().from(entity).where(eq(entity.id, id)).limit(1);
-    return row ?? null;
-  }
-
-  async list({ filter, sort = entityDefaultSort, page, pageSize }: ListEntityInput): Promise<PaginatedResult<Entity>> {
-    const where = filter && filterToSql(filter, entity);
-    const orderBy = sortToSql(sort, entity);
-
-    const items = await this.db
-      .select()
-      .from(entity)
-      .where(where)
-      .orderBy(...orderBy)
-      .limit(pageSize)
-      .offset((page - 1) * pageSize);
-    const [counted] = await this.db.select({ total: count() }).from(entity).where(where);
-    return toPaginatedResult(items, counted?.total ?? 0, { page, pageSize });
-  }
-
-  async create(input: CreateEntityInput): Promise<Entity> {
-    const [row] = await this.db.insert(entity).values(input).returning();
-    if (!row) {
-      throw new Error('Entity insert did not return a row');
-    }
-    return row;
-  }
-
-  async update({ id, ...attrs }: UpdateEntityInput): Promise<Entity> {
-    const [row] = await this.db
-      .update(entity)
-      .set({ ...attrs, updatedAt: new Date() })
-      .where(eq(entity.id, id))
-      .returning();
-    if (!row) {
-      throw new NotFoundError('Entity', id);
-    }
-    return row;
-  }
-
-  async delete({ id }: IdInput): Promise<void> {
-    const [row] = await this.db.delete(entity).where(eq(entity.id, id)).returning({ id: entity.id });
-    if (!row) {
-      throw new NotFoundError('Entity', id);
-    }
-  }
-}
-```
-
-**`tests/utils/pg-container.ts`**
-
-```ts
-import { fileURLToPath } from 'node:url';
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
-import type { DbClient } from '../../src/db/client.js';
-import { schema } from '../../src/db/schema.js';
-
-const migrationsFolder = fileURLToPath(new URL('../../db/migrations', import.meta.url));
-
-export interface TestDb {
-  readonly db: DbClient;
-  readonly stop: () => Promise<void>;
-}
-
-/**
- * Spin up a throwaway Postgres container, connect drizzle to it, and apply the
- * project's migrations with the drizzle migrator (same folder and __migrations__
- * table as drizzle.config.ts). DAO suites call this once in beforeAll and tear
- * it down in afterAll.
- */
-export async function startTestDb(): Promise<TestDb> {
-  const container: StartedPostgreSqlContainer = await new PostgreSqlContainer('postgres:17-alpine').start();
-  const pool = new Pool({ connectionString: container.getConnectionUri() });
-  const db = drizzle(pool, { schema });
-  await migrate(db, { migrationsFolder, migrationsTable: '__migrations__', migrationsSchema: 'public' });
-  return {
-    db,
-    stop: async () => {
-      await pool.end();
-      await container.stop();
-    }
-  };
-}
 ```
 
 ## Conventions
 
 ### The DAO layer
 
-| Layer        | File                              | Holds                                                                                       |
-| ------------ | --------------------------------- | ------------------------------------------------------------------------------------------- |
-| contract     | `models/dao.model.ts`             | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`; no zod, no ORM |
-| vocabulary   | `models/list-input.model.ts`      | the scalar filter inputs, `sortDirectionSchema`, the derived types                          |
-| builders     | `helpers/list-input.helper.ts`    | `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`, page limits    |
-| translation  | `helpers/dao.helper.ts`           | `filterToSql`, `sortToSql`, `toPaginatedResult`, `escapeLike`                               |
-| HTTP parsing | `helpers/query-parser.helper.ts`  | `normalizeQuery`                                                                            |
-| resource     | `db/schemas/<resource>.schema.ts` | the table, every input schema and type of one resource, its default sort                    |
-| registry     | `db/schema.ts`                    | `export const schema = { entity, … }`                                                       |
-| DAO          | `daos/<resource>.dao.ts`          | one class `implements Dao<…>`; queries only                                                 |
+| Layer        | File                              | Holds                                                                                           |
+| ------------ | --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| contract     | `models/dao.model.ts`             | `Dao<T, ListInput, CreateInput, UpdateInput>`, `PaginatedResult`, `IdInput`; no zod, no ORM     |
+| vocabulary   | `models/list-input.model.ts`      | the scalar filter inputs, `sortDirectionSchema`, the derived types                              |
+| builders     | `helpers/list-input.helper.ts`    | `createFilterInputSchema`, `createSortInputSchema`, `createListInputSchema`, page limits        |
+| translation  | `helpers/dao.helper.ts`           | `filterToSql`, `sortToSql`, `toPaginatedResult`, `escapeLike` (the engine's integration's code) |
+| HTTP parsing | `helpers/query-parser.helper.ts`  | `normalizeQuery`                                                                                |
+| resource     | `db/schemas/<resource>.schema.ts` | the table, every input schema and type of one resource, its default sort                        |
+| registry     | `db/schema.ts`                    | `export const schema = { entity, … }`                                                           |
+| DAO          | `daos/<resource>.dao.ts`          | one class `implements Dao<…>`; queries only                                                     |
 
-- **DAOs are the only code that touches the ORM**; they read no request, throw no HTTP errors, and hold no
-  configuration of their own. A missing row on update or delete is a `NotFoundError`.
-- **Every DAO `implements Dao<…>`** from `dao.model.ts`, the data access contract.
+- **The contract is `Dao<…>` in `dao.model.ts`**; row-input schemas end in `.strict()`; `sortToSql` is the one place the
+  tie-breaker is added.
 - **Resource schema files carry no comments and follow one order**: the table; the schemas (`select<Resource>Schema`,
   `<resource>IdInputSchema`, `create…`, `update…`, `<resource>FilterInputSchema`, `<resource>SortInputSchema`,
   `list<Resource>InputSchema`); `<resource>DefaultSort`; then the inferred types in the same order.
@@ -584,10 +314,7 @@ export async function startTestDb(): Promise<TestDb> {
 
 ### List queries
 
-- **Filter, sort and pagination follow the data access contract**, built per resource from the list-input builders;
-  schemas are strict, so an unknown field or operator is rejected.
 - **Fields are named after the table's columns**; the compiler rejects a field with no column.
-- **`sortToSql` appends the `id` tie-breaker**; each resource's schema file declares its default sort.
 - **Extending**: a filterable column is one line in the resource's filter schema, a sortable one one entry in its sort
   allowlist; a new operator is one line in its scalar schema plus one branch in `dao.helper.ts`.
 
@@ -599,13 +326,14 @@ export async function startTestDb(): Promise<TestDb> {
 
 ### Testing data access
 
-- **The translator and builders are unit tests**, with no database: SQL checked through what `PgDialect` renders, the
-  builders against an ad-hoc field config, a resource's schema test covering only its own columns and sort fields.
+- **The translator and builders are unit tests**, with no database: the translator through the SQL the engine's
+  dialect renders, the builders against an ad-hoc field config, a resource's schema test covering only its own columns
+  and sort fields.
 - **Three renders the translator's tests meet**: `PgDialect.sqlToQuery` returns `{ sql, params, typings }`, each nested
   `and` / `or` is parenthesised on its own, and an empty `not` renders as `false`.
-- **Each DAO has a suite against the real database** (`tests/db/<resource>.dao.test.ts`): one database per suite, rows cleared
-  before each test and seeded through `tests/utils/<resource>-seed.ts`; every method's happy path and edge cases, and
-  `list` for what only real rows show (pagination, sort with the tie-breaker, filters whose result depends on the engine,
-  `and` / `or` / `not`, LIKE metacharacters and hostile input treated as data).
+- **Each DAO has a suite against the real database**, in the stack's integration-test folder: one database per suite,
+  rows cleared before each test and seeded through a `<resource>-seed` helper; every method's happy path and edge
+  cases, and `list` for what only real rows show (pagination, sort with the tie-breaker, filters whose result depends on
+  the engine, `and` / `or` / `not`, LIKE metacharacters and hostile input treated as data).
 - **A new operator** gets a translator case and a builder rejection case; a DAO case only when its result depends on
   the engine.

@@ -17,10 +17,6 @@ runtime ─► workers/app.ts (Hono) ─► app.all('*') ─► RouterContextPro
 - **Hono is the server entry**, `workers/app.ts` on both targets: one `app.all('*', …)` handler builds a
   `RouterContextProvider` per request, sets the typed `appContext`, and hands `c.req.raw` to React Router's request
   handler. On Workers the runtime drives it; on Node, `server.ts` does.
-- **The context is typed and explicit.** `app/context.ts` exports `appContext = createContext<…>()` with everything
-  loaders and actions need (the Worker's bindings, or the server's configuration, later a database client); routes
-  read it with `context.get(appContext)`. React Router 8's middleware context is always on: no `AppLoadContext`, no
-  plain-object context.
 - **What goes on the context depends on the runtime**: on Workers the bindings and the execution context, built inside
   the handler, because bindings exist only per request; on Node the configuration, built once at module scope from
   `process.env`, because the process lives on.

@@ -57,6 +57,7 @@ API side, the controllers and `errorHandler` (the Express doc) produce it.
 - **One list params helper per resource writes the REST list format** for both the page URL and the request, so a deep
   link is the request.
 - **The web shows the API's error `message`** when it sent one, else the response's.
+- **A date filter is a day in the viewer's time zone**, sent as local midnight in ISO-8601.
 
 ## Verify it is wired
 

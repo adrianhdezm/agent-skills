@@ -23,8 +23,7 @@ for atomic work, and migrations applied by Wrangler locally and remotely.
 - **The binding exists only inside the request handler**, so anything that uses it is built there.
 - **Column types are SQLite's**: ids are text UUIDs set by the application, since SQLite cannot generate one; times are
   integer milliseconds, UTC by nature.
-- **Queries run one at a time**: there is no gain in running them concurrently. Work that must be atomic, and a list's
-  items plus its count, is one batch.
+- **Queries run one at a time**: there is no gain in running them concurrently. Work that must be atomic is one batch.
 - **Migrations live in `db/migrations/`** and are applied by Wrangler: `wrangler d1 migrations apply --local APP_DB`
   for the local database, `--remote` for Cloudflare's.
 - **Local data lives under `.wrangler/`**, git-ignored and safe to delete.
@@ -35,7 +34,6 @@ for atomic work, and migrations applied by Wrangler locally and remotely.
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wrangler.jsonc` | `"d1_databases": [{ "binding": "APP_DB", "database_name": "<name>", "database_id": "<id>", "migrations_table": "__migrations__", "migrations_dir": "db/migrations" }]` |
 | binding name     | `APP_DB`                                                                                                                                                               |
-| remote access    | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` in `.env`, listed in `.env.example`                                                           |
 | scripts          | `db:local:migrate` `wrangler d1 migrations apply --local APP_DB`                                                                                                       |
 
 ## Pitfalls
@@ -47,7 +45,7 @@ for atomic work, and migrations applied by Wrangler locally and remotely.
 
 ## Conventions
 
-- **D1 is bound as `APP_DB`**; after a binding change, `pnpm cf-typegen` and commit `worker-configuration.d.ts`.
+- **D1 is bound as `APP_DB`.**
 - **Ids are text UUIDs set by the application; times are integer milliseconds.**
 - **Queries run in sequence; atomic work is one batch.**
 - **Every migration is applied locally and remotely.**

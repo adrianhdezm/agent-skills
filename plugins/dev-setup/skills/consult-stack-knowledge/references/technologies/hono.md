@@ -24,9 +24,23 @@ Hono as the server entry: one app that whatever runs it drives through `app.fetc
 - **Tests reach the app through its real entry** where the runtime matters. `app.request()` is fine for a quick test of
   one route, but skips the entry point.
 
+## Required values
+
+| What         | Value                                                                              |
+| ------------ | ---------------------------------------------------------------------------------- |
+| dependencies | `hono`                                                                             |
+| middleware   | `hono/cors`; `hono/body-limit` with an `onError` that throws a 413 `HTTPException` |
+| error body   | the REST API concept's                                                             |
+
+## Pitfalls
+
+- **`c.req.json()` throws on a malformed body**: catch it in the handler and throw a 400 `HTTPException`, or it
+  surfaces as a 500.
+- **An error thrown from `body-limit`'s default answer** has no JSON body: give it an `onError` that throws a 413
+  `HTTPException`, so the error handler shapes it.
+
 ## Conventions
 
 - **The server entry is one Hono app**, the default export or `createApp(context)`; it never calls `serve()` itself.
 - **Errors go through one `onError`**: `HTTPException` messages are shown, anything else is a logged 500.
-- **Capabilities are wired by the server entry** (a database client, auth) and typed in the app's context. Where the
-  entry is the default-export app itself, no helper file sits next to it.
+- **Capabilities are wired by the server entry** (a database client, auth) and typed in the app's context.

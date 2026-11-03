@@ -40,7 +40,7 @@ over the whole stack. SAP Fiori Horizon components are opt-in.
 - [Angular + the API contract](../integrations/angular-api-contract.md)
 - [Docker Compose](../technologies/docker-compose.md)
 - [Postgres + Docker Compose](../integrations/postgres-docker-compose.md)
-- [Express + Docker Compose](../integrations/express-docker-compose.md)
+- [Node + Docker Compose](../integrations/node-docker-compose.md)
 - [Nginx + Docker Compose](../integrations/nginx-docker-compose.md)
 - [ESLint](../technologies/eslint.md)
 - [TypeScript + ESLint](../integrations/typescript-eslint.md)
@@ -93,7 +93,7 @@ my-app/
 The `db` service from [Postgres + Docker Compose](../integrations/postgres-docker-compose.md#required-values) with `<owner>` = `api`,
 then:
 
-- **`api`**: the Docker Compose doc's service, with `build: { context: ., dockerfile: api/Dockerfile }`, ports
+- **`api`**: Node + Docker Compose's service, with `build: { context: ., dockerfile: api/Dockerfile }`, ports
   `'${PORT:-3000}:3000'` and its `/health` healthcheck.
 - **`web`**: `build: { context: ., dockerfile: web/Dockerfile }`, ports `'${WEB_PORT:-4200}:80'` (Nginx listens on 80),
   depending on `api` being healthy.
@@ -129,7 +129,7 @@ never run esbuild), builds with `pnpm --filter api build`, and runs `node dist/s
 | API scripts           | `dev` `node --env-file=../.env --import=tsx --watch src/server.ts \| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname,req.headers,res.headers`; `build` `tsc -p tsconfig.app.json`; `typecheck` `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json`; `lint` `eslint .`; `test` `vitest run --project unit`; `test:integration` `vitest run --project db --project api`; `format`, `format:check` Prettier over `"**/*.{ts,js,mjs,json,md,yml,yaml}"`; `start` `node --env-file=../.env dist/server.js`; `db:generate`, `db:migrate` as the Drizzle doc says |
 | API configs           | the tsconfigs, `eslint.config.mjs` and `vitest.config.ts` under Reference code; `drizzle.config.ts` from Drizzle + Postgres; `.prettierignore` `node_modules`, `dist`, `db/migrations`, `db/data`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | web package           | the Angular app blueprint's values with `<name>` = `web`, minus `packageManager` and the CLI's `prettier` and `typescript` entries (the catalog has them); the browser calls the API directly and Nginx proxies nothing                                                                                                                                                                                                                                                                                                                                                                                        |
-| e2e                   | `@playwright/test@1`; its Reference code below; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| e2e                   | `@playwright/test@1`; its Reference code below; `playwright.config.ts` is in the web's `tsconfig.node.json`; the web `typecheck` adds `&& tsc -p e2e/tsconfig.json --noEmit`; Playwright loads `playwright.config.ts` and `e2e/**` as CommonJS, where `import.meta` throws: use `__dirname` there                                                                                                                                                                                                                                                                                                              |
 
 ## Reference code
 

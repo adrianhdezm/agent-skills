@@ -12,14 +12,15 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 
 ## Use it like this
 
-- **pnpm for everything**, never npm, npx or yarn: `pnpm add`, `pnpm exec` for a local binary, `pnpm dlx` for a one-off
-  CLI. pnpm 11 or newer (`allowBuilds` is a pnpm 11 setting).
+- **pnpm for everything**, never npm, npx or yarn, so there is one lockfile and one store: `pnpm add`, `pnpm exec` for
+  a local binary, `pnpm dlx` for a one-off CLI. pnpm 11 or newer (`allowBuilds` is a pnpm 11 setting).
 - **The tools create the manifest.** `pnpm init --bare --no-init-package-manager`, then `pnpm pkg set` for the fields
   and scripts, and `pnpm add` for the dependencies, so versions are current at scaffold time and nothing is
   hand-typed. A monorepo's package manifests are the exception: a framework's CLI writes one, and a package's
   `package.json` with only scripts is quicker to write than to set.
-- **ESM only**: `"type": "module"` in every package written here. A manifest a framework's CLI writes keeps the CLI's
-  module system; that framework's doc says what follows from it.
+- **ESM only**: `"type": "module"` in every package written here, since ESM is what the runtime runs as it is and what
+  bundlers emit. A manifest a framework's CLI writes keeps the CLI's module system; that framework's doc says what
+  follows from it.
 - **`private: true`** on every app and package nobody installs, so it is never published.
 - **`packageManager: "pnpm@<the local version>"`** at the root: Corepack reads it inside container builds, and it tells
   a teammate which pnpm wrote the lockfile.
@@ -32,21 +33,21 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
   with `pnpm --filter <name> <script>`.
 - **Versions are resolved by `pnpm add`, not copied from a table.** A package is held back only when a peer range
   forces it, with an exact version (`-E`) or a major (`@24`), and the doc for that tool says why.
-- **The same script names in every project**, so people and the `define-constraints` skill find them:
+- **The same script names in every project**, so people and tools find them:
   `dev`, `build`, `typecheck`, `lint`, `test`, `format`, `format:check`, plus `start` where something runs in
   production.
 
 ## Required values
 
-| Field            | Value                                                |
-| ---------------- | ---------------------------------------------------- |
-| `name`           | the directory's name, unless the user names it       |
-| `version`        | `0.1.0` (`0.0.0` for the packages inside a monorepo) |
-| `description`    | one sentence on what it does                         |
-| `private`        | `true`, a boolean                                    |
-| `type`           | `module`, except in a manifest a framework CLI wrote |
-| `engines.node`   | `>=24`, at the root                                  |
-| `packageManager` | `pnpm@$(pnpm --version)`, at the root only           |
+| Field            | Value                                                     |
+| ---------------- | --------------------------------------------------------- |
+| `name`           | the directory's name, unless the user names it            |
+| `version`        | `0.1.0`; `0.0.0` at a monorepo's root and in its packages |
+| `description`    | one sentence on what it does                              |
+| `private`        | `true`, a boolean                                         |
+| `type`           | `module`, except in a manifest a framework CLI wrote      |
+| `engines.node`   | the runtime doc's range, at the root                      |
+| `packageManager` | `pnpm@$(pnpm --version)`, at the root only                |
 
 ## Pitfalls
 
@@ -58,8 +59,8 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
 - **pnpm 12 fails `pnpm add` half done** (`ERR_PNPM_IGNORED_BUILDS`) when a new dependency has an unapproved install
   script; pnpm 11 fails every later `pnpm <script>` instead. Write `allowBuilds` first. A package that shows up in the
   error and is not in the stack's list is new: allow it if it must be built, set it to `false` otherwise, and say which.
-- **`pnpm up` and `pnpm down` are not your scripts.** `up` is pnpm's own update command and wins over a script of the
-  same name. Name such scripts with a prefix, as `compose:up` and `compose:down`.
+- **A script named after a pnpm command never runs** (`up` is pnpm's update, `deploy` its workspace deploy): prefix such
+  names.
 - **`pnpm add -E` pins only a full version.** `pnpm add -E typescript@6` writes a caret; resolve the version first
   (`pnpm view 'typescript@~6.0.0' version`) and pass it.
 - **`pnpm add --save-catalog` leaves an existing direct range alone.** Remove a package from a manifest before adding
@@ -75,4 +76,4 @@ The package manager: the manifest, pnpm's settings, workspaces, and how versions
   direct dependency of the package that uses it.
 - **Held-back versions stay held until their reason goes**, each where its own doc says why.
 - **Script names are the same everywhere**: `dev`, `build`, `typecheck`, `lint`, `test`, `format`, `format:check`.
-  Never name a script after a pnpm command (`up`, `update`, `add`, `install`).
+  Never name a script after a pnpm command (`up`, `update`, `add`, `install`, `deploy`).

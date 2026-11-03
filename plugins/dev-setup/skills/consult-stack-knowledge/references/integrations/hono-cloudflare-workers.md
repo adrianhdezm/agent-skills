@@ -20,7 +20,7 @@ workerd ─► main (the Hono app's default export) ─► app.fetch ─► hand
 - **Bindings are typed by the runtime**: `new Hono<{ Bindings: Env }>()`, where `Env` comes from `wrangler types`; `c.env`
   in handlers — from the first commit, even with no binding yet, so adding one changes no app code.
 - **Tests reach the app through its real entry**: `exports.default.fetch()` from `cloudflare:workers`, with bindings read
-  from `env` there. `app.request()` is fine for a quick test of one route, but skips the entry point.
+  from `env` there.
 
 ## Where it lives
 

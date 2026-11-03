@@ -9,8 +9,7 @@ aliases: [NgRx, @ngrx/]
 # NgRx
 
 NgRx 22 with `@ngrx/router-store`, used for **route-driven state**: each page route names a state, the URL enters the
-store one way, each page reads only its own slice and loads from its own lifecycle, and its requests end with it. The
-Angular full stack's `web/` uses it.
+store one way, each page reads only its own slice and loads from its own lifecycle, and its requests end with it.
 
 ## Use it like this
 
@@ -83,10 +82,11 @@ Angular full stack's `web/` uses it.
 
 ## Reference code
 
-Write these as given; they are the pattern every later resource copies. The detail page's slice is the list's shape
-with an `id: string | null` instead of the input, statuses `'idle' | 'loading' | 'loaded' | 'error'`, a `Load` /
-`Load Success` / `Load Failure` / `Leave` group, and one `load$` read ending on `Leave`; its reducer starts the slice
-over when the id changes. Its files close this section.
+The models, `EntityService` and the two helpers the effects import are the API client's files, defined where the app's
+API contract is wired. Write these as given; they are the pattern every later resource copies. The detail page's slice
+is the list's shape with an `id: string | null` instead of the input, statuses
+`'idle' | 'loading' | 'loaded' | 'error'`, a `Load` / `Load Success` / `Load Failure` / `Leave` group, and one `load$`
+read ending on `Leave`; its reducer starts the slice over when the id changes. Its files close this section.
 
 **`src/app/app.config.ts`**
 
@@ -874,10 +874,8 @@ Derive UI state that must follow the store with `linkedSignal`, not an `effect()
 | effects     | `store/<page>/<page>.effects.ts`                           | services, `Store`, `AppRouterActions.navigate`                 | call `Router` or `HttpClient`, react to `routerNavigatedAction`, let a read outlive `Leave` |
 | app router  | `store/app-router/`                                        | the `Router` (`navigate$` only)                                | keep the route in the store                                                                 |
 | app context | `store/app-context/`                                       | `environment`                                                  | change after start                                                                          |
-| service     | `services/<resource>.service.ts`                           | `HttpClient`, `selectApiBaseUrl`, helpers                      | be injected outside effects, keep state                                                     |
+| service     | `services/<resource>.service.ts`                           | the API client                                                 | be injected outside effects, keep state                                                     |
 
-- **Services write each request in full**: the URL and params inline, no private URL helper; the list reuses the shared
-  params helper so the page URL and the API request share one format.
 - **Naming**: action groups `<Page>Actions`, feature keys `<PAGE>_FEATURE_KEY`, selectors `select<Thing>`, effects
   `<what it does>$` (`stepBackPastLastPage$`, `navigateAfterSave$`).
 
@@ -894,5 +892,5 @@ Derive UI state that must follow the store with `linkedSignal`, not an `effect()
   destroy dispatches `Leave`. A page that derives something from a sequence of statuses (a `linkedSignal` or
   `computed` watching `status`) sees only the last of several `refreshState()` calls in one tick, since signals are
   read lazily: `await fixture.whenStable()` after each one.
-- **No spec for selectors that only pick a field**, nor for the route table: each page's end-to-end test opens its page
-  by URL, which proves the path, the state and the slice registered on the route.
+- **No spec for selectors that only pick a field**, nor for the route table: a test that opens the page by URL proves
+  the path, the state and the slice registered on the route.

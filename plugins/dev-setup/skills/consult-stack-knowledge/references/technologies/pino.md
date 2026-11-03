@@ -31,7 +31,7 @@ the platform runs each request, its console is the log.
 | dependencies    | `pino`                                                                                                                                                 |
 | devDependencies | `pino-pretty`                                                                                                                                          |
 | `dev` pipe      | `\| pino-pretty --colorize --singleLine --translateTime 'HH:MM:ss.l' --ignore pid,hostname`; a framework's request logger may add fields to `--ignore` |
-| tests           | `env: { LOG_LEVEL: 'silent' }` at the root of the test runner's config                                                                                 |
+| tests           | the test runner sets `LOG_LEVEL=silent` for every test (the stack's test config carries it)                                                            |
 | `.env.example`  | a commented `# LOG_LEVEL=debug`                                                                                                                        |
 
 ## Pitfalls

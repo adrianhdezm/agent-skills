@@ -10,8 +10,9 @@
 // architecture doc. How each technology is recognised in text is its doc's `aliases` (a word, or a literal such as
 // `@angular/`); a doc whose `family` names another technology may use that technology's vocabulary (the Cloudflare
 // products are bound to a Worker and created by Wrangler, NgRx exists only inside Angular). The shared toolchain
-// (`pnpm …`, `node …`, `tsconfig*.json`) is allowed inside code spans, as notation. Frontmatter is not prose and is
-// not checked. It prints each violation as file:line and exits non-zero when there is one.
+// (`pnpm …`, `node …`, `tsconfig*.json`) and the test runner (`vitest`) are allowed inside code spans, as notation.
+// Frontmatter is not prose and is not checked. It prints each violation as file:line and exits non-zero when there is
+// one.
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +34,7 @@ const names = Object.fromEntries(
     .map((t) => [t.id, (t.aliases ?? []).map(pattern)])
 );
 /** Allowed as notation inside a code span. */
-const notation = new Set(['pnpm', 'node', 'typescript']);
+const notation = new Set(['pnpm', 'node', 'typescript', 'vitest']);
 
 /** Whether `doc` may name `tech`: itself, or the family it belongs to. */
 function allowed(layer, doc, tech) {

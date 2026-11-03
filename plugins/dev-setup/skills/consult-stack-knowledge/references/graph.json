@@ -55,12 +55,14 @@
           "angular.json"
         ]
       },
+      "realises": [
+        "ui-components"
+      ],
       "aliases": [
         "Angular",
         "@angular/"
       ],
       "kind": "technology",
-      "realises": [],
       "owns": [
         {
           "holds": "`schematics[\"@schematics/angular:component\"].style: \"css\"`; `styles: [\"src/styles.css\"]`, `inlineStyleLanguage: \"css\"`; production budgets initial `2mb` / `4mb`, `anyComponentStyle` `4kB` / `8kB`; `development.fileReplacements` swapping `environment.ts` for `environment.development.ts`",
@@ -212,7 +214,7 @@
       "kind": "technology",
       "owns": [
         {
-          "holds": "`out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__', schema: 'public' }`",
+          "holds": "`out: './db/migrations'`, `schema: './<src>/db/schemas/*.schema.ts'` (`<src>` the app's source folder), `dialect` and `dbCredentials` from the engine's integration (throwing when the setting is unset), `migrations: { prefix: 'timestamp', table: '__migrations__' }`",
           "source": "Required values"
         }
       ]
@@ -256,11 +258,7 @@
       "kind": "technology",
       "owns": [
         {
-          "holds": "`module`/`moduleResolution` `\"NodeNext\"`, `lib`/`target` `\"ES2024\"`, `outDir: \"dist\"`, `rootDir: \"src\"`, `types: [\"node\"]`, `strict`, `skipLibCheck`, `sourceMap`, `composite: true` with its own `tsBuildInfoFile`, `include: [\"src/**/*.ts\"]` (which picks up `express.d.ts`)",
-          "source": "Required values"
-        },
-        {
-          "holds": "extends the app project with `composite: false`, `noEmit: true`, `rootDir: \".\"`, its own `tsBuildInfoFile`; includes the config files and `tests/**/*.ts`",
+          "holds": "`include: [\"src/**/*.ts\"]`, which picks up `src/express.d.ts`",
           "source": "Required values"
         }
       ]
@@ -393,7 +391,7 @@
       "realises": [],
       "owns": [
         {
-          "holds": "`>=24`, at the root",
+          "holds": "the runtime doc's range, at the root",
           "source": "Required values"
         }
       ]
@@ -409,18 +407,21 @@
       "detect": {
         "dependencies": [
           "pg"
+        ],
+        "fileContains": [
+          "docker-compose.yml=postgres:"
         ]
       },
       "aliases": [
         "Postgres",
-        "PostgresQL",
+        "PostgreSQL",
         "postgres:",
         "`pg`"
       ],
       "kind": "technology",
       "owns": [
         {
-          "holds": "`DB_PASSWORD=s3cr3t`, `DB_PORT=5432`, `DATABASE_URL=postgres://postgres:s3cr3t@localhost:5432/app`",
+          "holds": "`DATABASE_URL`, the full URL (user, password, host, port, `app`)",
           "source": "Required values"
         }
       ]
@@ -461,10 +462,6 @@
       "kind": "technology",
       "realises": [],
       "owns": [
-        {
-          "holds": "extends the runtime project, adds `tests` to `include`, its own `tsBuildInfoFile`",
-          "source": "Required values"
-        },
         {
           "holds": "includes `react-router.config.ts` and the build and test configs",
           "source": "Required values"
@@ -947,7 +944,7 @@
       "realises": [],
       "owns": [
         {
-          "holds": "`dialect: 'sqlite'`, the remote driver reading the `CLOUDFLARE_*` settings",
+          "holds": "`dialect: 'sqlite'`; `dbCredentials` from `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` in `.env`, listed in `.env.example`",
           "source": "Required values"
         }
       ],
@@ -965,7 +962,7 @@
       "realises": [],
       "owns": [
         {
-          "holds": "`dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset)",
+          "holds": "`dialect: 'postgresql'`, `dbCredentials.url` from `DATABASE_URL` (throws when unset), `migrations.schema: 'public'`",
           "source": "Required values"
         }
       ],
@@ -1006,19 +1003,6 @@
       "connects": [
         "eslint",
         "prettier"
-      ],
-      "kind": "integration",
-      "realises": [],
-      "owns": [],
-      "unless": []
-    },
-    "express-docker-compose": {
-      "id": "express-docker-compose",
-      "title": "Express + Docker Compose",
-      "file": "integrations/express-docker-compose.md",
-      "connects": [
-        "express",
-        "docker-compose"
       ],
       "kind": "integration",
       "realises": [],
@@ -1254,6 +1238,21 @@
       "realises": [],
       "owns": [],
       "unless": []
+    },
+    "node-docker-compose": {
+      "id": "node-docker-compose",
+      "title": "Node + Docker Compose",
+      "file": "integrations/node-docker-compose.md",
+      "connects": [
+        "node",
+        "docker-compose"
+      ],
+      "realises": [],
+      "unless": [
+        "react-router"
+      ],
+      "kind": "integration",
+      "owns": []
     },
     "node-typescript": {
       "id": "node-typescript",
@@ -2045,7 +2044,7 @@
         {
           "layer": "integrations",
           "kind": "integration",
-          "id": "express-docker-compose",
+          "id": "node-docker-compose",
           "optional": false
         },
         {
@@ -2261,6 +2260,12 @@
           "optional": false
         },
         {
+          "layer": "integrations",
+          "kind": "integration",
+          "id": "node-docker-compose",
+          "optional": false
+        },
+        {
           "layer": "technologies",
           "kind": "technology",
           "id": "eslint",
@@ -2337,7 +2342,7 @@
           "source": "Required values"
         },
         {
-          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and the Docker Compose doc's `migrate` and `api` services, in that order",
+          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and Node + Docker Compose's `migrate` and `api` services, in that order",
           "source": "Required values"
         }
       ]
@@ -2596,7 +2601,7 @@
         {
           "layer": "integrations",
           "kind": "integration",
-          "id": "express-docker-compose",
+          "id": "node-docker-compose",
           "optional": false
         },
         {
@@ -2676,7 +2681,7 @@
           "source": "Required values"
         },
         {
-          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and the Docker Compose doc's `migrate` and `api` services, in that order",
+          "holds": "one top-level `services:` holding Postgres + Docker Compose's `db` service (data at `./db/data`) and Node + Docker Compose's `migrate` and `api` services, in that order",
           "source": "Required values"
         }
       ]
@@ -3540,7 +3545,7 @@
       "cloudflare-workers-vitest",
       "postgres-docker-compose",
       "nginx-docker-compose",
-      "express-docker-compose",
+      "node-docker-compose",
       "react-router-docker-compose",
       "drizzle-postgres",
       "drizzle-d1",
